@@ -105,7 +105,7 @@ def press_buttons(driver, buttons_to_press=['accept']):
         except:
             ASCIIColors.warning(f"Couldn't press button {button_to_press} in this page.")
 
-def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None, wait_step_delay=1, buttons_to_press=['accept']):
+def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None, wait_step_delay=1, buttons_to_press=['accept'], max_size=None):
     if not PackageManager.check_package_installed("selenium"):
         PackageManager.install_package("selenium")
     if not PackageManager.check_package_installed("bs4"):
@@ -135,12 +135,13 @@ def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None
 
     
     if file_path:
-        # Save the text content as a text file
-        with open(file_path, 'w', encoding="utf-8") as file:
-            file.write(text_content)
-        if lollms_com:
-            lollms_com.info(f"Webpage content saved to {file_path}")
-    
+        if max_size and text_content< max_size:
+            # Save the text content as a text file
+            with open(file_path, 'w', encoding="utf-8") as file:
+                file.write(text_content)
+            if lollms_com:
+                lollms_com.info(f"Webpage content saved to {file_path}")
+            
     # Close the driver
     driver.quit()
 

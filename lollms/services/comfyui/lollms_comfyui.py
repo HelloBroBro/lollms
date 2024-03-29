@@ -90,9 +90,7 @@ def install_comfyui(lollms_app:LollmsApplication):
     if show_yes_no_dialog("warning!","Do you want to install all control net models?"):
         (comfyui_folder/"models/controlnet").mkdir(parents=True, exist_ok=True)        
         download_file("https://huggingface.co/thibaud/controlnet-openpose-sdxl-1.0/resolve/main/OpenPoseXL2.safetensors", comfyui_folder/"models/controlnet","OpenPoseXL2.safetensors")
-        download_file("https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/kohya_controllllite_xl_openpose_anime.safetensors", comfyui_folder/"models/controlnet","kohya_controllllite_xl_openpose_anime.safetensors")
-        download_file("https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/kohya_controllllite_xl_canny.safetensors", comfyui_folder/"models/controlnet","kohya_controllllite_xl_canny.safetensors")
-        download_file("https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/kohya_controllllite_xl_depth.safetensors", comfyui_folder/"models/controlnet","kohya_controllllite_xl_depth.safetensors")
+        download_file("https://huggingface.co/diffusers/controlnet-depth-sdxl-1.0/resolve/main/diffusion_pytorch_model.safetensors", comfyui_folder/"models/controlnet","DepthMap_XL.safetensors")
 
 
     if show_yes_no_dialog("warning!","Do you want to install all animation models?"):
