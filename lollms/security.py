@@ -21,7 +21,7 @@ def sanitize_path(path:str, allow_absolute_path:bool=False, error_text="Absolute
     # Regular expression to detect patterns like "...." and multiple forward slashes
     suspicious_patterns = re.compile(r'(\.\.+)|(/+/)')
     
-    if suspicious_patterns.search(path) or ((not allow_absolute_path) and Path(path).is_absolute()):
+    if suspicious_patterns.search(str(path)) or ((not allow_absolute_path) and Path(path).is_absolute()):
         ASCIIColors.error(error_text)
         raise HTTPException(status_code=400, detail=exception_text)
 

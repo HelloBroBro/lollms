@@ -135,7 +135,7 @@ def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None
 
     
     if file_path:
-        if max_size and text_content< max_size:
+        if max_size and len(text_content)< max_size:
             # Save the text content as a text file
             with open(file_path, 'w', encoding="utf-8") as file:
                 file.write(text_content)
