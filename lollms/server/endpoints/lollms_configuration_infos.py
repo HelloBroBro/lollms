@@ -14,7 +14,7 @@ import pkg_resources
 from lollms.server.elf_server import LOLLMSElfServer
 from lollms.binding import BindingBuilder, InstallOption
 from ascii_colors import ASCIIColors
-from lollms.utilities import load_config, trace_exception, gc
+from lollms.utilities import load_config, trace_exception, gc, show_yes_no_dialog
 from lollms.security import check_access
 from pathlib import Path
 from typing import List
@@ -53,11 +53,13 @@ async def update_setting(request: Request):
     """
     # Prevent all outsiders from sending something to this endpoint
     forbid_remote_access(lollmsElfServer)
+    
     try:
         config_data = (await request.json())
         check_access(lollmsElfServer, config_data["client_id"])
         if "config" in config_data.keys():
             config_data = config_data["config"]
+
         setting_name = config_data["setting_name"]
         setting_value = sanitize_path(config_data["setting_value"])
 
@@ -143,6 +145,9 @@ async def apply_settings(request: Request):
     """
     # Prevent all outsiders from sending something to this endpoint
     forbid_remote_access(lollmsElfServer)
+    if lollmsElfServer.config.turn_on_setting_update_validation:
+        if not show_yes_no_dialog("WARNING!!!","I received a settings modification request.\nIf this was not initiated by you, please select No. Are you the one who requested these settings changes?"):
+            return {"status":False,"error": "A settings modification attempt not validated by user"}
     try:
         config_data = await request.json()
         config = config_data["config"]
@@ -150,6 +155,16 @@ async def apply_settings(request: Request):
 
         try:
             for key in lollmsElfServer.config.config.keys():
+                if key=="host" and lollmsElfServer.config.config[key] in ["127.0.0.1","localhost"] and config.get(key, lollmsElfServer.config.config[key]) not in ["127.0.0.1","localhost"]:
+                    if not show_yes_no_dialog("WARNING!!!","You are changing the host value to something other than localhost, which can be dangerous if you do not trust the network you are on.\nIt is strongly advised not to do this as it may expose your computer to remote access, posing potential security risks.\nDo you want to ignore this message and proceed with changing the host value?"):
+                        config["host"]=lollmsElfServer.config.config[key]
+                if key=="turn_on_code_validation" and lollmsElfServer.config.config[key]==True and config.get(key, lollmsElfServer.config.config[key])==False:
+                    if not show_yes_no_dialog("WARNING!!!","I received a request to deactivate code execution validation.\nAre you sure?\nThis is a very bad idea, especially if you activate remote access.\nProceeding without proper validation can pose a serious security risk to your system and data.\nOnly proceed if you are absolutely certain of the security measures in place.\nDo you want to continue despite the warning?"):
+                        config["turn_on_code_validation"]=False
+                if key=="turn_on_setting_update_validation" and lollmsElfServer.config.config[key]==True and config.get(key, lollmsElfServer.config.config[key])==False:
+                    if not show_yes_no_dialog("WARNING!!!","I received a request to deactivate settings update validation.\nAre you sure?\nThis is a very risky decision, especially if you have enabled remote access.\nDisabling this validation can allow attackers to manipulate server settings and gain unauthorized access.\nProceed only if you are completely confident in the security of your system.\nDo you want to continue despite the warning?"):
+                        config["turn_on_setting_update_validation"]=False
+
                 lollmsElfServer.config.config[key] = config.get(key, lollmsElfServer.config.config[key])
             ASCIIColors.success("OK")
             lollmsElfServer.rebuild_personalities()

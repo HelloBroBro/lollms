@@ -16,6 +16,7 @@ from lollms.server.elf_server import LOLLMSElfServer
 from lollms.personality import AIPersonality, InstallOption
 from ascii_colors import ASCIIColors
 from lollms.utilities import load_config, trace_exception, gc
+from lollms.security import check_access
 from pathlib import Path
 from typing import List, Optional
 import psutil
@@ -29,6 +30,7 @@ class PersonalityListingInfos(BaseModel):
 
 
 class PersonalitySelectionInfos(BaseModel):
+    client_id:str
     id:int
 
 # ----------------------- Defining router and main class ------------------------------
@@ -177,6 +179,7 @@ def get_current_personality_path_infos():
 
 
 class PersonalityIn(BaseModel):
+    client_id:str
     name: str = Field(None)
 
 @router.post("/reinstall_personality")
@@ -187,6 +190,7 @@ async def reinstall_personality(personality_in: PersonalityIn):
     :param personality_in: PersonalityIn contans personality name.
     :return: A JSON response with the status of the operation.
     """
+    check_access(lollmsElfServer, personality_in.client_id)
     try:
         sanitize_path(personality_in.name)
         if not personality_in.name:
@@ -241,14 +245,13 @@ def remove_file(data:RemoveFileData):
         return {"state":False, "error":"No personality selected"}
     lollmsElfServer.personality.remove_file(data.name)
     return {"state":True}
-
-
-
-
 # ------------------------------------------- Mounting/Unmounting/Remounting ------------------------------------------------
 class PersonalityDataRequest(BaseModel):
+    client_id:str
     category:str
     name:str
+
+
 
 @router.post("/get_personality_config")
 def get_personality_config(data:PersonalityDataRequest):
@@ -271,14 +274,14 @@ def get_personality_config(data:PersonalityDataRequest):
         return {"status":False, "error":"Not found"}
     
 class PersonalityConfig(BaseModel):
+    client_id:str
     category:str
     name:str
     config:dict
 
-
-
 @router.post("/set_personality_config")
 def set_personality_config(data:PersonalityConfig):
+    check_access(lollmsElfServer, data.client_id)
     print("- Recovering personality config")
     category = sanitize_path(data.category)
     name = sanitize_path(data.name)
@@ -302,12 +305,14 @@ def set_personality_config(data:PersonalityConfig):
         return {"status":False, "error":"Not found"}
 
 class PersonalityMountingInfos(BaseModel):
+    client_id:str
     category:str
     folder:str
     language:Optional[str] = None
 
 @router.post("/mount_personality")
 def mount_personality(data:PersonalityMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     print("- Mounting personality")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
@@ -362,6 +367,7 @@ def mount_personality(data:PersonalityMountingInfos):
 
 @router.post("/remount_personality")
 def remount_personality(data:PersonalityMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
     language = data.language #.get('language', None)
@@ -414,6 +420,7 @@ def remount_personality(data:PersonalityMountingInfos):
 
 @router.post("/unmount_personality")
 def unmount_personality(data:PersonalityMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     print("- Unmounting personality ...")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
@@ -455,8 +462,12 @@ def unmount_personality(data:PersonalityMountingInfos):
         return {"status": False, "error":"Couldn't unmount personality"}
     
 
-@router.get("/unmount_all_personalities")
-def unmount_all_personalities():
+class AuthenticationInfos(BaseModel):
+    client_id:str
+
+@router.post("/unmount_all_personalities")
+def unmount_all_personalities(data:AuthenticationInfos):
+    check_access(lollmsElfServer, data.client_id)
     lollmsElfServer.config.personalities=["generic/lollms"]
     lollmsElfServer.mounted_personalities=[]
     lollmsElfServer.personality=None
@@ -470,6 +481,7 @@ def unmount_all_personalities():
 
 @router.post("/select_personality")
 def select_personality(data:PersonalitySelectionInfos):
+    check_access(lollmsElfServer, data.client_id)
     ASCIIColors.info("Selecting personality")
     id = data.id
     print(f"- Selecting active personality {id} ...",end="")
@@ -498,6 +510,7 @@ def select_personality(data:PersonalitySelectionInfos):
 
 @router.post("/get_personality_settings")
 def get_personality_settings(data:PersonalityMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     print("- Retreiving personality settings")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)

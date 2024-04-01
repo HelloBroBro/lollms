@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List
 import os
 import re
+import platform
 
 def check_access(lollmsElfServer, client_id):
     client = lollmsElfServer.session.get_client(client_id)
@@ -13,10 +14,34 @@ def check_access(lollmsElfServer, client_id):
         raise HTTPException(status_code=400, detail=f"Not accessible without id")
     return client
 
+def sanitize_code(code):
+    # Split the code by newline characters
+    lines = code.split('\n')
+    
+    # Keep only the first non-empty line and remove any potential malicious commands
+    sanitized_code = ""
+    
+    for line in lines:
+        if line.strip():  # Check if the line is not empty
+            # Check for potential malicious commands
+            if platform.system() == "Windows":
+                if "&" in line:
+                    line = line.split("&")[0]  # Keep only the first command before the ampersand
+                if "|" in line:
+                    line = line.split("|")[0]  # Keep only the first command before the pipe
+            else:  # Linux
+                if ";" in line:
+                    line = line.split(";")[0]  # Keep only the first command before the semicolon
+                if "|" in line:
+                    line = line.split("|")[0]  # Keep only the first command before the pipe
+            sanitized_code = line
+            break
+    
+    return sanitized_code
+
 def sanitize_path(path:str, allow_absolute_path:bool=False, error_text="Absolute database path detected", exception_text="Detected an attempt of path traversal. Are you kidding me?"):
     if path is None:
         return path
-    
     
     # Regular expression to detect patterns like "...." and multiple forward slashes
     suspicious_patterns = re.compile(r'(\.\.+)|(/+/)')

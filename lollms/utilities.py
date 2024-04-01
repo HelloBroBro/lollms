@@ -38,10 +38,13 @@ import git
 
 import mimetypes
 import subprocess
+from lollms.security import sanitize_code
 
 from functools import partial
 
 def create_conda_env(env_name, python_version):
+    env_name = sanitize_code(env_name)
+    python_version = sanitize_code(python_version)
     # Activate the Conda environment
     import platform
     if platform.system()=="Windows":
