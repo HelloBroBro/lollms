@@ -624,7 +624,7 @@ class LollmsApplication(LoLLMsCom):
 
             if self.personality.persona_data_vectorizer:
                 if documentation=="":
-                    documentation="\n!@>important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n!@>Documentation:\n"
+                    documentation="\n!@>Documentation:\n"
 
                 if self.config.data_vectorization_build_keys_words:
                     if discussion is None:

@@ -867,21 +867,44 @@ class AIPersonality:
         self.audio_samples = [f for f in self.audio_path.iterdir()]
 
         # Verify if the persona has a data folder
-        self.database_path = self.data_path / "db.json"
-        if self.database_path.exists():
-            ASCIIColors.info("Loading database ...",end="")
-            self.persona_data_vectorizer = TextVectorizer(
-                        "tfidf_vectorizer", # self.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
-                        model=self.model, #needed in case of using model_embedding
-                        save_db=True,
-                        database_path=self.database_path,
-                        data_visualization_method=VisualizationMethod.PCA,
-                        database_dict=None)
-            ASCIIColors.green("Ok")
+        if self.data_path.exists():
+            self.database_path = self.data_path / "db.json"
+            if self.database_path.exists():
+                ASCIIColors.info("Loading database ...",end="")
+                self.persona_data_vectorizer = TextVectorizer(
+                            "tfidf_vectorizer", # self.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
+                            model=self.model, #needed in case of using model_embedding
+                            save_db=True,
+                            database_path=self.database_path,
+                            data_visualization_method=VisualizationMethod.PCA,
+                            database_dict=None)
+                ASCIIColors.green("Ok")
+            else:
+                files = [f for f in self.data_path.iterdir() if f.suffix.lower() in [".txt", ".pdf", ".docx", ".pptx", ".md", ".py", ".c", ".cpp"] ]
+                if len(files)>0:
+                    dl = GenericDataLoader()
+                    self.persona_data_vectorizer = TextVectorizer(
+                                "tfidf_vectorizer", # self.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
+                                model=self.model, #needed in case of using model_embedding
+                                save_db=True,
+                                database_path=self.database_path,
+                                data_visualization_method=VisualizationMethod.PCA,
+                                database_dict=None)
+                    for f in files:
+                        text = dl.read_file(f)
+                        self.persona_data_vectorizer.add_document(f.name,text,self.config.data_vectorization_chunk_size, self.config.data_vectorization_overlap_size)
+                        # data_vectorization_chunk_size: 512 # chunk size
+                        # data_vectorization_overlap_size: 128 # overlap between chunks size
+                        # data_vectorization_nb_chunks: 2 # number of chunks to use
+                    self.persona_data_vectorizer.index()
+                    self.persona_data_vectorizer.save_db()
+                else:
+                    self.persona_data_vectorizer = None
+                    self._data = None
+    
         else:
             self.persona_data_vectorizer = None
             self._data = None
- 
 
         if self.run_scripts:
             # Search for any processor code
@@ -2465,7 +2488,7 @@ class APScript(StateMachine):
             callback(full_text, MSG_TYPE.MSG_TYPE_CHUNK)
 
 
-    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, msg_type:MSG_TYPE = MSG_TYPE.MSG_TYPE_FULL):
         """This sends full text to front end
 
         Args:
@@ -2476,7 +2499,7 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_FULL)
+            callback(full_text, msg_type)
 
     def full_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
         """This sends full text to front end (INVISIBLE to AI)
@@ -3035,7 +3058,7 @@ The AI should respond in this format using data from actions_list:
     <h3 style="margin-top: 0;">
         <a href="{link}" target="_blank" style="text-decoration: none; color: #333;">{title}</a>
     </h3>
-    <p style="color: #666;">{content}</p>
+    <pre style="white-space: pre-wrap;color: #666;">{content}</pre>
 </div>
 '''
         else:
@@ -3044,7 +3067,7 @@ The AI should respond in this format using data from actions_list:
     <h3 style="margin-top: 0;">
         <p style="text-decoration: none; color: #333;">{title}</p>
     </h3>
-    <p style="color: #666;">{content}</p>
+    <pre style="white-space: pre-wrap;color: #666;">{content}</pre>
 </div>
 '''
         

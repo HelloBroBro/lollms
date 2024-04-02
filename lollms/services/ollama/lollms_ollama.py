@@ -43,22 +43,43 @@ def verify_ollama(lollms_paths:LollmsPaths):
     
 
 def install_ollama(lollms_app:LollmsApplication):
-    if platform.system() == 'Windows':
-        root_path = "/mnt/"+"".join(str(Path(__file__).parent).replace("\\","/").split(":"))
-        if not os.path.exists('C:\\Windows\\System32\\wsl.exe'):
-            if not show_yes_no_dialog("warning!","No WSL is detected on your system. Do you want me to install it for you? Ollama won't be abble to work without wsl."):
-                return False
-            subprocess.run(['wsl', '--install', 'Ubuntu'])
-        subprocess.run(['wsl', 'bash', '-c', 'cp {} ~'.format( root_path + '/install_ollama.sh')])
-        subprocess.run(['wsl', 'bash', '-c', 'cp {} ~'.format( root_path + '/run_ollama.sh')])
-        subprocess.run(['wsl', 'bash', '~/install_ollama.sh'])
-    else:
-        root_path = str(Path(__file__).parent)
-        home = Path.home()
-        subprocess.run(['cp {} {}'.format( root_path + '/install_ollama.sh', home)])
-        subprocess.run(['cp {} {}'.format( root_path + '/run_ollama.sh', home)])
-        subprocess.run(['bash', f'{home}/install_ollama.sh'])
-    return True
+    import platform
+    import os
+    import shutil
+    import urllib.request
+    import subprocess
+    from pathlib import Path
+
+    if show_yes_no_dialog("Info","You have asked to download and install ollama on your system.\nOllama is a separate tool that servs a variaty of llms and lollms can use it as one of its bindings.\nIf you already have it installed, you can press No.\nYou can install it manually from their webite ollama.com.\nPress yes If you want to install it automatically now.\n"):
+        system = platform.system()
+        download_folder = Path.home() / "Downloads"
+
+        if system == "Windows":
+            url = "https://ollama.com/download/OllamaSetup.exe"
+            filename = "OllamaSetup.exe"
+            urllib.request.urlretrieve(url, download_folder / filename)
+            install_process = subprocess.Popen([str(download_folder / filename)])
+            install_process.wait()
+
+        elif system == "Linux":
+            url = "https://ollama.com/install.sh"
+            filename = "install.sh"
+            urllib.request.urlretrieve(url, download_folder / filename)
+            os.chmod(download_folder / filename, 0o755)
+            install_process = subprocess.Popen([str(download_folder / filename)])
+            install_process.wait()
+
+        elif system == "Darwin":
+            url = "https://ollama.com/download/Ollama-darwin.zip"
+            filename = "Ollama-darwin.zip"
+            urllib.request.urlretrieve(url, download_folder / filename)
+            shutil.unpack_archive(download_folder / filename, extract_dir=download_folder)
+            install_process = subprocess.Popen([str(download_folder / "Ollama-darwin" / "install.sh")])
+            install_process.wait()
+
+        else:
+            print("Unsupported operating system.")
+
 class Service:
     def __init__(
                     self, 
@@ -84,12 +105,6 @@ class Service:
 
         if not self.wait_for_service(1,False) and base_url is None:
             ASCIIColors.info("Loading ollama service")
-
-        # run ollama
-        if platform.system() == 'Windows':
-            subprocess.Popen(['wsl', 'bash', '~/run_ollama.sh'])
-        else:
-            subprocess.Popen(['bash', f'{Path.home()}/run_ollama.sh'])
 
         # Wait until the service is available at http://127.0.0.1:7860/
         if wait_for_service:
