@@ -2566,8 +2566,19 @@ class APScript(StateMachine):
         if not PackageManager.check_package_installed("autopep8"):
             PackageManager.install_package("autopep8")
         import autopep8
-        global_prompt = f"{prompt}\n!@>Code Builder:```python\n"
+        global_prompt = "\n".join([
+            f"{prompt}",
+            "!@>Extra conditions:",
+            "- The code must be complete, not just snippets, and should be put inside a single python markdown code.",
+            "-Preceive each python codeblock with a line using this syntax:",
+            "$$file_name|the file path relative to the root folder of the project$$",
+            "```python",
+            "# Placeholder. Here you need to put the code for the file",
+            "```",
+            "!@>Code Builder:"
+        ]) 
         code = self.fast_gen(global_prompt, max_title_length)
+        code_blocks = self.extract_code_blocks(code)
         try:
             back_quote_index = code.index("```")  # Remove trailing backticks
             if back_quote_index>=0:
@@ -2723,6 +2734,33 @@ The AI should respond in this format using data from actions_list:
         gen = fix_json(gen)
         return generate_actions(actions_list, gen)
 
+
+    def parse_directory_structure(self, structure):
+        paths = []
+        lines = structure.strip().split('\n')
+        stack = []
+        
+        for line in lines:
+            line = line.rstrip()
+            level = (len(line) - len(line.lstrip())) // 4
+            
+            if '/' in line or line.endswith(':'):
+                directory = line.strip(' ├─└│').rstrip(':').rstrip('/')
+                
+                while stack and level < stack[-1][0]:
+                    stack.pop()
+                
+                stack.append((level, directory))
+                path = '/'.join([dir for _, dir in stack]) + '/'
+                paths.append(path)
+            else:
+                file = line.strip(' ├─└│')
+                if stack:
+                    path = '/'.join([dir for _, dir in stack]) + '/' + file
+                    paths.append(path)
+            
+        return paths
+    
     def extract_code_blocks(self, text: str) -> List[dict]:
         remaining = text
         bloc_index = 0
@@ -2746,10 +2784,12 @@ The AI should respond in this format using data from actions_list:
         for index, code_delimiter_position in enumerate(indices):
             block_infos = {
                 'index':index,
+                'file_name': "",
                 'content': "",
                 'type':""
             }
             if is_start:
+
                 sub_text = text[code_delimiter_position+3:]
                 if len(sub_text)>0:
                     try:
@@ -2876,6 +2916,7 @@ The AI should respond in this format using data from actions_list:
                 return -1
         else:
             return -1
+        
     def multichoice_ranking(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="") -> int:
         """
         Ranks answers for a question from best to worst. returns a list of integers
@@ -2921,6 +2962,8 @@ The AI should respond in this format using data from actions_list:
         else:
             ASCIIColors.red("Model failed to rank inputs")
             return None
+
+
 
     def build_html5_integration(self, html, ifram_name="unnamed"):
         """

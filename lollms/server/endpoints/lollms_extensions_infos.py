@@ -19,12 +19,14 @@ from pathlib import Path
 from typing import List
 import psutil
 import yaml
-from lollms.security import sanitize_path
+from lollms.security import sanitize_path, check_access
 
 # --------------------- Parameter Classes -------------------------------
 class ExtensionInstallInfos(BaseModel):
+    client_id:str
     name:str
 class ExtensionMountingInfos(BaseModel):
+    client_id:str
     category:str
     folder:str
     language:str
@@ -123,6 +125,7 @@ def get_all_extensions():
 # --------------------- Installing -------------------------------
 @router.post("/install_extension")
 def install_extension(data: ExtensionInstallInfos):
+    check_access(lollmsElfServer, data.client_id)
     if not data.name:
         try:
             data.name=lollmsElfServer.config.extensions[-1]
@@ -148,6 +151,7 @@ def install_extension(data: ExtensionInstallInfos):
 
 @router.post("/reinstall_extension")
 def reinstall_extension(data: ExtensionInstallInfos):
+    check_access(lollmsElfServer, data.client_id)
     if not data.name:
         try:
             data.name=sanitize_path(lollmsElfServer.config.extensions[-1])
@@ -184,6 +188,7 @@ def reinstall_extension(data: ExtensionInstallInfos):
 
 @router.post("/mount_extension")
 def mount_extension(data:ExtensionMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     print("- Mounting extension")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
@@ -210,6 +215,7 @@ def mount_extension(data:ExtensionMountingInfos):
 
 @router.post("/remount_extension")
 def remount_extension(data:ExtensionMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     print("- Remounting extension")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
@@ -250,6 +256,7 @@ def remount_extension(data:ExtensionMountingInfos):
 
 @router.post("/unmount_extension")
 def unmount_extension(data:ExtensionMountingInfos):
+    check_access(lollmsElfServer, data.client_id)
     print("- Unmounting extension ...")
     category    = sanitize_path(data.category)
     name        = sanitize_path(data.folder)
