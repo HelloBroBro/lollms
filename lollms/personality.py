@@ -2196,18 +2196,18 @@ class APScript(StateMachine):
         
             return answer_list    
     def translate(self, text_chunk, output_language="french", max_generation_size=3000):
-        translated = self.remove_backticks(
-                            f"```markdown\n"+ self.fast_gen(
+        translated = self.fast_gen(
                                 "\n".join([
                                     f"!@>system:",
                                     f"Translate the following text to {output_language}.",
                                     "Be faithful to the original text and do not add or remove any information.",
+                                    "Respond only with the translated text.",
+                                    "Do not add comments, just the translation.",
                                     f"!@>text to translate:",
                                     f"{text_chunk}",
-                                    f"!@>Translation:",
-                                    f"```markdown\n"
+                                    f"!@>translation:",
                                     ]),
-                                    max_generation_size=max_generation_size))
+                                    max_generation_size=max_generation_size, callback=self.sink)
         return translated
 
     def summerize_text(self, text, summary_instruction="summerize", doc_name="chunk", answer_start="", max_generation_size=3000, max_summary_size=512, callback=None):
