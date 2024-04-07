@@ -1911,8 +1911,10 @@ class APScript(StateMachine):
             self.personality_config.config.save_config()
         else:
             self.load_personality_config()
+            
     def sink(self, s=None,i=None,d=None):
         pass
+
     def settings_updated(self):
         """
         To be implemented by the processor when the settings have changed
@@ -2068,7 +2070,8 @@ class APScript(StateMachine):
     def generate(self, prompt, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
         return self.personality.generate(prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
 
-    def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, context_details:dict=None):
+    from lollms.client_session import Client
+    def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, context_details:dict=None, client:Client=None):
         """
         This function generates code based on the given parameters.
 
@@ -3115,6 +3118,7 @@ The AI should respond in this format using data from actions_list:
 '''
         
     def build_a_folder_link(self, folder_path, link_text="Open Folder"):
+        folder_path = str(folder_path).replace('\\','/')
         return '''
 <a href="#" onclick="path=\''''+f'{folder_path}'+'''\';
 fetch('/open_folder', {
@@ -3136,10 +3140,11 @@ fetch('/open_folder', {
     console.error('Error:', error);
     });
 ">'''+f'''{link_text}</a>'''
-    def build_a_file_link(self, folder_path, link_text="Open Folder"):
+    def build_a_file_link(self, file_path, link_text="Open Folder"):
+        file_path = str(file_path).replace('\\','/')
         return '''
-<a href="#" onclick="path=\''''+f'{folder_path}'+'''\';
-fetch('/open_folder', {
+<a href="#" onclick="path=\''''+f'{file_path}'+'''\';
+fetch('/open_file', {
     method: 'POST',
     headers: {
         'Content-Type': 'application/json'

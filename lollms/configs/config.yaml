@@ -11,7 +11,7 @@ show_news_panel: True
 turn_on_setting_update_validation: True
 turn_on_code_execution: True
 turn_on_code_validation: True
-turn_on_open_file_validation: False
+turn_on_open_file_validation: True
 turn_on_send_file_validation: False
 
 force_accept_remote_access: false

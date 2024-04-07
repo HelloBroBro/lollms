@@ -179,7 +179,10 @@ def add_events(sio:socketio):
                         
                         if personality.processor is not None and personality.processor_cfg["custom_workflow"]:
                             ASCIIColors.info("processing...")
-                            generated_text = personality.processor.run_workflow(prompt, previous_discussion_text=personality.personality_conditioning+fd, callback=callback)
+                            context_details = {
+
+                            }
+                            generated_text = personality.processor.run_workflow(prompt, previous_discussion_text=personality.personality_conditioning+fd, callback=callback, context_details=context_details, client=client)
                         else:
                             ASCIIColors.info("generating...")
                             generated_text = personality.model.generate(

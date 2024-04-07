@@ -51,7 +51,7 @@ def add_events(sio:socketio):
 
     ALLOWED_EXTENSIONS = {
         'txt', 'csv', 'py', 'html', 'js', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'ico', 'svg', 'mp4', 'mp3', 'avi', 'mov',
-        'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf', 'js', "md"
+        'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf', 'js', "md", "json"
     }
 
     def allowed_file(filename):
