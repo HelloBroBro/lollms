@@ -282,19 +282,21 @@ class ModelResponse(BaseModel):
     """Usage statistics for the completion request."""
 
 
-class GenerationRequest(BaseModel):
+class ChatGenerationRequest(BaseModel):
     model: str = ""
     messages: List[Message]
-    max_tokens: Optional[int] = 1024
+    max_tokens: Optional[int] = -1
     stream: Optional[bool] = False
     temperature: Optional[float] = 0.1
 
 
 @router.post("/v1/chat/completions")
-async def v1_chat_completions(request: GenerationRequest):
+async def v1_chat_completions(request: ChatGenerationRequest):
     try:
         reception_manager=RECEPTION_MANAGER()
         messages = request.messages
+        max_tokens = request.max_tokens if request.max_tokens>0 else elf_server.config.max_n_predict
+        temperature = request.temperature if  elf_server.config.temperature else elf_server.config.temperature
         prompt = ""
         roles= False
         for message in messages:
@@ -305,7 +307,7 @@ async def v1_chat_completions(request: GenerationRequest):
                 prompt += f"{message.content}\n"
         if roles:
             prompt += "!@>assistant:"
-        n_predict = request.max_tokens if request.max_tokens>0 else 1024
+        n_predict = max_tokens if max_tokens>0 else 1024
         stream = request.stream
         prompt_tokens = len(elf_server.binding.tokenize(prompt))
         if elf_server.binding is not None:
@@ -346,7 +348,7 @@ async def v1_chat_completions(request: GenerationRequest):
                                                 prompt, 
                                                 n_predict, 
                                                 callback=callback, 
-                                                temperature=request.temperature or elf_server.config.temperature
+                                                temperature=temperature
                                             )
                         reception_manager.done = True
                     thread = threading.Thread(target=chunks_builder)
@@ -392,7 +394,7 @@ async def v1_chat_completions(request: GenerationRequest):
                                                 prompt, 
                                                 n_predict, 
                                                 callback=callback,
-                                                temperature=request.temperature or elf_server.config.temperature
+                                                temperature=temperature
                                             )
                 completion_tokens = len(elf_server.binding.tokenize(reception_manager.reception_buffer))
                 return ModelResponse(id = _generate_id(), choices = [Choices(message=Message(role="assistant", content=reception_manager.reception_buffer), finish_reason="stop", index=0)], created=int(time.time()), model=request.model,usage=Usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens))
@@ -404,20 +406,31 @@ async def v1_chat_completions(request: GenerationRequest):
         return {"status":False,"error":str(ex)}
 
 
+class CompletionGenerationRequest(BaseModel):
+    model: Optional[str] = ""
+    prompt: str = ""
+    max_tokens: Optional[int] = -1
+    stream: Optional[bool] = False
+    temperature: Optional[float] = -1
+
+
 @router.post("/v1/completions")
-async def v1_completion(request: Request):
+async def v1_completion(request: CompletionGenerationRequest):
     """
     Executes Python code and returns the output.
 
     :param request: The HTTP request object.
     :return: A JSON response with the status of the operation.
     """
-
     try:
-        data = (await request.json())
-        text = data.get("prompt")
-        n_predict = data.get("max_tokens")
-        stream = data.get("stream")
+        text = request.prompt
+        n_predict = request.max_tokens if request.max_tokens>=0 else elf_server.config.max_n_predict
+        temperature = request.temperature if request.temperature>=0 else elf_server.config.temperature
+        # top_k = request.top_k if request.top_k>=0 else elf_server.config.top_k
+        # top_p = request.top_p if request.top_p>=0 else elf_server.config.top_p
+        # repeat_last_n = request.repeat_last_n if request.repeat_last_n>=0 else elf_server.config.repeat_last_n
+        # repeat_penalty = request.repeat_penalty if request.repeat_penalty>=0 else elf_server.config.repeat_penalty
+        stream = request.stream
         
         if elf_server.binding is not None:
             if stream:
@@ -438,8 +451,8 @@ async def v1_completion(request: Request):
                                                 text, 
                                                 n_predict, 
                                                 callback=callback, 
-                                                temperature=data.get("temperature", elf_server.config.temperature)
-                                            ))
+                                                temperature=temperature,
+                            ))
                 
                 return StreamingResponse(generate_chunks())
             else:

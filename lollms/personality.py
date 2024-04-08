@@ -1064,12 +1064,11 @@ class AIPersonality:
                     self.vectorizer.index()
                     if callback is not None:
                         callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
-                    self.HideBlockingMessage("Adding file to vector store.\nPlease stand by")
+                    self.HideBlockingMessage(client.client_id)
                     return True
             except Exception as e:
                 trace_exception(e)
-                self.HideBlockingMessage("Adding file to vector store.\nPlease stand by")
-                self.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {GenericDataLoader.get_supported_file_types()}")
+                self.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {GenericDataLoader.get_supported_file_types()}",client_id=client.client_id)
                 return False
     def save_personality(self, package_path=None):
         """

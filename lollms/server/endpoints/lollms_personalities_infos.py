@@ -234,6 +234,7 @@ def clear_personality_files_list():
     lollmsElfServer.personality.remove_all_files()
     return {"state":True}
 class RemoveFileData(BaseModel):
+    client_id:str
     name:str
     
 @router.post("/remove_file")
@@ -241,6 +242,8 @@ def remove_file(data:RemoveFileData):
     """
     Removes a file form the personality files
     """
+    check_access(lollmsElfServer, data.client_id)
+    
     if lollmsElfServer.personality is None:
         return {"state":False, "error":"No personality selected"}
     lollmsElfServer.personality.remove_file(data.name)
