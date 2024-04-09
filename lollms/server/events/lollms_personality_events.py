@@ -24,7 +24,7 @@ from functools import partial
 from datetime import datetime
 import threading
 import os
-
+from lollms.security import check_access
 router = APIRouter()
 lollmsElfServer = LOLLMSElfServer.get_instance()
 
@@ -117,7 +117,7 @@ def add_events(sio:socketio):
     @sio.on('execute_command')
     def execute_command(sid, data):
         client_id = sid
-        client = lollmsElfServer.session.get_client(client_id)
+        client = check_access(lollmsElfServer, client_id)
 
         lollmsElfServer.cancel_gen = False
         client.generated_text=""
@@ -153,7 +153,7 @@ def add_events(sio:socketio):
                 if lollmsElfServer.personality.processor is not None:
                     lollmsElfServer.start_time = datetime.now()
                     lollmsElfServer.personality.processor.callback = partial(lollmsElfServer.process_chunk, client_id=client_id)
-                    lollmsElfServer.personality.processor.execute_command(command, parameters)
+                    lollmsElfServer.personality.processor.execute_command(command, parameters, client)
                 else:
                     lollmsElfServer.warning("Non scripted personalities do not support commands",client_id=client_id)
                 lollmsElfServer.close_message(client_id)
