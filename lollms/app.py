@@ -743,6 +743,12 @@ class LollmsApplication(LoLLMsCom):
 
         # Raise an error if the available space is 0 or less
         if available_space<1:
+            ASCIIColors.red(f"available_space:{available_space}")
+            ASCIIColors.red(f"n_doc_tk:{n_doc_tk}")
+            ASCIIColors.red(f"n_history_tk:{n_history_tk}")
+            ASCIIColors.red(f"n_isearch_tk:{n_isearch_tk}")
+            
+            ASCIIColors.red(f"self.config.max_n_predict:{self.config.max_n_predict}")
             self.error(f"Not enough space in context!!\nVerify that your vectorization settings for documents or internet search are realistic compared to your context size.\nYou are {available_space} short of context!")
             raise Exception("Not enough space in context!!")
 
