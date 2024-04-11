@@ -880,7 +880,7 @@ class AIPersonality:
                             database_dict=None)
                 ASCIIColors.green("Ok")
             else:
-                files = [f for f in self.data_path.iterdir() if f.suffix.lower() in [".txt", ".pdf", ".docx", ".pptx", ".md", ".py", ".c", ".cpp"] ]
+                files = [f for f in self.data_path.iterdir() if f.suffix.lower() in ['.sh', '.json', '.sym', '.log', '.snippet', '.se', '.yml', '.snippets', '.lua', '.pdf', '.md', '.docx', '.yaml', '.inc', '.txt', '.ini', '.pas', '.pptx', '.map', '.php', '.xlsx', '.rtf', '.hpp', '.h', '.asm', '.xml', '.hh', '.sql', '.java', '.c', '.html', '.inf', '.rb', '.py', '.cs', '.js', '.bat', '.css', '.s', '.cpp', '.csv'] ]
                 if len(files)>0:
                     dl = GenericDataLoader()
                     self.persona_data_vectorizer = TextVectorizer(
@@ -1012,6 +1012,7 @@ class AIPersonality:
                             self.new_message("",MSG_TYPE.MSG_TYPE_FULL)
                             output = f'<img src="{pth}" width="800">\n\n'
                             self.full(output)
+                            self.app.close_message(client.client_id if client is not None else 0)
 
                         if self.model.binding_type not in [BindingType.TEXT_IMAGE, BindingType.TEXT_IMAGE_VIDEO]:
                             # self.ShowBlockingMessage("Understanding image (please wait)")
@@ -1022,6 +1023,7 @@ class AIPersonality:
                             output += "## image description :\n"+ self.model.interrogate_blip([img])[0]
                             # output += "## image description :\n"+ self.model.qna_blip([img],"q:Describe this photo with as much details as possible.\na:")[0]
                             self.full(output)
+                            self.app.close_message(client.client_id if client is not None else 0)
                             self.HideBlockingMessage("Understanding image (please wait)")
                             if self.config.debug:
                                 ASCIIColors.yellow(output)
@@ -2200,7 +2202,7 @@ class APScript(StateMachine):
                                     f"Translate the following text to {output_language}.",
                                     "Be faithful to the original text and do not add or remove any information.",
                                     "Respond only with the translated text.",
-                                    "Do not add comments, just the translation.",
+                                    "Do not add comments or explanations.",
                                     f"!@>text to translate:",
                                     f"{text_chunk}",
                                     f"!@>translation:",
