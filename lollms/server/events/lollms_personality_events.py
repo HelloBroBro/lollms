@@ -1,8 +1,8 @@
 """
 project: lollms
-file: lollms_files_events.py 
+file: lollms_files_events.py
 author: ParisNeo
-description: 
+description:
     Events related to socket io personality events
 
 """
@@ -31,7 +31,7 @@ lollmsElfServer = LOLLMSElfServer.get_instance()
 
 # ----------------------------------- events -----------------------------------------
 def add_events(sio:socketio):
-            
+
     @sio.on('get_personality_files')
     def get_personality_files(sid, data):
         client_id = sid
@@ -39,19 +39,23 @@ def add_events(sio:socketio):
 
         client.generated_text       = ""
         client.cancel_generation    = False
-        
+
         try:
             lollmsElfServer.personality.setCallback(partial(lollmsElfServer.process_chunk,client_id = client_id))
         except Exception as ex:
-            trace_exception(ex)        
+            trace_exception(ex)
 
     import os
     import imghdr
     import mimetypes
 
     ALLOWED_EXTENSIONS = {
-        'txt', 'csv', 'py', 'html', 'js', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'ico', 'svg', 'mp4', 'mp3', 'avi', 'mov',
-        'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'pdf', 'js', "md", "json"
+        'asm', 'avi', 'bat', 'bmp', 'c', 'cpp', 'cs', 'csproj', 'css', 'csv', 'doc', 'docx',
+        'gif', 'h', 'hh', 'hpp', 'html', 'ico', 'inc', 'ini', 'java', 'jpeg', 'jpg',
+        'js', 'json', 'log', 'lua', 'map', 'md', 'mov', 'mp3', 'mp4', 'pas', 'pdf',
+        'php', 'png', 'ppt', 'pptx', 'ps1', 'py', 'rb', 'rtf', 's', 'se', 'sh', 'sln', 'snippet',
+        'snippets', 'sql', 'svg', 'sym', 'tif', 'tiff', 'ts', 'txt', 'wav', 'webp',
+        'xlsx', 'xls', 'xml', 'yaml', 'yml'
     }
 
     def allowed_file(filename):
@@ -101,7 +105,7 @@ def add_events(sio:socketio):
         if is_last_chunk:
             lollmsElfServer.success('File received and saved successfully')
             lollmsElfServer.ShowBlockingMessage(f"File received {file_path.name}.\nProcessing ...")
-            
+
             if lollmsElfServer.personality.processor:
                 result = lollmsElfServer.personality.processor.add_file(file_path, client, partial(lollmsElfServer.process_chunk, client_id=client_id))
             else:

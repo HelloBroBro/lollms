@@ -3,7 +3,7 @@
 # File          : personality.py
 # Author        : ParisNeo with the help of the community
 # license       : Apache 2.0
-# Description   : 
+# Description   :
 # This is an interface class for lollms personalities.
 ######
 from fastapi import Request
@@ -67,7 +67,7 @@ def is_package_installed(package_name):
         return True
     except pkg_resources.DistributionNotFound:
         return False
-    
+
 
 def install_package(package_name):
     try:
@@ -76,10 +76,10 @@ def install_package(package_name):
         print(f"{package_name} is already installed.")
     except ImportError:
         print(f"{package_name} is not installed. Installing...")
-        
+
         # Install the package using pip
         subprocess.check_call(["pip", "install", package_name])
-        
+
         print(f"{package_name} has been successfully installed.")
 
 
@@ -93,15 +93,15 @@ def fix_json(json_text):
         trace_exception(e)
 class AIPersonality:
 
-    # Extra     
+    # Extra
     def __init__(
-                    self, 
-                    personality_package_path: str|Path, 
-                    lollms_paths:LollmsPaths, 
+                    self,
+                    personality_package_path: str|Path,
+                    lollms_paths:LollmsPaths,
                     config:LOLLMSConfig,
                     model:LLMBinding=None,
                     app:LoLLMsCom=None,
-                    run_scripts=True, 
+                    run_scripts=True,
                     selected_language=None,
                     is_relative_path=True,
                     installation_option:InstallOption=InstallOption.INSTALL_IF_NECESSARY,
@@ -178,7 +178,7 @@ class AIPersonality:
         self._disclaimer: str = ""
         self._help: str = ""
         self._commands: list = []
-        
+
         # Default model parameters
         self._model_temperature: float = 0.1 # higher: more creative, lower more deterministic
         self._model_n_predicts: int = 2048 # higher: generates many words, lower generates
@@ -186,7 +186,7 @@ class AIPersonality:
         self._model_top_p: float = 0.95
         self._model_repeat_penalty: float = 1.3
         self._model_repeat_last_n: int = 40
-        
+
         self._processor_cfg: dict = {}
 
         self._logo: Optional[Image.Image] = None
@@ -237,7 +237,7 @@ class AIPersonality:
         if self.app:
             return self.app.ShowBlockingMessage(content=content, client_id=client_id, verbose=verbose)
         ASCIIColors.white(content)
-        
+
     def HideBlockingMessage(self, client_id=None, verbose:bool=True):
         if self.app:
             return self.app.HideBlockingMessage(client_id=client_id, verbose=verbose)
@@ -257,17 +257,17 @@ class AIPersonality:
         if self.app:
             return self.app.success(content=content, duration=duration, client_id=client_id, verbose=verbose)
         ASCIIColors.success(content)
-        
+
     def error(self, content, duration:int=4, client_id=None, verbose:bool=True):
         if self.app:
             return self.app.error(content=content, duration=duration, client_id=client_id, verbose=verbose)
         ASCIIColors.error(content)
-        
-    def notify( self,                        
-                content, 
-                notification_type:NotificationType=NotificationType.NOTIF_SUCCESS, 
-                duration:int=4, 
-                client_id=None, 
+
+    def notify( self,
+                content,
+                notification_type:NotificationType=NotificationType.NOTIF_SUCCESS,
+                duration:int=4,
+                client_id=None,
                 display_type:NotificationDisplayType=NotificationDisplayType.TOAST,
                 verbose=True
             ):
@@ -343,7 +343,7 @@ class AIPersonality:
 
         Returns:
             str: The built prompt.
-        """        
+        """
         if context_size is None:
             context_size = self.config.ctx_size
         if minimum_spare_context_size is None:
@@ -383,7 +383,7 @@ class AIPersonality:
         f' </div>',
         f' </details>\n'
         ])
-    
+
     def internet_search_with_vectorization(self, query, quick_search:bool=False):
         """
         Do internet search and return the result
@@ -391,11 +391,11 @@ class AIPersonality:
         from lollms.internet import internet_search_with_vectorization
         return internet_search_with_vectorization(
                                                     query,
-                                                    internet_nb_search_pages=self.config.internet_nb_search_pages, 
+                                                    internet_nb_search_pages=self.config.internet_nb_search_pages,
                                                     internet_vectorization_chunk_size=self.config.internet_vectorization_chunk_size,
-                                                    internet_vectorization_overlap_size=self.config.internet_vectorization_overlap_size, 
+                                                    internet_vectorization_overlap_size=self.config.internet_vectorization_overlap_size,
                                                     internet_vectorization_nb_chunks=self.config.internet_vectorization_nb_chunks,
-                                                    model = self.model, 
+                                                    model = self.model,
                                                     quick_search=quick_search
                                                     )
 
@@ -418,13 +418,13 @@ class AIPersonality:
     def multichoice_question(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="") -> int:
         """
         Interprets a multi-choice question from a users response. This function expects only one choice as true. All other choices are considered false. If none are correct, returns -1.
-        
+
         Args:
             question (str): The multi-choice question posed by the user.
             possible_ansers (List[Any]): A list containing all valid options for the chosen value. For each item in the list, either 'True', 'False', None or another callable should be passed which will serve as the truth test function when checking against the actual user input.
             max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
             conditionning: An optional system message to put at the beginning of the prompt
-            
+
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
@@ -444,11 +444,11 @@ class AIPersonality:
         elements += [
                 f"!@>question: {question}",
                 "!@>possible answers:",
-                f"{choices}",            
+                f"{choices}",
         ]
         elements += ["!@>answer:"]
         prompt = self.build_prompt(elements)
-            
+
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50, callback=self.sink).strip().replace("</s>","").replace("<s>","")
         selection = gen.strip().split()[0].replace(",","").replace(".","")
         self.print_prompt("Multi choice selection",prompt+gen)
@@ -461,13 +461,13 @@ class AIPersonality:
     def multichoice_ranking(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="") -> int:
         """
         Ranks answers for a question from best to worst. returns a list of integers
-        
+
         Args:
             question (str): The multi-choice question posed by the user.
             possible_ansers (List[Any]): A list containing all valid options for the chosen value. For each item in the list, either 'True', 'False', None or another callable should be passed which will serve as the truth test function when checking against the actual user input.
             max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
             conditionning: An optional system message to put at the beginning of the prompt
-            
+
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
@@ -490,7 +490,7 @@ class AIPersonality:
 
         elements += ["!@>answer:"]
         prompt = self.build_prompt(elements)
-            
+
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50).strip().replace("</s>","").replace("<s>","")
         self.print_prompt("Multi choice ranking",prompt+gen)
         if gen.index("]")>=0:
@@ -540,7 +540,7 @@ class AIPersonality:
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -553,24 +553,24 @@ class AIPersonality:
         ASCIIColors.red(title, end="")
         ASCIIColors.red(" *-*-*-*-*-*-*-*")
         ASCIIColors.yellow(prompt)
-        ASCIIColors.red(" *-*-*-*-*-*-*-*")  
+        ASCIIColors.red(" *-*-*-*-*-*-*-*")
 
 
 
     def fast_gen_with_images(self, prompt: str, images:list, max_generation_size: int=None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool  = False, callback=None, show_progress=False) -> str:
         """
         Fast way to generate text from text and images
-        
+
         This method takes in a prompt, maximum generation size, optional placeholders, sacrifice list, and debug flag.
         It reshapes the context before performing text generation by adjusting and cropping the number of tokens.
-        
+
         Parameters:
         - prompt (str): The input prompt for text generation.
         - max_generation_size (int): The maximum number of tokens to generate.
         - placeholders (dict, optional): A dictionary of placeholders to be replaced in the prompt. Defaults to an empty dictionary.
         - sacrifice (list, optional): A list of placeholders to sacrifice if the window is bigger than the context size minus the number of tokens to generate. Defaults to ["previous_discussion"].
         - debug (bool, optional): Flag to enable/disable debug mode. Defaults to False.
-        
+
         Returns:
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
@@ -588,15 +588,15 @@ class AIPersonality:
         ])
         if debug == False:
             debug = self.config.debug
-            
+
         if max_generation_size is None:
             prompt_size = self.model.tokenize(prompt)
             max_generation_size = self.model.config.ctx_size - len(prompt_size)
 
         pr = PromptReshaper(prompt)
-        prompt = pr.build(placeholders, 
-                        self.model.tokenize, 
-                        self.model.detokenize, 
+        prompt = pr.build(placeholders,
+                        self.model.tokenize,
+                        self.model.detokenize,
                         self.model.config.ctx_size - max_generation_size,
                         sacrifice
                         )
@@ -611,37 +611,37 @@ class AIPersonality:
             pass
         if debug:
             self.print_prompt("prompt", prompt+gen)
-           
+
         return gen
 
     def fast_gen(self, prompt: str, max_generation_size: int=None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool  = False, callback=None, show_progress=False) -> str:
         """
         Fast way to generate code
-        
+
         This method takes in a prompt, maximum generation size, optional placeholders, sacrifice list, and debug flag.
         It reshapes the context before performing text generation by adjusting and cropping the number of tokens.
-        
+
         Parameters:
         - prompt (str): The input prompt for text generation.
         - max_generation_size (int): The maximum number of tokens to generate.
         - placeholders (dict, optional): A dictionary of placeholders to be replaced in the prompt. Defaults to an empty dictionary.
         - sacrifice (list, optional): A list of placeholders to sacrifice if the window is bigger than the context size minus the number of tokens to generate. Defaults to ["previous_discussion"].
         - debug (bool, optional): Flag to enable/disable debug mode. Defaults to False.
-        
+
         Returns:
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
         if debug == False:
             debug = self.config.debug
-            
+
         if max_generation_size is None:
             prompt_size = self.model.tokenize(prompt)
             max_generation_size = self.model.config.ctx_size - len(prompt_size)
 
         pr = PromptReshaper(prompt)
-        prompt = pr.build(placeholders, 
-                        self.model.tokenize, 
-                        self.model.detokenize, 
+        prompt = pr.build(placeholders,
+                        self.model.tokenize,
+                        self.model.detokenize,
                         self.model.config.ctx_size - max_generation_size,
                         sacrifice
                         )
@@ -652,7 +652,7 @@ class AIPersonality:
         gen = self.generate(prompt, max_generation_size, callback=callback, show_progress=show_progress).strip().replace("</s>", "").replace("<s>", "")
         if debug:
             self.print_prompt("prompt", prompt+gen)
-           
+
         return gen
 
     def remove_text_from_string(self, string, text_to_find):
@@ -690,12 +690,12 @@ class AIPersonality:
             if dt==0:
                 dt=1
             spd = self.nb_received_tokens/dt
-            ASCIIColors.green(f"Received {self.nb_received_tokens} tokens (speed: {spd:.2f}t/s)              ",end="\r",flush=True) 
+            ASCIIColors.green(f"Received {self.nb_received_tokens} tokens (speed: {spd:.2f}t/s)              ",end="\r",flush=True)
             sys.stdout = sys.__stdout__
             sys.stdout.flush()
             self.nb_received_tokens+=1
 
-        
+
         antiprompt = self.detect_antiprompt(bot_says)
         if antiprompt:
             self.bot_says = self.remove_text_from_string(bot_says,antiprompt)
@@ -717,14 +717,14 @@ class AIPersonality:
         self.model.generate_with_images(
                                 prompt,
                                 images,
-                                max_size, 
+                                max_size,
                                 partial(self.process, callback=callback, show_progress=show_progress),
                                 temperature=self.model_temperature if temperature is None else temperature,
                                 top_k=self.model_top_k if top_k is None else top_k,
                                 top_p=self.model_top_p if top_p is None else top_p,
                                 repeat_penalty=self.model_repeat_penalty if repeat_penalty is None else repeat_penalty,
                                 repeat_last_n = self.model_repeat_last_n if repeat_last_n is None else repeat_last_n
-                                ).strip()    
+                                ).strip()
         return self.bot_says
 
     def generate(self, prompt, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, show_progress=False ):
@@ -735,15 +735,15 @@ class AIPersonality:
             self.print_prompt("gen",prompt)
 
         self.model.generate(
-                                prompt, 
-                                max_size, 
+                                prompt,
+                                max_size,
                                 partial(self.process, callback=callback, show_progress=show_progress),
                                 temperature=self.model_temperature if temperature is None else temperature,
                                 top_k=self.model_top_k if top_k is None else top_k,
                                 top_p=self.model_top_p if top_p is None else top_p,
                                 repeat_penalty=self.model_repeat_penalty if repeat_penalty is None else repeat_penalty,
                                 repeat_last_n = self.model_repeat_last_n if repeat_last_n is None else repeat_last_n,
-                                ).strip()    
+                                ).strip()
         return self.bot_says
 
     def setCallback(self, callback: Callable[[str, MSG_TYPE, dict, list], bool]):
@@ -807,7 +807,7 @@ class AIPersonality:
         self._user_name = config.get("user_name", self._user_name)
         self._category_desc = config.get("category", self._category)
         self._language = config.get("language", self._language)
-        
+
 
         self._personality_description = config.get("personality_description", self._personality_description)
         self._personality_conditioning = config.get("personality_conditioning", self._personality_conditioning)
@@ -828,10 +828,10 @@ class AIPersonality:
         self._model_top_p = config.get("model_top_p", self._model_top_p)
         self._model_repeat_penalty = config.get("model_repeat_penalty", self._model_repeat_penalty)
         self._model_repeat_last_n = config.get("model_repeat_last_n", self._model_repeat_last_n)
-        
+
         # Script parameters (for example keys to connect to search engine or any other usage)
         self._processor_cfg = config.get("processor_cfg", self._processor_cfg)
-        
+
 
         #set package path
         self.personality_package_path = package_path
@@ -880,7 +880,10 @@ class AIPersonality:
                             database_dict=None)
                 ASCIIColors.green("Ok")
             else:
-                files = [f for f in self.data_path.iterdir() if f.suffix.lower() in ['.sh', '.json', '.sym', '.log', '.snippet', '.se', '.yml', '.snippets', '.lua', '.pdf', '.md', '.docx', '.yaml', '.inc', '.txt', '.ini', '.pas', '.pptx', '.map', '.php', '.xlsx', '.rtf', '.hpp', '.h', '.asm', '.xml', '.hh', '.sql', '.java', '.c', '.html', '.inf', '.rb', '.py', '.cs', '.js', '.bat', '.css', '.s', '.cpp', '.csv'] ]
+                files = [f for f in self.data_path.iterdir() if f.suffix.lower() in ['.asm', '.bat', '.c', '.cpp', '.cs', '.csproj', '.css',
+                    '.csv', '.docx', '.h', '.hh', '.hpp', '.html', '.inc', '.ini', '.java', '.js', '.json', '.log',
+                    '.lua', '.map', '.md', '.pas', '.pdf', '.php', '.pptx', '.ps1', '.py', '.rb', '.rtf', '.s', '.se', '.sh', '.sln',
+                    '.snippet', '.snippets', '.sql', '.sym', '.ts', '.txt', '.xlsx', '.xml', '.yaml', '.yml'] ]
                 if len(files)>0:
                     dl = GenericDataLoader()
                     self.persona_data_vectorizer = TextVectorizer(
@@ -901,7 +904,7 @@ class AIPersonality:
                 else:
                     self.persona_data_vectorizer = None
                     self._data = None
-    
+
         else:
             self.persona_data_vectorizer = None
             self._data = None
@@ -926,7 +929,7 @@ class AIPersonality:
 
         self._assets_list = contents
         return config
-    
+
 
 
     def remove_file(self, file_name, callback=None):
@@ -965,16 +968,16 @@ class AIPersonality:
                 Path(file).unlink()
             except Exception as ex:
                 ASCIIColors.warning(f"Couldn't remove the file {file}")
-        self.text_files=[]  
-        self.image_files=[]  
+        self.text_files=[]
+        self.image_files=[]
         self.vectorizer = None
-        return True     
-    
+        return True
+
     def add_file(self, path, client:Client, callback=None, process=True):
         output = ""
         if not self.callback:
             self.callback = callback
-            
+
         path = Path(path)
         if path.suffix in [".wav",".mp3"]:
             self.audio_files.append(path)
@@ -1176,7 +1179,7 @@ class AIPersonality:
         if hasattr(self, '_logo'):
             return self._logo
         else:
-            return None    
+            return None
     @property
     def version(self):
         """Get the version of the package."""
@@ -1217,7 +1220,7 @@ class AIPersonality:
         """Set the user name."""
         self._user_name = value
 
-        
+
     @property
     def language(self) -> str:
         """Get the language."""
@@ -1389,7 +1392,7 @@ class AIPersonality:
         Args:
             text (str): The new link text for the AI assistant.
         """
-        self._link_text = text    
+        self._link_text = text
     @property
     def ai_message_prefix(self):
         """
@@ -1651,7 +1654,7 @@ class AIPersonality:
                 return prompt.lower()
         return None
 
-    
+
     # Helper functions
     @staticmethod
     def replace_keys(input_string, replacements):
@@ -1667,7 +1670,7 @@ class AIPersonality:
         Returns:
             str: The input string with all occurrences of keys replaced by their
                 corresponding values.
-        """        
+        """
         pattern = r"\{\{(\w+)\}\}"
         # The pattern matches "{{key}}" and captures "key" in a group.
         # The "\w+" matches one or more word characters (letters, digits, or underscore).
@@ -1698,7 +1701,7 @@ class StateMachine:
         self.states_dict = states_dict
         self.current_state_id = 0
         self.callback = None
-    
+
     def goto_state(self, state):
         """
         Transition to the state with the given name or index.
@@ -1734,11 +1737,11 @@ class StateMachine:
         """
         if callback:
             self.callback=callback
-            
+
         current_state = self.states_dict[self.current_state_id]
         commands = current_state["commands"]
         command = command.strip()
-        
+
         for cmd, func in commands.items():
             if cmd == command[0:len(cmd)]:
                 try:
@@ -1746,7 +1749,7 @@ class StateMachine:
                 except:# retrocompatibility
                     func(command, full_context)
                 return
-        
+
         default_func = current_state.get("default")
         if default_func is not None:
             default_func(command, full_context)
@@ -1822,8 +1825,8 @@ class LoLLMsAction:
             'parameters': self.parameters,
             'description': self.description
         }
-        return json.dumps(action_dict, indent=4, cls=LoLLMsActionParametersEncoder)    
-        
+        return json.dumps(action_dict, indent=4, cls=LoLLMsActionParametersEncoder)
+
     @staticmethod
     def from_str(string: str) -> 'LoLLMsAction':
         action_dict = json.loads(string)
@@ -1881,7 +1884,7 @@ class APScript(StateMachine):
     Personality-specific processor classes should inherit from this class and override the necessary methods.
     """
     def __init__(
-                    self, 
+                    self,
                     personality         :AIPersonality,
                     personality_config  :TypedConfig,
                     states_dict         :dict   = {},
@@ -1906,7 +1909,7 @@ class APScript(StateMachine):
             self.personality_config.config.save_config()
         else:
             self.load_personality_config()
-            
+
     def sink(self, s=None,i=None,d=None):
         pass
 
@@ -1915,7 +1918,7 @@ class APScript(StateMachine):
         To be implemented by the processor when the settings have changed
         """
         pass
-    
+
     def mounted(self):
         """
         triggered when mounted
@@ -1960,9 +1963,9 @@ class APScript(StateMachine):
         request_data = {"command": "some_command", "parameters": {...}}
         response = await handler.handle_request(request_data)
         ```
-        """        
+        """
         return {"status":True}
-    
+
 
     def load_personality_config(self):
         """
@@ -1975,13 +1978,13 @@ class APScript(StateMachine):
 
         Returns:
             dict: A dictionary containing the loaded data from the local_config.yaml file.
-        """     
+        """
         try:
             self.personality_config.config.load_config()
         except:
             self.personality_config.config.save_config()
         self.personality_config.sync()
-       
+
     def install(self):
         """
         Installation procedure (to be implemented)
@@ -2039,7 +2042,7 @@ class APScript(StateMachine):
                 if key not in data:
                     data[key] = value
                     updated = True
-            
+
             if updated:
                 self.save_config_file(path, data)
 
@@ -2093,7 +2096,7 @@ class APScript(StateMachine):
         """
 
         return None
-    
+
 
     # ================================================= Advanced methods ===========================================
     def compile_latex(self, file_path, pdf_latex_path=None):
@@ -2119,9 +2122,9 @@ class APScript(StateMachine):
             return {"status":True,"file_path":pdf_file}
 
         except subprocess.CalledProcessError as e:
-            print(f"Error occurred while compiling LaTeX: {e}") 
+            print(f"Error occurred while compiling LaTeX: {e}")
             return {"status":False,"error":e}
-            
+
     def find_numeric_value(self, text):
         pattern = r'\d+[.,]?\d*'
         match = re.search(pattern, text)
@@ -2136,7 +2139,7 @@ class APScript(StateMachine):
         if text.endswith("```"):
             text= text[:-3]
         return text
-    
+
     def search_duckduckgo(self, query: str, max_results: int = 10, instant_answers: bool = True, regular_search_queries: bool = True, get_webpage_content: bool = False) -> List[Dict[str, Union[str, None]]]:
         """
         Perform a search using the DuckDuckGo search engine and return the results as a list of dictionaries.
@@ -2159,9 +2162,9 @@ class APScript(StateMachine):
         from duckduckgo_search import DDGS
         if not (instant_answers or regular_search_queries):
             raise ValueError("One of ('instant_answers', 'regular_search_queries') must be True")
-        
+
         query = query.strip("\"'")
-        
+
         with DDGS() as ddgs:
             if instant_answers:
                 answer_list = list(ddgs.answers(query))
@@ -2172,7 +2175,7 @@ class APScript(StateMachine):
                     answer_dict["href"] = answer_dict.get('FirstURL', '')
             else:
                 answer_list = []
-                
+
             if regular_search_queries:
                 results = ddgs.text(query, safe=False, result_type='link')
                 for result in results[:max_results]:
@@ -2181,7 +2184,7 @@ class APScript(StateMachine):
                     href = result['FirstURL'] or ''
                     answer_dict = {'title': title, 'body': body, 'href': href}
                     answer_list.append(answer_dict)
-        
+
             if get_webpage_content:
                 for i, result in enumerate(answer_list):
                     try:
@@ -2191,9 +2194,9 @@ class APScript(StateMachine):
                             answer_list[i]['body'] = content
                     except Exception as e:
                         print(f"Error retrieving webpage content for {result['href']}: {str(e)}")
-        
+
             return answer_list
-        
+
 
     def translate(self, text_chunk, output_language="french", max_generation_size=3000):
         translated = self.fast_gen(
@@ -2211,13 +2214,13 @@ class APScript(StateMachine):
         return translated
 
     def summerize_text(
-                        self, 
-                        text, 
-                        summary_instruction="summerize", 
-                        doc_name="chunk", 
-                        answer_start="", 
-                        max_generation_size=3000, 
-                        max_summary_size=512, 
+                        self,
+                        text,
+                        summary_instruction="summerize",
+                        doc_name="chunk",
+                        answer_start="",
+                        max_generation_size=3000,
+                        max_summary_size=512,
                         callback=None,
                         chunk_summary_post_processing=None
                     ):
@@ -2241,14 +2244,14 @@ class APScript(StateMachine):
         return text
 
     def smart_data_extraction(
-                                self, 
-                                text, 
-                                data_extraction_instruction="summerize", 
-                                final_task_instruction="reformulate with better wording", 
-                                doc_name="chunk", 
-                                answer_start="", 
-                                max_generation_size=3000, 
-                                max_summary_size=512, 
+                                self,
+                                text,
+                                data_extraction_instruction="summerize",
+                                final_task_instruction="reformulate with better wording",
+                                doc_name="chunk",
+                                answer_start="",
+                                max_generation_size=3000,
+                                max_summary_size=512,
                                 callback=None,
                                 chunk_summary_post_processing=None
                             ):
@@ -2269,19 +2272,19 @@ class APScript(StateMachine):
             if dtk_ln<=10: # it is not sumlmarizing
                 break
         self.step_start(f"Rewriting ...")
-        text = self.summerize_chunks([text], 
+        text = self.summerize_chunks([text],
         final_task_instruction, doc_name, answer_start, max_generation_size, callback, chunk_summary_post_processing=chunk_summary_post_processing)
         self.step_end(f"Rewriting ...")
-        
+
         return text
 
     def summerize_chunks(
-                            self, 
-                            chunks, 
-                            summary_instruction="summerize", 
-                            doc_name="chunk", 
-                            answer_start="", 
-                            max_generation_size=3000, 
+                            self,
+                            chunks,
+                            summary_instruction="summerize",
+                            doc_name="chunk",
+                            answer_start="",
+                            max_generation_size=3000,
                             callback=None,
                             chunk_summary_post_processing=None
                         ):
@@ -2306,12 +2309,12 @@ class APScript(StateMachine):
         return "\n".join(summeries)
 
     def sequencial_chunks_summary(
-                            self, 
-                            chunks, 
-                            summary_instruction="summerize", 
-                            doc_name="chunk", 
-                            answer_start="", 
-                            max_generation_size=3000, 
+                            self,
+                            chunks,
+                            summary_instruction="summerize",
+                            doc_name="chunk",
+                            answer_start="",
+                            max_generation_size=3000,
                             callback=None,
                             chunk_summary_post_processing=None
                         ):
@@ -2357,7 +2360,7 @@ class APScript(StateMachine):
 
         Returns:
             str: The built prompt.
-        """        
+        """
         if context_size is None:
             context_size = self.personality.config.ctx_size
         if minimum_spare_context_size is None:
@@ -2404,7 +2407,7 @@ class APScript(StateMachine):
         f' </div>',
         f' </details>\n'
         ])
-    
+
     def internet_search_with_vectorization(self, query, quick_search:bool=False ):
         """
         Do internet search and return the result
@@ -2419,7 +2422,7 @@ class APScript(StateMachine):
         for i, chunk in enumerate(chunks):
             vectorizer.add_document(f"chunk_{i}", self.personality.model.detokenize(chunk))
         vectorizer.index()
-        docs, sorted_similarities, document_ids = vectorizer.recover_text(query, internet_vectorization_nb_chunks)        
+        docs, sorted_similarities, document_ids = vectorizer.recover_text(query, internet_vectorization_nb_chunks)
         return docs, sorted_similarities
 
 
@@ -2459,7 +2462,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2477,7 +2480,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2495,7 +2498,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2513,7 +2516,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2531,7 +2534,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2549,7 +2552,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2567,7 +2570,7 @@ class APScript(StateMachine):
             - chunk
             - Message Type : the type of message
             - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata 
+            - Metadata (optional) : a list of metadata
         """
         if not callback and self.callback:
             callback = self.callback
@@ -2677,7 +2680,7 @@ class APScript(StateMachine):
             "# Placeholder. Here you need to put the code for the file",
             "```",
             "!@>Code Builder:"
-        ]) 
+        ])
         code = self.fast_gen(global_prompt, max_title_length)
         code_blocks = self.extract_code_blocks(code)
         try:
@@ -2701,7 +2704,7 @@ class APScript(StateMachine):
 
         Returns:
             str: The generated title.
-        """        
+        """
         global_prompt = f"!@>instructions: Based on the provided prompt, suggest a concise and relevant title that captures the main topic or theme of the conversation. Only return the suggested title, without any additional text or explanation.\n!@>prompt: {prompt}\n!@>title:"
         title = self.fast_gen(global_prompt,max_title_length)
         return title
@@ -2710,11 +2713,11 @@ class APScript(StateMachine):
     def plan_with_images(self, request: str, images:list, actions_list:list=[LoLLMsAction], context:str = "", max_answer_length: int = 512) -> List[LoLLMsAction]:
         """
         creates a plan out of a request and a context
-        
+
         Args:
             request (str): The request posed by the user.
             max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
-            
+
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
@@ -2725,7 +2728,7 @@ Act as plan builder, a tool capable of making plans to perform the user requeste
             template +="""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
 !@>list of action types information:
 [
-{{actions_list}} 
+{{actions_list}}
 ]
 The AI should respond in this format using data from actions_list:
 {
@@ -2734,20 +2737,20 @@ The AI should respond in this format using data from actions_list:
         "name": name of the action 1,
         "parameters":[
             parameter name: parameter value
-        ]        
+        ]
     },
     {
         "name": name of the action 2,
         "parameters":[
             parameter name: parameter value
-        ]        
+        ]
     }
     ...
     ]
 }
 """
         if context!="":
-            template += """!@>Context:                               
+            template += """!@>Context:
 {{context}}Ok
 """
         template +="""!@>request: {{request}}
@@ -2758,9 +2761,9 @@ The AI should respond in this format using data from actions_list:
                 "context":context,
                 "request":request,
                 "actions_list":",\n".join([f"{action}" for action in actions_list])
-                }, 
-                self.personality.model.tokenize, 
-                self.personality.model.detokenize, 
+                },
+                self.personality.model.tokenize,
+                self.personality.model.detokenize,
                 self.personality.model.config.ctx_size,
                 ["previous_discussion"]
                 )
@@ -2773,11 +2776,11 @@ The AI should respond in this format using data from actions_list:
     def plan(self, request: str, actions_list:list=[LoLLMsAction], context:str = "", max_answer_length: int = 512) -> List[LoLLMsAction]:
         """
         creates a plan out of a request and a context
-        
+
         Args:
             request (str): The request posed by the user.
             max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
-            
+
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
@@ -2788,7 +2791,7 @@ Act as plan builder, a tool capable of making plans to perform the user requeste
             template +="""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
 !@>list of action types information:
 [
-{{actions_list}} 
+{{actions_list}}
 ]
 The AI should respond in this format using data from actions_list:
 {
@@ -2797,20 +2800,20 @@ The AI should respond in this format using data from actions_list:
         "name": name of the action 1,
         "parameters":[
             parameter name: parameter value
-        ]        
+        ]
     },
     {
         "name": name of the action 2,
         "parameters":[
             parameter name: parameter value
-        ]        
+        ]
     }
     ...
     ]
 }
 """
         if context!="":
-            template += """!@>Context:                               
+            template += """!@>Context:
 {{context}}Ok
 """
         template +="""!@>request: {{request}}
@@ -2821,9 +2824,9 @@ The AI should respond in this format using data from actions_list:
                 "context":context,
                 "request":request,
                 "actions_list":",\n".join([f"{action}" for action in actions_list])
-                }, 
-                self.personality.model.tokenize, 
-                self.personality.model.detokenize, 
+                },
+                self.personality.model.tokenize,
+                self.personality.model.detokenize,
                 self.personality.model.config.ctx_size,
                 ["previous_discussion"]
                 )
@@ -2840,17 +2843,17 @@ The AI should respond in this format using data from actions_list:
         paths = []
         lines = structure.strip().split('\n')
         stack = []
-        
+
         for line in lines:
             line = line.rstrip()
             level = (len(line) - len(line.lstrip())) // 4
-            
+
             if '/' in line or line.endswith(':'):
                 directory = line.strip(' ├─└│').rstrip(':').rstrip('/')
-                
+
                 while stack and level < stack[-1][0]:
                     stack.pop()
-                
+
                 stack.append((level, directory))
                 path = '/'.join([dir for _, dir in stack]) + '/'
                 paths.append(path)
@@ -2859,9 +2862,9 @@ The AI should respond in this format using data from actions_list:
                 if stack:
                     path = '/'.join([dir for _, dir in stack]) + '/' + file
                     paths.append(path)
-            
+
         return paths
-    
+
     def extract_code_blocks(self, text: str) -> List[dict]:
         remaining = text
         bloc_index = 0
@@ -2879,7 +2882,7 @@ The AI should respond in this format using data from actions_list:
                     index=len(remaining)
                     indices.append(index)
                 remaining = ""
-                
+
         code_blocks = []
         is_start = True
         for index, code_delimiter_position in enumerate(indices):
@@ -2908,7 +2911,7 @@ The AI should respond in this format using data from actions_list:
                         block_infos["type"]='language-specific'
                     else:
                         block_infos["type"]=sub_text[:next_index]
-                        
+
                     next_pos = indices[index+1]-code_delimiter_position
                     if sub_text[next_pos-3]=="`":
                         block_infos["content"]=sub_text[start_pos:next_pos-3].strip()
@@ -2948,7 +2951,7 @@ The AI should respond in this format using data from actions_list:
             code = "\n".join([
                         extra_imports,
                         code
-                    ])            
+                    ])
             ASCIIColors.magenta(code)
             module_name = 'custom_module'
             spec = importlib.util.spec_from_loader(module_name, loader=None)
@@ -2973,13 +2976,13 @@ The AI should respond in this format using data from actions_list:
     def multichoice_question(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="") -> int:
         """
         Interprets a multi-choice question from a users response. This function expects only one choice as true. All other choices are considered false. If none are correct, returns -1.
-        
+
         Args:
             question (str): The multi-choice question posed by the user.
             possible_ansers (List[Any]): A list containing all valid options for the chosen value. For each item in the list, either 'True', 'False', None or another callable should be passed which will serve as the truth test function when checking against the actual user input.
             max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
             conditionning: An optional system message to put at the beginning of the prompt
-            
+
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
@@ -3005,7 +3008,7 @@ The AI should respond in this format using data from actions_list:
         ]
         elements += ["!@>answer:"]
         prompt = self.build_prompt(elements)
-            
+
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50, callback=self.sink).strip().replace("</s>","").replace("<s>","")
         if len(gen)>0:
             selection = gen.strip().split()[0].replace(",","").replace(".","")
@@ -3017,17 +3020,17 @@ The AI should respond in this format using data from actions_list:
                 return -1
         else:
             return -1
-        
+
     def multichoice_ranking(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="") -> int:
         """
         Ranks answers for a question from best to worst. returns a list of integers
-        
+
         Args:
             question (str): The multi-choice question posed by the user.
             possible_ansers (List[Any]): A list containing all valid options for the chosen value. For each item in the list, either 'True', 'False', None or another callable should be passed which will serve as the truth test function when checking against the actual user input.
             max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
             conditionning: An optional system message to put at the beginning of the prompt
-            
+
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
@@ -3050,7 +3053,7 @@ The AI should respond in this format using data from actions_list:
 
         elements += ["!@>answer:"]
         prompt = self.build_prompt(elements)
-            
+
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50).strip().replace("</s>","").replace("<s>","")
         self.print_prompt("Multi choice ranking",prompt+gen)
         if gen.index("]")>=0:
@@ -3144,47 +3147,47 @@ The AI should respond in this format using data from actions_list:
         ASCIIColors.red(title, end="")
         ASCIIColors.red(" *-*-*-*-*-*-*-*")
         ASCIIColors.yellow(prompt)
-        ASCIIColors.red(" *-*-*-*-*-*-*-*")        
+        ASCIIColors.red(" *-*-*-*-*-*-*-*")
 
 
     def fast_gen_with_images(self, prompt: str, images:list, max_generation_size: int= None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool = False, callback=None, show_progress=False) -> str:
         """
         Fast way to generate code
-        
+
         This method takes in a prompt, maximum generation size, optional placeholders, sacrifice list, and debug flag.
         It reshapes the context before performing text generation by adjusting and cropping the number of tokens.
-        
+
         Parameters:
         - prompt (str): The input prompt for text generation.
         - max_generation_size (int): The maximum number of tokens to generate.
         - placeholders (dict, optional): A dictionary of placeholders to be replaced in the prompt. Defaults to an empty dictionary.
         - sacrifice (list, optional): A list of placeholders to sacrifice if the window is bigger than the context size minus the number of tokens to generate. Defaults to ["previous_discussion"].
         - debug (bool, optional): Flag to enable/disable debug mode. Defaults to False.
-        
+
         Returns:
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
         return self.personality.fast_gen_with_images(prompt=prompt, images=images, max_generation_size=max_generation_size,placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
-    
+
     def fast_gen(self, prompt: str, max_generation_size: int= None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool = False, callback=None, show_progress=False) -> str:
         """
         Fast way to generate code
-        
+
         This method takes in a prompt, maximum generation size, optional placeholders, sacrifice list, and debug flag.
         It reshapes the context before performing text generation by adjusting and cropping the number of tokens.
-        
+
         Parameters:
         - prompt (str): The input prompt for text generation.
         - max_generation_size (int): The maximum number of tokens to generate.
         - placeholders (dict, optional): A dictionary of placeholders to be replaced in the prompt. Defaults to an empty dictionary.
         - sacrifice (list, optional): A list of placeholders to sacrifice if the window is bigger than the context size minus the number of tokens to generate. Defaults to ["previous_discussion"].
         - debug (bool, optional): Flag to enable/disable debug mode. Defaults to False.
-        
+
         Returns:
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
         return self.personality.fast_gen(prompt=prompt,max_generation_size=max_generation_size,placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
-    
+
 
     #Helper method to convert outputs path to url
     def path2url(file):
@@ -3214,7 +3217,7 @@ The AI should respond in this format using data from actions_list:
     <pre style="white-space: pre-wrap;color: #666;">{content}</pre>
 </div>
 '''
-        
+
     def build_a_folder_link(self, folder_path, link_text="Open Folder"):
         folder_path = str(folder_path).replace('\\','/')
         return '''
@@ -3260,7 +3263,7 @@ fetch('/open_file', {
     .catch(error => {
     console.error('Error:', error);
     });
-">'''+f'''{link_text}</a>'''           
+">'''+f'''{link_text}</a>'''
 # ===========================================================
 class AIPersonalityInstaller:
     def __init__(self, personality:AIPersonality) -> None:
@@ -3269,10 +3272,10 @@ class AIPersonalityInstaller:
 
 class PersonalityBuilder:
     def __init__(
-                    self, 
-                    lollms_paths:LollmsPaths, 
-                    config:LOLLMSConfig, 
-                    model:LLMBinding, 
+                    self,
+                    lollms_paths:LollmsPaths,
+                    config:LOLLMSConfig,
+                    model:LLMBinding,
                     app=None,
                     installation_option:InstallOption=InstallOption.INSTALL_IF_NECESSARY,
                     callback=None
@@ -3328,7 +3331,7 @@ class PersonalityBuilder:
                                             callback=self.callback
                                         )
         return self.personality
-    
+
     def get_personality(self):
         return self.personality
 
