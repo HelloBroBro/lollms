@@ -388,9 +388,9 @@ class DiscussionsDB:
         discussions = []
         data = json_data
         for discussion_data in data:
-            discussion_id = discussion_data.get("id")
-            discussion_title = discussion_data.get("title")
-            messages_data = discussion_data.get("messages", [])
+            discussion_id = discussion_data.id
+            discussion_title = discussion_data.title
+            messages_data = discussion_data.messages
             discussion = {"id": discussion_id, "title": discussion_title, "messages": []}
 
             # Insert discussion into the database

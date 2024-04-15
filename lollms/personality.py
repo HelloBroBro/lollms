@@ -1046,6 +1046,7 @@ class AIPersonality:
                 # self.ShowBlockingMessage("Adding file to vector store.\nPlease stand by")
                 self.text_files.append(path)
                 ASCIIColors.info("Received text compatible file")
+                self.ShowBlockingMessage("Processing file\nPlease wait ...")
                 if process:
                     if self.vectorizer is None:
                         self.vectorizer = TextVectorizer(

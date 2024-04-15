@@ -190,7 +190,8 @@ async def export_multiple_discussions(discussion_export: DiscussionExport):
 
 class DiscussionInfo(BaseModel):
     id: int
-    content: str
+    title: str
+    messages: List[dict]
 
 class DiscussionImport(BaseModel):
     client_id: str

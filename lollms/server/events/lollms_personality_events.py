@@ -104,7 +104,8 @@ def add_events(sio:socketio):
 
         if is_last_chunk:
             lollmsElfServer.success('File received and saved successfully')
-            lollmsElfServer.ShowBlockingMessage(f"File received {file_path.name}.\nProcessing ...")
+            lollmsElfServer.HideBlockingMessage()
+            lollmsElfServer.ShowBlockingMessage(f"File received {file_path.name}.\nVectorizing the data ...")
 
             if lollmsElfServer.personality.processor:
                 result = lollmsElfServer.personality.processor.add_file(file_path, client, partial(lollmsElfServer.process_chunk, client_id=client_id))
