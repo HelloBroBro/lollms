@@ -636,7 +636,11 @@ class LollmsApplication(LoLLMsCom):
                 try:
                     docs, sorted_similarities, document_ids = self.personality.persona_data_vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
                     for doc, infos, doc_id in zip(docs, sorted_similarities, document_ids):
-                        documentation += f"!@>document chunk:\nchunk_infos:{infos}\ncontent:{doc}\n"
+                        if self.config.data_vectorization_put_chunk_informations_into_context:
+                            documentation += f"!@>document chunk:\nchunk_infos:{infos}\ncontent:{doc}\n"
+                        else:
+                            documentation += f"!@>chunk:\n{doc}\n"
+
                 except Exception as ex:
                     trace_exception(ex)
                     self.warning("Couldn't add documentation to the context. Please verify the vector database")
@@ -660,13 +664,21 @@ class LollmsApplication(LoLLMsCom):
 
                         doc_id = self.personality.vectorizer.chunks[doc_index]['document_id']
                         content = self.personality.vectorizer.chunks[doc_index]['chunk_text']
-                        documentation += f"!@>document chunk:\nchunk_infos:{doc_id}\ncontent:{content}\n"
+                        
+                        if self.config.data_vectorization_put_chunk_informations_into_context:
+                            documentation += f"!@>document chunk:\nchunk_infos:{doc_id}\ncontent:{content}\n"
+                        else:
+                            documentation += f"!@>chunk:\n{content}\n"
 
                     docs, sorted_similarities, document_ids = self.personality.vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
                     for doc, infos in zip(docs, sorted_similarities):
                         if self.config.data_vectorization_force_first_chunk and len(self.personality.vectorizer.chunks)>0 and infos[0]==doc_id:
                             continue
-                        documentation += f"!@>document chunk:\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
+                        if self.config.data_vectorization_put_chunk_informations_into_context:
+                            documentation += f"!@>document chunk:\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
+                        else:
+                            documentation += f"!@>chunk:\n{doc}\n"
+
                     documentation += "\n!@>important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
                 except Exception as ex:
                     trace_exception(ex)
@@ -760,7 +772,7 @@ class LollmsApplication(LoLLMsCom):
             ASCIIColors.red(f"n_isearch_tk:{n_isearch_tk}")
             
             ASCIIColors.red(f"self.config.max_n_predict:{self.config.max_n_predict}")
-            self.error(f"Not enough space in context!!\nVerify that your vectorization settings for documents or internet search are realistic compared to your context size.\nYou are {available_space} short of context!")
+            self.InfoMessage(f"Not enough space in context!!\nVerify that your vectorization settings for documents or internet search are realistic compared to your context size.\nYou are {available_space} short of context!")
             raise Exception("Not enough space in context!!")
 
         # Accumulate messages until the cumulative number of tokens exceeds available_space
