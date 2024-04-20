@@ -303,7 +303,7 @@ class LollmsApplication(LoLLMsCom):
             generation_infos["generated_text"] += chunk
         antiprompt = self.personality.detect_antiprompt(generation_infos["generated_text"])
         if antiprompt:
-            ASCIIColors.warning(f"\nDetected hallucination with antiprompt: {antiprompt}")
+            ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
             generation_infos["generated_text"] = self.remove_text_from_string(generation_infos["generated_text"],antiprompt)
             return False
         else:

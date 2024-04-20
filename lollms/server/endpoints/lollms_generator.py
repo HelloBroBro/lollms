@@ -441,7 +441,7 @@ async def v1_completion(request: CompletionGenerationRequest):
                         output["text"] += chunk
                         antiprompt = detect_antiprompt(output["text"])
                         if antiprompt:
-                            ASCIIColors.warning(f"\nDetected hallucination with antiprompt: {antiprompt}")
+                            ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
                             output["text"] = remove_text_from_string(output["text"],antiprompt)
                             return False
                         else:
@@ -462,7 +462,7 @@ async def v1_completion(request: CompletionGenerationRequest):
                     output["text"] += chunk
                     antiprompt = detect_antiprompt(output["text"])
                     if antiprompt:
-                        ASCIIColors.warning(f"\nDetected hallucination with antiprompt: {antiprompt}")
+                        ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
                         output["text"] = remove_text_from_string(output["text"],antiprompt)
                         return False
                     else:

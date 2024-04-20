@@ -151,6 +151,8 @@ class AIPersonality:
         self._supported_languages: str = []
         self._selected_language: str = selected_language
 
+        self._languages: List[dict]=[]
+
         # Conditionning
         self._personality_description: str = "This personality is a helpful and Kind AI ready to help you solve your problems"
         self._personality_conditioning: str = "\n".join([
@@ -699,7 +701,7 @@ class AIPersonality:
         antiprompt = self.detect_antiprompt(bot_says)
         if antiprompt:
             self.bot_says = self.remove_text_from_string(bot_says,antiprompt)
-            ASCIIColors.warning(f"\nDetected hallucination with antiprompt: {antiprompt}")
+            ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
             return False
         else:
             if callback:
