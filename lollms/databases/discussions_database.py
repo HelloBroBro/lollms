@@ -576,7 +576,7 @@ class Message:
             (self.sender, self.content, self.metadata, self.ui, self.message_type, self.rank, self.parent_message_id, self.binding, self.model, self.personality, self.created_at, self.started_generating_at, self.finished_generating_at, nb_tokens, self.discussion_id)
         )
 
-    def update(self, new_content, new_metadata=None, new_ui=None, commit=True):
+    def update(self, new_content, new_metadata=None, new_ui=None, started_generating_at=None, nb_tokens=None, commit=True):
         self.finished_generating_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         text = f"UPDATE message SET content = ?"
         params = [new_content]
@@ -586,6 +586,15 @@ class Message:
         if new_ui is not None:
             text+=", ui = ?"
             params.append(new_ui)
+
+        if started_generating_at is not None:
+            text+=", started_generating_at = ?"
+            params.append(started_generating_at)
+
+        if nb_tokens is not None:
+            text+=", nb_tokens = ?"
+            params.append(nb_tokens)
+
 
         text +=", finished_generating_at = ? WHERE id = ?"
         params.append(self.finished_generating_at)
@@ -771,14 +780,14 @@ class Discussion:
         else:
             return False 
 
-    def update_message(self, new_content, new_metadata=None, new_ui=None):
+    def update_message(self, new_content, new_metadata=None, new_ui=None, started_generating_at=None, nb_tokens=None):
         """Updates the content of a message
 
         Args:
             message_id (int): The id of the message to be changed
             new_content (str): The nex message content
         """
-        self.current_message.update(new_content, new_metadata, new_ui)
+        self.current_message.update(new_content, new_metadata, new_ui, started_generating_at, nb_tokens)
 
     def edit_message(self, message_id, new_content, new_metadata=None, new_ui=None):
         """Edits the content of a message

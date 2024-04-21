@@ -422,6 +422,7 @@ class LLMBinding:
     def add_default_configurations(self, binding_config:TypedConfig):
         binding_config.addConfigs([
             {"name":"model_name","type":"str","value":'', "help":"Last known model for fast model recovery"},
+            {"name":"model_template","type":"text","value":'', "help":"The template for the currently used model (optional)"},
             {"name":"clip_model_name","type":"str","value":'ViT-L-14/openai','options':["ViT-L-14/openai","ViT-H-14/laion2b_s32b_b79k"], "help":"Clip model to be used for images understanding"},
             {"name":"caption_model_name","type":"str","value":'blip-large','options':['blip-base', 'git-large-coco', 'blip-large','blip2-2.7b', 'blip2-flan-t5-xl'], "help":"Clip model to be used for images understanding"},
             {"name":"vqa_model_name","type":"str","value":'Salesforce/blip-vqa-capfilt-large','options':['Salesforce/blip-vqa-capfilt-large', 'Salesforce/blip-vqa-base', 'Salesforce/blip-image-captioning-large','Salesforce/blip2-opt-2.7b', 'Salesforce/blip2-flan-t5-xxl'], "help":"Salesforce question/answer model"},

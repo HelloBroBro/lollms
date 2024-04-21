@@ -80,6 +80,9 @@ async def update_setting(request: Request):
                     lollmsElfServer.binding = BindingBuilder().build_binding(lollmsElfServer.config, lollmsElfServer.lollms_paths, InstallOption.INSTALL_IF_NECESSARY, lollmsCom=lollmsElfServer)
                     lollmsElfServer.config.model_name = lollmsElfServer.binding.binding_config.model_name
                     lollmsElfServer.model = lollmsElfServer.binding.build_model()
+                    for per in lollmsElfServer.mounted_personalities:
+                        if per is not None:
+                            per.model = lollmsElfServer.model
                     lollmsElfServer.config.save_config()
                     ASCIIColors.green("Binding loaded successfully")
                 except Exception as ex:

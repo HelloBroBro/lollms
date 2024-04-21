@@ -143,13 +143,16 @@ def add_events(sio:socketio):
                         client.discussion = lollmsElfServer.db.load_last_discussion()
 
                 ump = lollmsElfServer.config.discussion_prompt_separator + lollmsElfServer.config.user_name.strip() if lollmsElfServer.config.use_user_name_in_discussions else lollmsElfServer.personality.user_message_prefix
+                created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')                 
                 message = client.discussion.add_message(
                     message_type    = MSG_TYPE.MSG_TYPE_FULL.value,
                     sender_type     = SENDER_TYPES.SENDER_TYPES_USER.value,
                     sender          = ump.replace(lollmsElfServer.config.discussion_prompt_separator,"").replace(":",""),
                     content="",
                     metadata=None,
-                    parent_message_id=lollmsElfServer.message_id
+                    parent_message_id=lollmsElfServer.message_id,
+                    created_at=created_at,
+                    nb_tokens=None
                 )
                 lollmsElfServer.busy=True
                 command = data["command"]

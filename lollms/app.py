@@ -812,7 +812,11 @@ class LollmsApplication(LoLLMsCom):
                             "\n" + self.config.discussion_prompt_separator + message.sender + ": " + message.content.strip())
 
                     # Check if adding the message will exceed the available space
-                    if tokens_accumulated + len(message_tokenized) > available_space:
+                    if tokens_accumulated + len(message_tokenized) > available_space-n_tokens:
+                        # Update the cumulative number of tokens
+                        msg = message_tokenized[-(available_space-tokens_accumulated-n_tokens):]
+                        tokens_accumulated += available_space-tokens_accumulated-n_tokens
+                        full_message_list.insert(0, msg)
                         break
 
                     # Add the tokenized message to the full_message_list
