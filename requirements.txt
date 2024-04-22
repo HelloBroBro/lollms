@@ -5,8 +5,11 @@ wget
 setuptools
 requests
 
+
 safe_store
+pipmaster
 ascii_colors>=0.1.3
+beautifulsoup4
 
 autopep8
 

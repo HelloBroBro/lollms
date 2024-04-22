@@ -20,6 +20,7 @@ import pkg_resources
 from pathlib import Path
 from PIL import Image
 import re
+
 from datetime import datetime
 import importlib
 import shutil
@@ -37,6 +38,8 @@ import sys
 from lollms.com import LoLLMsCom
 from lollms.helpers import trace_exception
 from lollms.utilities import PackageManager
+
+from lollms.code_parser import compress_js, compress_python, compress_html
 
 
 import requests
@@ -3268,6 +3271,17 @@ fetch('/open_file', {
     });
 ">'''+f'''{link_text}</a>'''
 # ===========================================================
+    def compress_js(self, code):
+        return compress_js(code)
+    def compress_python(self, code):
+        return compress_python(code)
+    def compress_html(self, code):
+        return compress_html(code)
+
+# ===========================================================
+    def select_model(self, binding_name, model_name):
+        self.personality.app.select_model(binding_name, model_name)
+
 class AIPersonalityInstaller:
     def __init__(self, personality:AIPersonality) -> None:
         self.personality = personality

@@ -23,7 +23,7 @@ import subprocess
 import importlib
 import sys, os
 import platform
-
+import gc
 
 class LollmsApplication(LoLLMsCom):
     def __init__(
@@ -130,6 +130,35 @@ class LollmsApplication(LoLLMsCom):
             self.mount_personalities()
             self.mount_extensions()
 
+
+    def select_model(self, binding_name, model_name):
+        self.config["binding_name"] = binding_name
+        self.config["model_name"] = model_name
+        print(f"New binding selected : {binding_name}")
+
+        try:
+            if self.binding:
+                self.binding.destroy_model()
+            self.binding = None
+            self.model = None
+            for per in self.mounted_personalities:
+                if per is not None:
+                    per.model = None
+            gc.collect()
+            self.binding = BindingBuilder().build_binding(self.config, self.lollms_paths, InstallOption.INSTALL_IF_NECESSARY, lollmsCom=self)
+            self.config["model_name"] = model_name
+            self.model = self.binding.build_model()
+            for per in self.mounted_personalities:
+                if per is not None:
+                    per.model = self.model
+            self.config.save_config()
+            ASCIIColors.green("Binding loaded successfully")
+            return True
+        except Exception as ex:
+            ASCIIColors.error(f"Couldn't build binding: [{ex}]")
+            trace_exception(ex)
+            return False
+        
     def add_discussion_to_skills_library(self, client: Client):
         messages = client.discussion.get_messages()
 
