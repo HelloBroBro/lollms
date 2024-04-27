@@ -7,6 +7,7 @@ from typing import List
 import os
 import re
 import platform
+import string
 
 def check_access(lollmsElfServer, client_id):
     client = lollmsElfServer.session.get_client(client_id)
@@ -95,39 +96,98 @@ def sanitize_shell_code(code, whitelist=None):
     return sanitized_code
 
 
-def sanitize_path(path:str, allow_absolute_path:bool=False, error_text="Absolute database path detected", exception_text="Detected an attempt of path traversal. Are you kidding me?"):
+class InvalidFilePathError(Exception):
+    pass
+
+
+def sanitize_path(path: str, allow_absolute_path: bool = False, error_text="Absolute database path detected", exception_text="Detected an attempt of path traversal or command injection. Are you kidding me?"):
+    """
+    Sanitize a given file path by checking for potentially dangerous patterns and unauthorized characters.
+
+    Args:
+    -----
+    path (str): The file path to sanitize.
+    allow_absolute_path (bool, optional): Whether to allow absolute paths. Default is False.
+    error_text (str, optional): The error message to display if an absolute path is detected. Default is "Absolute database path detected".
+    exception_text (str, optional): The exception message to display if a path traversal, command injection, or unauthorized character is detected. Default is "Detected an attempt of path traversal or command injection. Are you kidding me?".
+
+    Raises:
+    ------
+    HTTPException: If an absolute path, path traversal, command injection, or unauthorized character is detected.
+
+    Returns:
+    -------
+    str: The sanitized file path.
+
+    Note:
+    -----
+    This function checks for patterns like "....", multiple forward slashes, and command injection attempts like $(whoami). It also checks for unauthorized punctuation characters, excluding the dot (.) character.
+    """    
     if not allow_absolute_path and path.strip().startswith("/"):
         raise HTTPException(status_code=400, detail=exception_text)
 
     if path is None:
         return path
-    
-    # Regular expression to detect patterns like "...." and multiple forward slashes
-    suspicious_patterns = re.compile(r'(\.\.+)|(/+/)')
-    
+
+    # Regular expression to detect patterns like "....", multiple forward slashes, and command injection attempts like $(whoami)
+    suspicious_patterns = re.compile(r'(\.\.+)|(/+/)|(\$\(.*\))')
+
     if suspicious_patterns.search(str(path)) or ((not allow_absolute_path) and Path(path).is_absolute()):
         ASCIIColors.error(error_text)
+        raise HTTPException(status_code=400, detail=exception_text)
+
+    # Detect if any unauthorized characters, excluding the dot character, are present in the path
+    unauthorized_chars = set('!"#$%&\'()*+,:;<=>?@[]^`{|}~')
+    if any(char in unauthorized_chars for char in path):
         raise HTTPException(status_code=400, detail=exception_text)
 
     if not allow_absolute_path:
         path = path.lstrip('/')
 
     return path
+
     
-def sanitize_path_from_endpoint(path: str, error_text="A suspected LFI attack detected. The path sent to the server has suspicious elements in it!", exception_text="Invalid path!"):
-    if path.strip().startswith("/"):
-        raise HTTPException(status_code=400, detail=exception_text)
-    # Fix the case of "/" at the beginning on the path
+def sanitize_path_from_endpoint(path: str, error_text: str = "A suspected LFI attack detected. The path sent to the server has suspicious elements in it!", exception_text: str = "Invalid path!") -> str:
+    """
+    Sanitize a given file path from an endpoint by checking for potentially dangerous patterns and unauthorized characters.
+
+    Args:
+    -----
+    path (str): The file path to sanitize.
+    error_text (str, optional): The error message to display if a path traversal or unauthorized character is detected. Default is "A suspected LFI attack detected. The path sent to the server has suspicious elements in it!".
+    exception_text (str, optional): The exception message to display if an absolute path or invalid character is detected. Default is "Invalid path!".
+
+    Raises:
+    ------
+    HTTPException: If an absolute path, path traversal, or unauthorized character is detected.
+
+    Returns:
+    -------
+    str: The sanitized file path.
+
+    Note:
+    -----
+    This function checks for patterns like "...." and multiple forward slashes. It also checks for unauthorized punctuation characters, excluding the dot (.) character.
+    """
+
     if path is None:
         return path
-    
+
+    if path.strip().startswith("/"):
+        raise HTTPException(status_code=400, detail=exception_text)
+
     # Regular expression to detect patterns like "...." and multiple forward slashes
     suspicious_patterns = re.compile(r'(\.\.+)|(/+/)')
-    
+
+    # Detect if any unauthorized characters, excluding the dot character, are present in the path
+    unauthorized_chars = set('!"#$%&\'()*+,:;<=>?@[]^`{|}~')
+    if any(char in unauthorized_chars for char in path):
+        raise HTTPException(status_code=400, detail=exception_text)
+
     if suspicious_patterns.search(path) or Path(path).is_absolute():
         ASCIIColors.error(error_text)
         raise HTTPException(status_code=400, detail=exception_text)
-    
+
     path = path.lstrip('/')
     return path
 

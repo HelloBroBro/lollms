@@ -2997,9 +2997,6 @@ The AI should respond in this format using data from actions_list:
         elements += [
                 "!@>system:",
                 "Answer this multi choices question.",
-                f"!@>question: {question}",
-                "!@>possible answers:",
-                f"{choices}",
         ]
         if context!="":
             elements+=[
@@ -3011,6 +3008,11 @@ The AI should respond in this format using data from actions_list:
                 "Do not answer with an id outside this possible answers.",
                 "Do not explain your reasons or add comments.",
                 "the output should be an integer."
+        ]
+        elements += [
+                f"!@>question: {question}",
+                "!@>possible answers:",
+                f"{choices}",
         ]
         elements += ["!@>answer:"]
         prompt = self.build_prompt(elements)
