@@ -150,7 +150,7 @@ class AIPersonality:
         self._user_name: str = "user"
         self._category: str = "General"
         self._category_desc: str = "General"
-        self._language: str = "englsish"
+        self._language: str = "english"
         self._supported_languages: str = []
         self._selected_language: str = selected_language
 
@@ -170,7 +170,7 @@ class AIPersonality:
             "Date: {{date}}",
         ])
         self._welcome_message: str = "Welcome! I am lollms (Lord of LLMs) A free and open assistant built by ParisNeo. What can I do for you today?"
-        self._include_welcome_message_in_disucssion: bool = True
+        self._include_welcome_message_in_discussion: bool = True
         self._user_message_prefix: str = "!@>human: "
         self._link_text: str = "\n"
         self._ai_message_prefix: str = "!@>lollms:"
@@ -817,7 +817,7 @@ class AIPersonality:
         self._personality_description = config.get("personality_description", self._personality_description)
         self._personality_conditioning = config.get("personality_conditioning", self._personality_conditioning)
         self._welcome_message = config.get("welcome_message", self._welcome_message)
-        self._include_welcome_message_in_disucssion = config.get("include_welcome_message_in_disucssion", self._include_welcome_message_in_disucssion)
+        self._include_welcome_message_in_discussion = config.get("include_welcome_message_in_discussion", self._include_welcome_message_in_discussion)
 
         self._user_message_prefix = config.get("user_message_prefix", self._user_message_prefix)
         self._link_text = config.get("link_text", self._link_text)
@@ -1105,7 +1105,7 @@ class AIPersonality:
             "personality_description": self._personality_description,
             "personality_conditioning": self._personality_conditioning,
             "welcome_message": self._welcome_message,
-            "include_welcome_message_in_disucssion": self._include_welcome_message_in_disucssion,
+            "include_welcome_message_in_discussion": self._include_welcome_message_in_discussion,
             "user_message_prefix": self._user_message_prefix,
             "link_text": self._link_text,
             "ai_message_prefix": self._ai_message_prefix,
@@ -1147,7 +1147,7 @@ class AIPersonality:
             "personality_description": self._personality_description,
             "personality_conditioning": self._personality_conditioning,
             "welcome_message": self._welcome_message,
-            "include_welcome_message_in_disucssion": self._include_welcome_message_in_disucssion,
+            "include_welcome_message_in_discussion": self._include_welcome_message_in_discussion,
             "user_message_prefix": self._user_message_prefix,
             "link_text": self._link_text,
             "ai_message_prefix": self._ai_message_prefix,
@@ -1340,24 +1340,24 @@ class AIPersonality:
         self._welcome_message = message
 
     @property
-    def include_welcome_message_in_disucssion(self) -> bool:
+    def include_welcome_message_in_discussion(self) -> bool:
         """
         Getter for the include welcome message in disucssion.
 
         Returns:
             bool: whether to add the welcome message to tje discussion or not.
         """
-        return self._include_welcome_message_in_disucssion
+        return self._include_welcome_message_in_discussion
 
-    @include_welcome_message_in_disucssion.setter
-    def include_welcome_message_in_disucssion(self, message: bool):
+    @include_welcome_message_in_discussion.setter
+    def include_welcome_message_in_discussion(self, message: bool):
         """
         Setter for the welcome message.
 
         Args:
             message (str): The new welcome message for the AI assistant.
         """
-        self._include_welcome_message_in_disucssion = message
+        self._include_welcome_message_in_discussion = message
 
 
     @property
