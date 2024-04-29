@@ -2872,6 +2872,23 @@ The AI should respond in this format using data from actions_list:
         return paths
 
     def extract_code_blocks(self, text: str) -> List[dict]:
+        """
+        This function extracts code blocks from a given text.
+
+        Parameters:
+        text (str): The text from which to extract code blocks. Code blocks are identified by triple backticks (```).
+
+        Returns:
+        List[dict]: A list of dictionaries where each dictionary represents a code block and contains the following keys:
+            - 'index' (int): The index of the code block in the text.
+            - 'file_name' (str): An empty string. This field is not used in the current implementation.
+            - 'content' (str): The content of the code block.
+            - 'type' (str): The type of the code block. If the code block starts with a language specifier (like 'python' or 'java'), this field will contain that specifier. Otherwise, it will be set to 'language-specific'.
+
+        Note:
+        The function assumes that the number of triple backticks in the text is even.
+        If the number of triple backticks is odd, it will consider the rest of the text as the last code block.
+        """        
         remaining = text
         bloc_index = 0
         first_index=0
