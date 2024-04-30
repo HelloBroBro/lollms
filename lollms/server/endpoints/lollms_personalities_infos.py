@@ -47,6 +47,7 @@ def list_personalities_categories():
 
 @router.get("/list_personalities")
 def list_personalities(category:str):
+    category = sanitize_path(category)
     if not category:
         return []
     try:
@@ -220,19 +221,24 @@ async def reinstall_personality(personality_in: PersonalityIn):
 
 
 # ------------------------------------------- Files manipulation -----------------------------------------------------
+class Identification(BaseModel):
+    client_id:str
 
-@router.get("/get_current_personality_files_list")
-def get_current_personality_files_list():
+@router.post("/get_current_personality_files_list")
+def get_current_personality_files_list(data:Identification):
+    check_access(lollmsElfServer, data.client_id)
     if lollmsElfServer.personality is None:
         return {"state":False, "error":"No personality selected"}
     return {"state":True, "files":[{"name":Path(f).name, "size":Path(f).stat().st_size} for f in lollmsElfServer.personality.text_files]+[{"name":Path(f).name, "size":Path(f).stat().st_size} for f in lollmsElfServer.personality.image_files]}
 
-@router.get("/clear_personality_files_list")
-def clear_personality_files_list():
+@router.post("/clear_personality_files_list")
+def clear_personality_files_list(data:Identification):
+    check_access(lollmsElfServer, data.client_id)
     if lollmsElfServer.personality is None:
         return {"state":False, "error":"No personality selected"}
     lollmsElfServer.personality.remove_all_files()
     return {"state":True}
+
 class RemoveFileData(BaseModel):
     client_id:str
     name:str

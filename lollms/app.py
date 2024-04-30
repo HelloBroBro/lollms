@@ -24,7 +24,7 @@ import importlib
 import sys, os
 import platform
 import gc
-
+import yaml
 class LollmsApplication(LoLLMsCom):
     def __init__(
                     self, 
@@ -577,7 +577,24 @@ class LollmsApplication(LoLLMsCom):
         current_message = messages[message_index]
 
         # Build the conditionning text block
-        conditionning = self.personality.personality_conditioning
+        if self.config.force_output_language_to_be and self.config.force_output_language_to_be.lower().strip() !="english":
+            language = self.config.force_output_language_to_be.lower().strip().split()[0]
+            language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{language}.yaml"
+            if not language_path.exists():
+                self.info(f"This is the first time this personality seaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
+                language_path.parent.mkdir(exist_ok=True, parents=True)
+                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n")
+                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.welcome_message}\n!@>translation:\n")
+                with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
+                    yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
+            else:
+                with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
+                    language_pack = yaml.safe_load(f)
+                    conditionning = language_pack["conditionning"]
+        else:
+            conditionning = self.personality.personality_conditioning
+
+        
 
         # Check if there are document files to add to the prompt
         internet_search_results = ""
@@ -603,7 +620,7 @@ class LollmsApplication(LoLLMsCom):
             n_negative_boost = 0
 
         if self.config.force_output_language_to_be:
-            force_language="\n!@>important information: Answer the user in this language :"+self.config.force_output_language_to_be+"\n"
+            force_language="\n!@>important information: Answer the user in "+self.config.force_output_language_to_be+" and do not translate your answer to english\n"
             n_force_language = len(self.model.tokenize(force_language))
         else:
             force_language=""

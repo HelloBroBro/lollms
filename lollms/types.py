@@ -1,5 +1,4 @@
 from enum import Enum
-
 class MSG_TYPE(Enum):
     # Messaging
     MSG_TYPE_CHUNK                  = 0 # A chunk of a message (used for classical chat)
@@ -61,3 +60,8 @@ class GenerationPresets:
         Default preset with moderate temperature, top_k, and top_p.
         """
         return {'temperature': 0.5, 'top_k': 20, 'top_p': 0.85}
+
+
+class SUMMARY_MODE(Enum):
+    SUMMARY_MODE_SEQUENCIAL        = 0
+    SUMMARY_MODE_HIERARCHICAL      = 0

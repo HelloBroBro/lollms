@@ -16,6 +16,7 @@ from lollms.binding import LLMBinding, BindingType
 from lollms.utilities import PromptReshaper, PackageManager, discussion_path_to_url, process_ai_output
 from lollms.com import NotificationType, NotificationDisplayType
 from lollms.client_session import Session, Client
+
 import pkg_resources
 from pathlib import Path
 from PIL import Image
@@ -28,7 +29,7 @@ import subprocess
 import yaml
 from ascii_colors import ASCIIColors
 import time
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_TYPE, SUMMARY_MODE
 import json
 from typing import Any, List, Optional, Type, Callable, Dict, Any, Union
 import json
@@ -2228,16 +2229,26 @@ class APScript(StateMachine):
                         max_generation_size=3000,
                         max_summary_size=512,
                         callback=None,
-                        chunk_summary_post_processing=None
+                        chunk_summary_post_processing=None,
+                        summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
                     ):
         depth=0
         tk = self.personality.model.tokenize(text)
         prev_len = len(tk)
-        while len(tk)>max_summary_size:
+        document_chunks=None
+        while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
             self.step_start(f"Comprerssing {doc_name}... [depth {depth+1}]")
             chunk_size = int(self.personality.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
-            text = self.summerize_chunks(document_chunks,summary_instruction, doc_name, answer_start, max_generation_size, callback, chunk_summary_post_processing=chunk_summary_post_processing)
+            text = self.summerize_chunks(
+                                            document_chunks,
+                                            summary_instruction, 
+                                            doc_name, 
+                                            answer_start, 
+                                            max_generation_size, 
+                                            callback, 
+                                            chunk_summary_post_processing=chunk_summary_post_processing,
+                                            summary_mode=summary_mode)
             tk = self.personality.model.tokenize(text)
             tk = self.personality.model.tokenize(text)
             dtk_ln=prev_len-len(tk)
@@ -2259,7 +2270,8 @@ class APScript(StateMachine):
                                 max_generation_size=3000,
                                 max_summary_size=512,
                                 callback=None,
-                                chunk_summary_post_processing=None
+                                chunk_summary_post_processing=None,
+                                summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
                             ):
         depth=0
         tk = self.personality.model.tokenize(text)
@@ -2268,7 +2280,16 @@ class APScript(StateMachine):
             self.step_start(f"Comprerssing... [depth {depth+1}]")
             chunk_size = int(self.personality.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
-            text = self.summerize_chunks(document_chunks, data_extraction_instruction, doc_name, answer_start, max_generation_size, callback, chunk_summary_post_processing=chunk_summary_post_processing)
+            text = self.summerize_chunks(
+                                            document_chunks, 
+                                            data_extraction_instruction, 
+                                            doc_name, 
+                                            answer_start, 
+                                            max_generation_size, 
+                                            callback, 
+                                            chunk_summary_post_processing=chunk_summary_post_processing, 
+                                            summary_mode=summary_mode
+                                        )
             tk = self.personality.model.tokenize(text)
             dtk_ln=prev_len-len(tk)
             prev_len = len(tk)
@@ -2278,8 +2299,14 @@ class APScript(StateMachine):
             if dtk_ln<=10: # it is not sumlmarizing
                 break
         self.step_start(f"Rewriting ...")
-        text = self.summerize_chunks([text],
-        final_task_instruction, doc_name, answer_start, max_generation_size, callback, chunk_summary_post_processing=chunk_summary_post_processing)
+        text = self.summerize_chunks(
+                                        [text],
+                                        final_task_instruction, 
+                                        doc_name, answer_start, 
+                                        max_generation_size, 
+                                        callback, 
+                                        chunk_summary_post_processing=chunk_summary_post_processing
+                                    )
         self.step_end(f"Rewriting ...")
 
         return text
@@ -2292,27 +2319,49 @@ class APScript(StateMachine):
                             answer_start="",
                             max_generation_size=3000,
                             callback=None,
-                            chunk_summary_post_processing=None
+                            chunk_summary_post_processing=None,
+                            summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
                         ):
-        summeries = []
-        for i, chunk in enumerate(chunks):
-            self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
-            summary = f"{answer_start}"+ self.fast_gen(
-                        "\n".join([
-                            f"!@>Document_chunk: {doc_name}:",
-                            f"{chunk}",
-                            f"!@>instruction: {summary_instruction}",
-                            f"Answer directly with the summary with no extra comments.",
-                            f"!@>summary:",
-                            f"{answer_start}"
-                            ]),
-                            max_generation_size=max_generation_size,
-                            callback=callback)
-            if chunk_summary_post_processing:
-                summary = chunk_summary_post_processing(summary)
-            summeries.append(summary)
-            self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
-        return "\n".join(summeries)
+        if summary_mode==SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL:
+            summary = ""
+            for i, chunk in enumerate(chunks):
+                self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+                summary = f"{answer_start}"+ self.fast_gen(
+                            "\n".join([
+                                f"!@>Document_chunk: {doc_name}:",
+                                f"{summary}",
+                                f"{chunk}",
+                                f"!@>instruction: {summary_instruction}",
+                                f"Answer directly with the summary with no extra comments.",
+                                f"!@>summary:",
+                                f"{answer_start}"
+                                ]),
+                                max_generation_size=max_generation_size,
+                                callback=callback)
+                if chunk_summary_post_processing:
+                    summary = chunk_summary_post_processing(summary)
+                self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            return summary
+        else:
+            summeries = []
+            for i, chunk in enumerate(chunks):
+                self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+                summary = f"{answer_start}"+ self.fast_gen(
+                            "\n".join([
+                                f"!@>Document_chunk: {doc_name}:",
+                                f"{chunk}",
+                                f"!@>instruction: {summary_instruction}",
+                                f"Answer directly with the summary with no extra comments.",
+                                f"!@>summary:",
+                                f"{answer_start}"
+                                ]),
+                                max_generation_size=max_generation_size,
+                                callback=callback)
+                if chunk_summary_post_processing:
+                    summary = chunk_summary_post_processing(summary)
+                summeries.append(summary)
+                self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            return "\n".join(summeries)
 
     def sequencial_chunks_summary(
                             self,
