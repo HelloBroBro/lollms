@@ -547,6 +547,47 @@ class LollmsApplication(LoLLMsCom):
                 file_path.unlink()
                 ASCIIColors.info(f"Deleted file: {file_path}")
 
+
+    #languages:
+    def get_personality_languages(self):
+        languages = []
+        # Construire le chemin vers le dossier contenant les fichiers de langue pour la personnalité actuelle
+        languages_dir = self.lollms_paths.personal_configuration_path / "personalities" / self.personality.name
+        
+        # Vérifier si le dossier existe
+        if not languages_dir.exists():
+            print(f"Le dossier {languages_dir} n'existe pas.")
+            return languages
+        
+        # Itérer sur chaque fichier YAML dans le dossier
+        for language_file in languages_dir.glob("languages_*.yaml"):
+            # Extraire le code de langue depuis le nom du fichier
+            language_code = language_file.stem.split("_")[-1]
+            languages.append(language_code)
+        
+        return languages
+
+
+    def set_personality_language(self, language:str):
+        if language is None or  language == "":
+            return False
+        language = language.lower().strip().split()[0]
+        language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{language}.yaml"
+        if not language_path.exists():
+            self.info(f"This is the first time this personality seaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
+            language_path.parent.mkdir(exist_ok=True, parents=True)
+            conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n")
+            welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.welcome_message}\n!@>translation:\n")
+            with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
+                yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
+        else:
+            with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
+                language_pack = yaml.safe_load(f)
+                conditionning = language_pack["conditionning"]
+        self.config.current_language=language
+        self.config.save_config()
+        return True
+
     # -------------------------------------- Prompt preparing
     def prepare_query(self, client_id: str, message_id: int = -1, is_continue: bool = False, n_tokens: int = 0, generation_type = None, force_using_internet=False) -> Tuple[str, str, List[str]]:
         """
@@ -577,8 +618,8 @@ class LollmsApplication(LoLLMsCom):
         current_message = messages[message_index]
 
         # Build the conditionning text block
-        if self.config.force_output_language_to_be and self.config.force_output_language_to_be.lower().strip() !="english":
-            language = self.config.force_output_language_to_be.lower().strip().split()[0]
+        if self.config.current_language and self.config.current_language.lower().strip() !="english":
+            language = self.config.current_language.lower().strip().split()[0]
             language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{language}.yaml"
             if not language_path.exists():
                 self.info(f"This is the first time this personality seaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
@@ -619,8 +660,8 @@ class LollmsApplication(LoLLMsCom):
             negative_boost=""
             n_negative_boost = 0
 
-        if self.config.force_output_language_to_be:
-            force_language="\n!@>important information: Answer the user in "+self.config.force_output_language_to_be+" and do not translate your answer to english\n"
+        if self.config.current_language:
+            force_language="\n!@>important information: Answer the user in "+self.config.current_language+" and do not translate your answer to english\n"
             n_force_language = len(self.model.tokenize(force_language))
         else:
             force_language=""

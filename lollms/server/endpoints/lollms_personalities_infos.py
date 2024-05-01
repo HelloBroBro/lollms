@@ -254,6 +254,48 @@ def remove_file(data:RemoveFileData):
         return {"state":False, "error":"No personality selected"}
     lollmsElfServer.personality.remove_file(data.name)
     return {"state":True}
+
+
+
+# ------------------------------------------- Languages endpoints ------------------------------------------------
+class Identification(BaseModel):
+    client_id:str
+
+@router.post("/get_personality_languages_list")
+def get_current_personality_files_list(data:Identification):
+    check_access(lollmsElfServer, data.client_id)
+    languages_list = lollmsElfServer.get_personality_languages()
+    
+    # Return the languages list
+    return languages_list
+
+@router.post("/get_personality_language")
+def set_personality_language(request: Identification):
+    # Access verification
+    check_access(lollmsElfServer, request.client_id)
+    return lollmsElfServer.config.current_language
+
+class SetLanguageRequest(BaseModel):
+    client_id: str
+    language: str
+
+# Definition of the endpoint for setting the personality language
+@router.post("/set_personality_language")
+def set_personality_language(request: SetLanguageRequest):
+    # Access verification
+    check_access(lollmsElfServer, request.client_id)
+
+    # Calling the method to set the personality language
+    success = lollmsElfServer.set_personality_language(request.language)
+    
+    # Returning an appropriate response depending on whether the operation was successful or not
+    if success:
+        return {"message": f"The personality language has been successfully set to {request.language}."}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to set the personality language")
+
+
+
 # ------------------------------------------- Mounting/Unmounting/Remounting ------------------------------------------------
 class PersonalityDataRequest(BaseModel):
     client_id:str
