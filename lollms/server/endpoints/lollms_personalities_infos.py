@@ -15,7 +15,7 @@ import pkg_resources
 from lollms.server.elf_server import LOLLMSElfServer
 from lollms.personality import AIPersonality, InstallOption
 from ascii_colors import ASCIIColors
-from lollms.utilities import load_config, trace_exception, gc
+from lollms.utilities import load_config, trace_exception, gc, show_yes_no_dialog
 from lollms.security import check_access
 from pathlib import Path
 from typing import List, Optional
@@ -270,7 +270,7 @@ def get_current_personality_files_list(data:Identification):
     return languages_list
 
 @router.post("/get_personality_language")
-def set_personality_language(request: Identification):
+def get_personality_language(request: Identification):
     # Access verification
     check_access(lollmsElfServer, request.client_id)
     return lollmsElfServer.config.current_language
@@ -284,6 +284,7 @@ class SetLanguageRequest(BaseModel):
 def set_personality_language(request: SetLanguageRequest):
     # Access verification
     check_access(lollmsElfServer, request.client_id)
+    sanitize_path(request.language)
 
     # Calling the method to set the personality language
     success = lollmsElfServer.set_personality_language(request.language)
@@ -294,7 +295,29 @@ def set_personality_language(request: SetLanguageRequest):
     else:
         raise HTTPException(status_code=400, detail="Failed to set the personality language")
 
+# Definition of the endpoint for setting the personality language
+@router.post("/del_personality_language")
+def del_personality_language(request: SetLanguageRequest):
+    # Access verification
+    check_access(lollmsElfServer, request.client_id)
+    sanitize_path(request.language)
+    language = request.language.lower().strip().split()[0]
+    default_language = lollmsElfServer.personality.language.lower().strip().split()[0]
 
+    if language==default_language:
+        lollmsElfServer.InfoMessage("It is not possible to delete the default language of a personality")
+        return
+    # Calling the method to set the personality language
+    if lollmsElfServer.config.turn_on_language_validation:
+        if not show_yes_no_dialog("Language deletion request received","I have received a language deletion request. Are you sure?"):
+            return
+    success = lollmsElfServer.del_personality_language(request.language)
+    
+    # Returning an appropriate response depending on whether the operation was successful or not
+    if success:
+        return {"message": f"The personality language has been successfully set to {request.language}."}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to set the personality language")
 
 # ------------------------------------------- Mounting/Unmounting/Remounting ------------------------------------------------
 class PersonalityDataRequest(BaseModel):
@@ -544,7 +567,15 @@ def select_personality(data:PersonalitySelectionInfos):
         if lollmsElfServer.personality.processor:
             lollmsElfServer.personality.processor.selected()
         ASCIIColors.success("ok")
+        
         print(f"Selected {lollmsElfServer.personality.name}")
+
+        language = lollmsElfServer.config.current_language
+        default_language = lollmsElfServer.personality.language.lower().strip().split()[0]
+
+        if language != default_language:
+            lollmsElfServer.set_personality_language(language)
+
         if lollmsElfServer.config.auto_save:
             ASCIIColors.info("Saving configuration")
             lollmsElfServer.config.save_config()

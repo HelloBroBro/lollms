@@ -99,7 +99,9 @@ async def text2Audio(request: LollmsText2AudioRequest):
                 lollmsElfServer.tts = LollmsXTTS(
                     lollmsElfServer, 
                     voice_samples_path=Path(__file__).parent/"voices", 
-                    xtts_base_url= lollmsElfServer.config.xtts_base_url
+                    xtts_base_url= lollmsElfServer.config.xtts_base_url,
+                    use_deep_speed= lollmsElfServer.config.xtts_use_deep_speed,
+                    use_streaming_mode= lollmsElfServer.config.xtts_use_streaming_mode,
                 )
         except Exception as ex:
             return {"url": None, "error":f"{ex}"}
@@ -113,7 +115,13 @@ async def text2Audio(request: LollmsText2AudioRequest):
         try:
             from lollms.services.xtts.lollms_xtts import LollmsXTTS
             if lollmsElfServer.tts is None:
-                lollmsElfServer.tts = LollmsXTTS(lollmsElfServer, voice_samples_path=Path(__file__).parent/"voices", xtts_base_url= lollmsElfServer.config.xtts_base_url)
+                lollmsElfServer.tts = LollmsXTTS(
+                                                    lollmsElfServer, 
+                                                    voice_samples_path=Path(__file__).parent/"voices", 
+                                                    xtts_base_url= lollmsElfServer.config.xtts_base_url,
+                                                    use_deep_speed=lollmsElfServer.config.xtts_use_deepspeed,
+                                                    use_streaming_mode=lollmsElfServer.config.xtts_use_streaming_mode                                                    
+                                                )
             language = lollmsElfServer.config.current_language# convert_language_name()
             if voice!="main_voice":
                 voices_folder = lollmsElfServer.lollms_paths.custom_voices_path
@@ -164,7 +172,9 @@ def start_xtts():
             lollmsElfServer.tts = LollmsXTTS(
                 lollmsElfServer, 
                 voice_samples_path=Path(__file__).parent/"voices", 
-                xtts_base_url= lollmsElfServer.config.xtts_base_url
+                xtts_base_url= lollmsElfServer.config.xtts_base_url,
+                use_deep_speed=lollmsElfServer.config.xtts_use_deepspeed,
+                use_streaming_mode=lollmsElfServer.config.xtts_use_streaming_mode                                                    
             )
         lollmsElfServer.HideBlockingMessage()
     except Exception as ex:

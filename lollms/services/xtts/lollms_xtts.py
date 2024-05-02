@@ -88,7 +88,10 @@ class LollmsXTTS:
                     share=False,
                     max_retries=10,
                     voice_samples_path="",
-                    wait_for_service=True
+                    wait_for_service=True,
+                    use_deep_speed=False,
+                    use_streaming_mode = True
+
                     ):
         if xtts_base_url=="" or xtts_base_url=="http://127.0.0.1:8020":
             xtts_base_url = None
@@ -97,6 +100,8 @@ class LollmsXTTS:
         self.app = app
         root_dir = lollms_paths.personal_path
         self.voice_samples_path = voice_samples_path
+        self.use_deep_speed = use_deep_speed
+        self.use_streaming_mode = use_streaming_mode
         
         # Store the path to the script
         if xtts_base_url is None:
@@ -138,7 +143,12 @@ class LollmsXTTS:
         # Get the path to the current Python interpreter
         python_path = sys.executable
         ASCIIColors.yellow("Loading XTTS ")
-        process = run_python_script_in_env("xtts", f"-m xtts_api_server -o  {self.output_folder} -sf {self.voice_samples_path} -p {self.xtts_base_url.split(':')[-1].replace('/','')}", wait= False)
+        options= ""
+        if self.use_deep_speed:
+            options += "--deepspeed"
+        if self.use_streaming_mode:
+            options += "--streaming-mode --streaming-mode-improve --stream-play-sync"
+        process = run_python_script_in_env("xtts", f"-m xtts_api_server {options} -o {self.output_folder} -sf {self.voice_samples_path} -p {self.xtts_base_url.split(':')[-1].replace('/','')}", wait= False)
         return process
     
     def wait_for_service(self, max_retries = 150, show_warning=True):

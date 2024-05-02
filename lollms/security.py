@@ -125,13 +125,12 @@ def sanitize_path(path: str, allow_absolute_path: bool = False, error_text="Abso
     """    
     if path is None:
         return path
-    
-    if not allow_absolute_path and path.strip().startswith("/"):
-        raise HTTPException(status_code=400, detail=exception_text)
 
     # Normalize path to use forward slashes
     path = path.replace('\\', '/')
 
+    if not allow_absolute_path and path.strip().startswith("/"):
+        raise HTTPException(status_code=400, detail=exception_text)
 
     # Regular expression to detect patterns like "....", multiple forward slashes, and command injection attempts like $(whoami)
     suspicious_patterns = re.compile(r'(\.\.+)|(/+/)|(\$\(.*\))')
