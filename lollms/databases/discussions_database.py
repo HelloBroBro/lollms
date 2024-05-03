@@ -2,10 +2,16 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime
-from lollms.helpers import ASCIIColors
+from ascii_colors import ASCIIColors, trace_exception
+from lollms.types import MSG_TYPE
+from lollms.types import BindingType
+from lollms.utilities import PackageManager, discussion_path_to_url
 from lollms.paths import LollmsPaths
 from lollms.databases.skills_database import SkillsLibrary
+from lollms.com import LoLLMsCom
+from safe_store import TextVectorizer, VisualizationMethod, GenericDataLoader
 import json
+import shutil
 
 __author__ = "parisneo"
 __github__ = "https://github.com/ParisNeo/lollms-webui"
@@ -16,7 +22,8 @@ __license__ = "Apache 2.0"
 # =================================== Database ==================================================================
 class DiscussionsDB:
     
-    def __init__(self, lollms_paths:LollmsPaths, discussion_db_name="default"):
+    def __init__(self, lollms:LoLLMsCom, lollms_paths:LollmsPaths, discussion_db_name="default"):
+        self.lollms = lollms
         self.lollms_paths = lollms_paths
         
         self.discussion_db_name = discussion_db_name
@@ -24,7 +31,6 @@ class DiscussionsDB:
 
         self.discussion_db_path.mkdir(exist_ok=True, parents= True)
         self.discussion_db_file_path = self.discussion_db_path/"database.db"
-
 
     def create_tables(self):
         db_version = 12
@@ -199,7 +205,7 @@ class DiscussionsDB:
         else:
             last_discussion_id = last_discussion_id[0]
         self.current_message_id = self.select("SELECT id FROM message WHERE discussion_id=? ORDER BY id DESC LIMIT 1", (last_discussion_id,), fetch_all=False)
-        return Discussion(last_discussion_id, self)
+        return Discussion(self.lollms, last_discussion_id, self)
     
     def create_discussion(self, title="untitled"):
         """Creates a new discussion
@@ -211,10 +217,10 @@ class DiscussionsDB:
             Discussion: A Discussion instance 
         """
         discussion_id = self.insert(f"INSERT INTO discussion (title) VALUES (?)",(title,))
-        return Discussion(discussion_id, self)
+        return Discussion(self.lollms, discussion_id, self)
 
     def build_discussion(self, discussion_id=0):
-        return Discussion(discussion_id, self)
+        return Discussion(self.lollms, discussion_id, self)
 
     def get_discussions(self):
         rows = self.select("SELECT * FROM discussion")         
@@ -618,7 +624,8 @@ class Message:
         return msgJson
 
 class Discussion:
-    def __init__(self, discussion_id, discussions_db:DiscussionsDB):
+    def __init__(self, lollms:LoLLMsCom, discussion_id, discussions_db:DiscussionsDB):
+        self.lollms = lollms
         self.discussion_id = discussion_id
         self.discussions_db = discussions_db
         self.discussion_folder = self.discussions_db.discussion_db_path/f"{discussion_id}"
@@ -627,19 +634,181 @@ class Discussion:
         self.discussion_text_folder = self.discussion_folder / "text_data"
         self.discussion_skills_folder = self.discussion_folder / "skills"
         self.discussion_rag_folder = self.discussion_folder / "rag"
+        self.discussion_view_images_folder = self.discussion_folder / "view_images"
+
         self.discussion_folder.mkdir(exist_ok=True)
         self.discussion_images_folder.mkdir(exist_ok=True)
         self.discussion_text_folder.mkdir(exist_ok=True)
         self.discussion_skills_folder.mkdir(exist_ok=True)
         self.discussion_rag_folder.mkdir(exist_ok=True)
+        self.discussion_view_images_folder.mkdir(exist_ok=True)
         self.messages = self.get_messages()
         
         if len(self.messages)>0:
             self.current_message = self.messages[-1]
 
-    def add_file(self, file_name):
-        # TODO : add file
-        pass
+        # Initialize the file lists
+        self.update_file_lists()
+
+
+        self.vectorizer = TextVectorizer(
+            self.lollms.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
+            model=self.lollms.model, #needed in case of using model_embedding
+            database_path=self.discussion_rag_folder/"db.json",
+            save_db=self.lollms.config.data_vectorization_save_db,
+            data_visualization_method=VisualizationMethod.PCA,
+            database_dict=None)
+    
+        if len(self.vectorizer.chunks)==0 and len(self.text_files)>0:
+            for path in self.text_files:
+                data = GenericDataLoader.read_file(path)
+                self.vectorizer.add_document(path, data, self.lollms.config.data_vectorization_chunk_size, self.lollms.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
+                self.vectorizer.index()
+            
+
+    def update_file_lists(self):
+        self.text_files = [Path(file) for file in self.discussion_text_folder.glob('*')]
+        self.image_files = [Path(file) for file in self.discussion_images_folder.glob('*')]
+        self.audio_files = [Path(file) for file in self.discussion_audio_folder.glob('*')]
+        self.rag_db = [Path(file) for file in self.discussion_rag_folder.glob('*')]
+
+
+    def remove_file(self, file_name, callback=None):
+        try:
+            all_files = self.text_files+self.image_files+self.audio_files
+            if any(file_name == entry.name for entry in self.text_files):
+                fn = [entry for entry in self.text_files if entry.name == file_name][0]
+                self.text_files = [entry for entry in self.text_files if entry.name != file_name]
+                Path(fn).unlink()
+                if len(self.text_files)>0:
+                    try:
+                        self.vectorizer.remove_document(fn)
+                        if callback is not None:
+                            callback("File removed successfully",MSG_TYPE.MSG_TYPE_INFO)
+                        return True
+                    except ValueError as ve:
+                        ASCIIColors.error(f"Couldn't remove the file")
+                        return False
+                else:
+                    self.vectorizer = None
+            elif any(file_name == entry.name for entry in self.image_files):
+                fn = [entry for entry in self.image_files if entry.name == file_name][0]
+                self.image_files = [entry for entry in self.image_files if entry.name != file_name]
+                Path(fn).unlink()
+            elif any(file_name == entry.name for entry in self.audio_files):
+                fn = [entry for entry in self.audio_files if entry.name == file_name][0]
+                self.audio_files = [entry for entry in self.audio_files if entry.name != file_name]
+                Path(fn).unlink()
+
+        except Exception as ex:
+            trace_exception(ex)
+            ASCIIColors.warning(f"Couldn't remove the file {file_name}")
+
+    def remove_all_files(self):
+        # Iterate over each directory and remove all files
+        for path in [self.discussion_images_folder, self.discussion_rag_folder, self.discussion_audio_folder, self.discussion_text_folder]:
+            for file in path.glob('*'):
+                if file.is_file():  # Ensure it's a file, not a directory
+                    file.unlink()  # Delete the file
+                    
+        # Clear the lists to reflect the current state (empty directories)
+        self.text_files.clear()
+        self.image_files.clear()
+        self.audio_files.clear()
+
+    def add_file(self, path, client, callback=None, process=True):
+        output = ""
+
+        path = Path(path)
+        if path.suffix in [".wav",".mp3"]:
+            self.audio_files.append(path)
+            if process:
+                self.lollms.new_messagenew_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
+                self.lollms.info(f"Transcribing ... ")
+                if self.whisper is None:
+                    if not PackageManager.check_package_installed("whisper"):
+                        PackageManager.install_package("openai-whisper")
+                        try:
+                            import conda.cli
+                            conda.cli.main("install", "conda-forge::ffmpeg", "-y")
+                        except:
+                            ASCIIColors.bright_red("Couldn't install ffmpeg. whisper won't work. Please install it manually")
+
+                    import whisper
+                    self.whisper = whisper.load_model("base")
+                result = self.whisper.transcribe(str(path))
+                transcription_fn = str(path)+".txt"
+                with open(transcription_fn, "w", encoding="utf-8") as f:
+                    f.write(result["text"])
+
+                self.info(f"File saved to {transcription_fn}")
+                self.full(result["text"])
+                self.step_end("Transcribing ... ")
+        elif path.suffix in [".png",".jpg",".jpeg",".gif",".bmp",".svg",".webp"]:
+            self.image_files.append(path)
+            if process:
+                
+                try:
+                    view_file = self.discussion_view_images_folder/path.name
+                    shutil.copyfile(path, view_file)
+                    pth = str(view_file).replace("\\","/").split('/')
+                    if "discussion_databases" in pth:
+                        pth = discussion_path_to_url(view_file)
+                        self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
+                        output = f'<img src="{pth}" width="800">\n\n'
+                        self.lollms.full(output, client_id=client.client_id)
+                        self.lollms.close_message(client.client_id if client is not None else 0)
+
+                    if self.lollms.model.binding_type not in [BindingType.TEXT_IMAGE, BindingType.TEXT_IMAGE_VIDEO]:
+                        # self.ShowBlockingMessage("Understanding image (please wait)")
+                        from PIL import Image
+                        img = Image.open(str(view_file))
+                        # Convert the image to RGB mode
+                        img = img.convert("RGB")
+                        output += "## image description :\n"+ self.lollms.model.interrogate_blip([img])[0]
+                        # output += "## image description :\n"+ self.lollms.model.qna_blip([img],"q:Describe this photo with as much details as possible.\na:")[0]
+                        self.lollms.full(output)
+                        self.lollms.close_message(client.client_id if client is not None else 0)
+                        self.lollms.HideBlockingMessage("Understanding image (please wait)")
+                        if self.lollms.config.debug:
+                            ASCIIColors.yellow(output)
+                    else:
+                        # self.ShowBlockingMessage("Importing image (please wait)")
+                        self.lollms.HideBlockingMessage("Importing image (please wait)")
+
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.lollms.HideBlockingMessage("Understanding image (please wait)", False)
+                    ASCIIColors.error("Couldn't create new message")
+            ASCIIColors.info("Received image file")
+            if callback is not None:
+                callback("Image file added successfully", MSG_TYPE.MSG_TYPE_INFO)
+        else:
+            try:
+                # self.ShowBlockingMessage("Adding file to vector store.\nPlease stand by")
+                self.text_files.append(path)
+                ASCIIColors.info("Received text compatible file")
+                self.lollms.ShowBlockingMessage("Processing file\nPlease wait ...")
+                if process:
+                    if self.vectorizer is None:
+                        self.vectorizer = TextVectorizer(
+                                    self.lollms.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
+                                    model=self.lollms.model, #needed in case of using model_embedding
+                                    database_path=self.discussion_rag_folder/"db.json",
+                                    save_db=self.lollms.config.data_vectorization_save_db,
+                                    data_visualization_method=VisualizationMethod.PCA,
+                                    database_dict=None)
+                    data = GenericDataLoader.read_file(path)
+                    self.vectorizer.add_document(path, data, self.lollms.config.data_vectorization_chunk_size, self.lollms.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
+                    self.vectorizer.index()
+                    if callback is not None:
+                        callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
+                    self.lollms.HideBlockingMessage(client.client_id)
+                    return True
+            except Exception as e:
+                trace_exception(e)
+                self.lollms.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {GenericDataLoader.get_supported_file_types()}",client_id=client.client_id)
+                return False
 
     def load_message(self, id):
         """Gets a list of messages information

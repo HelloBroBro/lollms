@@ -1,4 +1,6 @@
 from ascii_colors import ASCIIColors
+from lollms.types import MSG_TYPE, SENDER_TYPES
+from typing import Callable
 import socketio
 from enum import Enum
 class NotificationType(Enum):
@@ -96,6 +98,9 @@ class LoLLMsCom:
             self.sio.sleep(1)
         return infos["result"]
 
+    def close_message(self, client_id):
+        pass
+    
     def info(self, content, duration:int=4, client_id=None, verbose:bool=None):
         self.notify(
                 content, 
@@ -136,6 +141,26 @@ class LoLLMsCom:
                 verbose = verbose
             )
         
+    def new_message(self, 
+                            client_id, 
+                            sender=None, 
+                            content="",
+                            parameters=None,
+                            metadata=None,
+                            ui=None,
+                            message_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_FULL, 
+                            sender_type:SENDER_TYPES=SENDER_TYPES.SENDER_TYPES_AI,
+                            open=False
+                        ):
+        pass
+    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends full text to front end
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the text to. Defaults to None.
+        """
+        pass
 
     def notify(
                 self, 

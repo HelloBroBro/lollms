@@ -17,7 +17,7 @@ from lollms.security import sanitize_path, check_access
 from ascii_colors import ASCIIColors
 from lollms.databases.discussions_database import DiscussionsDB, Discussion
 from typing import List
-
+import shutil
 from safe_store.text_vectorizer import TextVectorizer, VectorizationMethod, VisualizationMethod
 import tqdm
 from pathlib import Path
@@ -69,7 +69,7 @@ def select_database(data:DatabaseSelectionParameters):
 
     print(f'Selecting database {data.name}')
     # Create database object
-    lollmsElfServer.db = DiscussionsDB(lollmsElfServer.lollms_paths, data.name)
+    lollmsElfServer.db = DiscussionsDB(lollmsElfServer, lollmsElfServer.lollms_paths, data.name)
     ASCIIColors.info("Checking discussions database... ",end="")
     lollmsElfServer.db.create_tables()
     lollmsElfServer.db.add_missing_columns()
@@ -98,7 +98,7 @@ async def edit_title(discussion_edit_title: DiscussionEditTitle):
         client_id = discussion_edit_title.client_id
         title = discussion_edit_title.title
         discussion_id = discussion_edit_title.id
-        lollmsElfServer.session.get_client(client_id).discussion = Discussion(discussion_id, lollmsElfServer.db)
+        lollmsElfServer.session.get_client(client_id).discussion = Discussion(lollmsElfServer, discussion_id, lollmsElfServer.db)
         lollmsElfServer.session.get_client(client_id).discussion.rename(title)
         return {'status':True}
     except Exception as ex:
@@ -114,7 +114,7 @@ async def make_title(discussion_title: DiscussionTitle):
     try:
         ASCIIColors.info("Making title")
         discussion_id = discussion_title.id
-        discussion = Discussion(discussion_id, lollmsElfServer.db)
+        discussion = Discussion(lollmsElfServer, discussion_id, lollmsElfServer.db)
         title = lollmsElfServer.make_discussion_title(discussion)
         discussion.rename(title)
         return {'status':True, 'title':title}
@@ -151,10 +151,14 @@ async def delete_discussion(discussion: DiscussionDelete):
     try:
 
         client_id           = discussion.client_id
-        discussion_id       = discussion.id
-        lollmsElfServer.session.get_client(client_id).discussion = Discussion(discussion_id, lollmsElfServer.db)
+        discussion_id       = sanitize_path(discussion.id)
+        discussion_path = lollmsElfServer.lollms_paths.personal_discussions_path/lollmsElfServer.config.discussion_db_name/discussion_id
+
+        lollmsElfServer.session.get_client(client_id).discussion = Discussion(lollmsElfServer, discussion_id, lollmsElfServer.db)
         lollmsElfServer.session.get_client(client_id).discussion.delete_discussion()
         lollmsElfServer.session.get_client(client_id).discussion = None
+
+        shutil.rmtree(discussion_path)
         return {'status':True}
     except Exception as ex:
         trace_exception(ex)
@@ -208,3 +212,38 @@ async def import_multiple_discussions(discussion_import: DiscussionImport):
         trace_exception(ex)
         lollmsElfServer.error(ex)
         return {"status":False,"error":str(ex)}
+
+
+
+# ------------------------------------------- Files manipulation -----------------------------------------------------
+class Identification(BaseModel):
+    client_id:str
+
+@router.post("/get_discussion_files_list")
+def get_discussion_files_list(data:Identification):
+    client = check_access(lollmsElfServer, data.client_id)
+    return {"state":True, "files":[{"name":Path(f).name, "size":Path(f).stat().st_size} for f in client.discussion.text_files]+[{"name":Path(f).name, "size":Path(f).stat().st_size} for f in client.discussion.image_files]}
+
+@router.post("/clear_discussion_files_list")
+def clear_discussion_files_list(data:Identification):
+    client = check_access(lollmsElfServer, data.client_id)
+    if lollmsElfServer.personality is None:
+        return {"state":False, "error":"No personality selected"}
+    client.discussion.remove_all_files()
+    return {"state":True}
+
+class RemoveFileData(BaseModel):
+    client_id:str
+    name:str
+    
+@router.post("/remove_discussion_file")
+def remove_discussion_file(data:RemoveFileData):
+    """
+    Removes a file form the personality files
+    """
+    client = check_access(lollmsElfServer, data.client_id)
+    
+    if lollmsElfServer.personality is None:
+        return {"state":False, "error":"No personality selected"}
+    client.discussion.remove_file(data.name)
+    return {"state":True}

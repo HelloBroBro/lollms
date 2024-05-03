@@ -26,6 +26,7 @@ from lollms.main_config import LOLLMSConfig
 from lollms.com import NotificationType, NotificationDisplayType, LoLLMsCom
 from lollms.security import sanitize_path
 from lollms.utilities import show_message_dialog
+from lollms.types import BindingType
 
 import urllib
 import inspect
@@ -41,20 +42,7 @@ __author__ = "parisneo"
 __github__ = "https://github.com/ParisNeo/lollms_bindings_zoo"
 __copyright__ = "Copyright 2023, "
 __license__ = "Apache 2.0"
-class BindingType(Enum):
-    """Binding types."""
-    
-    TEXT_ONLY = 0
-    """This binding only supports text."""
-    
-    TEXT_IMAGE = 1
-    """This binding supports text and image."""
 
-    TEXT_IMAGE_VIDEO = 2
-    """This binding supports text, image and video."""
-
-    TEXT_AUDIO = 3
-    """This binding supports text and audio."""
 
 class LLMBinding:
     

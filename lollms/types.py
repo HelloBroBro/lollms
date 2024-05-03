@@ -61,6 +61,20 @@ class GenerationPresets:
         """
         return {'temperature': 0.5, 'top_k': 20, 'top_p': 0.85}
 
+class BindingType(Enum):
+    """Binding types."""
+    
+    TEXT_ONLY = 0
+    """This binding only supports text."""
+    
+    TEXT_IMAGE = 1
+    """This binding supports text and image."""
+
+    TEXT_IMAGE_VIDEO = 2
+    """This binding supports text, image and video."""
+
+    TEXT_AUDIO = 3
+    """This binding supports text and audio."""
 
 class SUMMARY_MODE(Enum):
     SUMMARY_MODE_SEQUENCIAL        = 0

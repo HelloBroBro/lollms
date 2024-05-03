@@ -588,10 +588,10 @@ class LollmsApplication(LoLLMsCom):
         if language!= default_language:
             language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{language}.yaml"
             if not language_path.exists():
-                self.ShowBlockingMessage(f"This is the first time this personality seaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
+                self.ShowBlockingMessage(f"This is the first time this personality speaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
                 language_path.parent.mkdir(exist_ok=True, parents=True)
-                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n")
-                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.welcome_message}\n!@>translation:\n")
+                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n", callback=self.personality.sink)
+                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.welcome_message}\n!@>translation:\n", callback=self.personality.sink)
                 with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
                     yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
                 self.HideBlockingMessage()
@@ -640,7 +640,9 @@ class LollmsApplication(LoLLMsCom):
         if self.personality.callback is None:
             self.personality.callback = partial(self.process_chunk, client_id=client_id)
         # Get the list of messages
-        messages = self.session.get_client(client_id).discussion.get_messages()
+        client = self.session.get_client(client_id)
+        discussion = client.discussion
+        messages = discussion.get_messages()
 
         # Find the index of the message with the specified message_id
         message_index = -1
@@ -659,10 +661,10 @@ class LollmsApplication(LoLLMsCom):
         if self.config.current_language and  current_language!= default_language:
             language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{current_language}.yaml"
             if not language_path.exists():
-                self.info(f"This is the first time this personality seaks {current_language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {current_language} out of the box")
+                self.info(f"This is the first time this personality speaks {current_language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {current_language} out of the box")
                 language_path.parent.mkdir(exist_ok=True, parents=True)
-                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {current_language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n")
-                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {current_language}:\n{self.personality.welcome_message}\n!@>translation:\n")
+                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {current_language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n", callback=self.personality.sink)
+                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {current_language}:\n{self.personality.welcome_message}\n!@>translation:\n", callback=self.personality.sink)
                 with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
                     yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
             else:
@@ -769,12 +771,14 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning("Couldn't add documentation to the context. Please verify the vector database")
             
-            if len(self.personality.text_files) > 0 and self.personality.vectorizer:
+            if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
+                if discussion is None:
+                    discussion = self.recover_discussion(client_id)
+
                 if documentation=="":
                     documentation="\n!@>important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n!@>Documentation:\n"
 
                 if self.config.data_vectorization_build_keys_words:
-                    discussion = self.recover_discussion(client_id)
                     self.personality.step_start("Building vector store query")
                     query = self.personality.fast_gen(f"\n!@>instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.\n!@>discussion:\n{discussion[-2048:]}\n!@>enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     self.personality.step_end("Building vector store query")
@@ -783,20 +787,20 @@ class LollmsApplication(LoLLMsCom):
                     query = current_message.content
 
                 try:
-                    if self.config.data_vectorization_force_first_chunk and len(self.personality.vectorizer.chunks)>0:
-                        doc_index = list(self.personality.vectorizer.chunks.keys())[0]
+                    if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0:
+                        doc_index = list(client.discussion.vectorizer.chunks.keys())[0]
 
-                        doc_id = self.personality.vectorizer.chunks[doc_index]['document_id']
-                        content = self.personality.vectorizer.chunks[doc_index]['chunk_text']
+                        doc_id = client.discussion.vectorizer.chunks[doc_index]['document_id']
+                        content = client.discussion.vectorizer.chunks[doc_index]['chunk_text']
                         
                         if self.config.data_vectorization_put_chunk_informations_into_context:
                             documentation += f"!@>document chunk:\nchunk_infos:{doc_id}\ncontent:{content}\n"
                         else:
                             documentation += f"!@>chunk:\n{content}\n"
 
-                    docs, sorted_similarities, document_ids = self.personality.vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
+                    docs, sorted_similarities, document_ids = client.discussion.vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
                     for doc, infos in zip(docs, sorted_similarities):
-                        if self.config.data_vectorization_force_first_chunk and len(self.personality.vectorizer.chunks)>0 and infos[0]==doc_id:
+                        if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0 and infos[0]==doc_id:
                             continue
                         if self.config.data_vectorization_put_chunk_informations_into_context:
                             documentation += f"!@>document chunk:\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
