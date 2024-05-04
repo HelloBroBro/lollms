@@ -161,6 +161,11 @@ def add_events(sio:socketio):
                 if lollmsElfServer.personality.processor is not None:
                     lollmsElfServer.start_time = datetime.now()
                     lollmsElfServer.personality.processor.callback = partial(lollmsElfServer.process_chunk, client_id=client_id)
+                    lollmsElfServer.personality.vectorizer = client.discussion.vectorizer
+                    lollmsElfServer.personality.text_files = client.discussion.text_files
+                    lollmsElfServer.personality.image_files = client.discussion.image_files
+                    lollmsElfServer.personality.audio_files = client.discussion.audio_files
+                    
                     lollmsElfServer.personality.processor.execute_command(command, parameters, client)
                 else:
                     lollmsElfServer.warning("Non scripted personalities do not support commands",client_id=client_id)

@@ -662,9 +662,14 @@ class Discussion:
         if len(self.vectorizer.chunks)==0 and len(self.text_files)>0:
             for path in self.text_files:
                 data = GenericDataLoader.read_file(path)
-                self.vectorizer.add_document(path, data, self.lollms.config.data_vectorization_chunk_size, self.lollms.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
+                try:
+                    self.vectorizer.add_document(path, data, self.lollms.config.data_vectorization_chunk_size, self.lollms.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
+                except Exception as ex:
+                    trace_exception(ex)            
+            try:
                 self.vectorizer.index()
-            
+            except Exception as ex:
+                trace_exception(ex)            
 
     def update_file_lists(self):
         self.text_files = [Path(file) for file in self.discussion_text_folder.glob('*')]

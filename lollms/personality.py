@@ -2348,7 +2348,7 @@ class APScript(StateMachine):
                 self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
                 summary = f"{answer_start}"+ self.fast_gen(
                             "\n".join([
-                                f"!@>Document_chunk: {doc_name}:",
+                                f"!@>Document_chunk [{doc_name}]:",
                                 f"{chunk}",
                                 f"!@>instruction: {summary_instruction}",
                                 f"Answer directly with the summary with no extra comments.",

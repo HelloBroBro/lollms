@@ -151,8 +151,9 @@ async def delete_discussion(discussion: DiscussionDelete):
     try:
 
         client_id           = discussion.client_id
-        discussion_id       = sanitize_path(discussion.id)
-        discussion_path = lollmsElfServer.lollms_paths.personal_discussions_path/lollmsElfServer.config.discussion_db_name/discussion_id
+        discussion_id       = discussion.id
+        discussion_path = lollmsElfServer.lollms_paths.personal_discussions_path/lollmsElfServer.config.discussion_db_name/f"{discussion_id}"
+
 
         lollmsElfServer.session.get_client(client_id).discussion = Discussion(lollmsElfServer, discussion_id, lollmsElfServer.db)
         lollmsElfServer.session.get_client(client_id).discussion.delete_discussion()

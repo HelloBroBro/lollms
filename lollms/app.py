@@ -560,6 +560,8 @@ class LollmsApplication(LoLLMsCom):
         languages = []
         # Construire le chemin vers le dossier contenant les fichiers de langue pour la personnalité actuelle
         languages_dir = self.lollms_paths.personal_configuration_path / "personalities" / self.personality.name
+        if self.personality.language is None:
+            self.personality.language="english"
         default_language = self.personality.language.lower().strip().split()[0]
         # Vérifier si le dossier existe
         languages_dir.mkdir(parents=True, exist_ok=True)

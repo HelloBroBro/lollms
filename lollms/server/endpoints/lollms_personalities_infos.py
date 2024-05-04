@@ -571,6 +571,8 @@ def select_personality(data:PersonalitySelectionInfos):
         print(f"Selected {lollmsElfServer.personality.name}")
 
         language = lollmsElfServer.config.current_language
+        if lollmsElfServer.personality.language is None:
+            lollmsElfServer.personality.language = "english"
         default_language = lollmsElfServer.personality.language.lower().strip().split()[0]
 
         if language != default_language:
