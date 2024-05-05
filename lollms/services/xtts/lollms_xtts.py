@@ -22,6 +22,7 @@ import subprocess
 import time
 import json
 import platform
+import threading
 from dataclasses import dataclass
 from PIL import Image, PngImagePlugin
 from enum import Enum
@@ -29,7 +30,7 @@ from typing import List, Dict, Any
 
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
-from lollms.utilities import git_pull, show_yes_no_dialog, run_python_script_in_env, create_conda_env, run_pip_in_env
+from lollms.utilities import git_pull, show_yes_no_dialog, run_python_script_in_env, create_conda_env, run_pip_in_env, environment_exists
 import subprocess
 import platform
 
@@ -37,29 +38,51 @@ def verify_xtts(lollms_paths:LollmsPaths):
     # Clone repository
     root_dir = lollms_paths.personal_path
     shared_folder = root_dir/"shared"
-    xtts_folder = shared_folder / "xtts"
-    return xtts_folder.exists()
+    xtts_path = shared_folder / "xtts"
+    return xtts_path.exists()
     
 def install_xtts(lollms_app:LollmsApplication):
     ASCIIColors.green("XTTS installation started")
-
+    repo_url = "https://github.com/ParisNeo/xtts-api-server"
     root_dir = lollms_app.lollms_paths.personal_path
     shared_folder = root_dir/"shared"
-    xtts_folder = shared_folder / "xtts"
-    if xtts_folder.exists() and PackageManager.check_package_installed("xtts-api-server"):
-        if not show_yes_no_dialog("warning!","It looks like xtts is already installed on your system.\nDo you want to reinstall it?"):
-            lollms_app.error("Service installation canceled")
-            return
-    
-    lollms_app.ShowBlockingMessage("Creating xtts environment")
-    ASCIIColors.cyan("Installing autosd conda environment with python 3.10")
-    create_conda_env("xtts","3.10")
+    xtts_path = shared_folder / "xtts"
+
+    # Step 1: Clone or update the repository
+    if os.path.exists(xtts_path):
+        print("Repository already exists. Pulling latest changes...")
+        try:
+            subprocess.run(["git", "-C", xtts_path, "pull"], check=True)
+        except:
+            subprocess.run(["git", "clone", repo_url, xtts_path], check=True)
+
+    else:
+        print("Cloning repository...")
+        subprocess.run(["git", "clone", repo_url, xtts_path], check=True)
+
+    # Step 2: Create or update the Conda environment
+    if environment_exists("xtts"):
+        print("Conda environment 'xtts' already exists. Updating...")
+        # Here you might want to update the environment, e.g., update Python or dependencies
+        # This step is highly dependent on how you manage your Conda environments and might involve
+        # running `conda update` commands or similar.
+    else:
+        print("Creating Conda environment 'xtts'...")
+        create_conda_env("xtts", "3.8")
+
+    # Step 3: Install or update dependencies using your custom function
+    requirements_path = os.path.join(xtts_path, "requirements.txt")
+    run_pip_in_env("xtts", f"install -r {requirements_path}", cwd=xtts_path)
+    run_pip_in_env("xtts", f"install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118", cwd=xtts_path)
+
+    # Step 4: Launch the server
+    # Assuming the server can be started with a Python script in the cloned repository
+    print("Launching XTTS API server...")
+    run_python_script_in_env("xtts", "xtts_api_server", cwd=xtts_path)
+
+    print("XTTS API server setup and launch completed.")
     ASCIIColors.cyan("Done")
     ASCIIColors.cyan("Installing xtts-api-server")
-    run_pip_in_env("xtts", "install --upgrade xtts-api-server")
-    run_pip_in_env("xtts", "install --upgrade torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118")
-    ASCIIColors.cyan("Done")
-    xtts_folder.mkdir(exist_ok=True,parents=True)
     ASCIIColors.green("XTTS server installed successfully")
 
 
@@ -67,9 +90,9 @@ def install_xtts(lollms_app:LollmsApplication):
 def get_xtts(lollms_paths:LollmsPaths):
     root_dir = lollms_paths.personal_path
     shared_folder = root_dir/"shared"
-    xtts_folder = shared_folder / "xtts"
-    xtts_script_path = xtts_folder / "lollms_xtts.py"
-    git_pull(xtts_folder)
+    xtts_path = shared_folder / "xtts"
+    xtts_script_path = xtts_path / "lollms_xtts.py"
+    git_pull(xtts_path)
     
     if xtts_script_path.exists():
         ASCIIColors.success("lollms_xtts found.")
@@ -86,13 +109,15 @@ class LollmsXTTS:
                     app:LollmsApplication, 
                     xtts_base_url=None,
                     share=False,
-                    max_retries=10,
+                    max_retries=20,
+                    voices_folder=None,
                     voice_samples_path="",
                     wait_for_service=True,
                     use_deep_speed=False,
                     use_streaming_mode = True
-
-                    ):
+                ):
+        self.voices_folder = voices_folder
+        self.ready = False
         if xtts_base_url=="" or xtts_base_url=="http://127.0.0.1:8020":
             xtts_base_url = None
         # Get the current directory
@@ -113,7 +138,7 @@ class LollmsXTTS:
 
         self.auto_xtts_url = self.xtts_base_url+"/sdapi/v1"
         shared_folder = root_dir/"shared"
-        self.xtts_folder = shared_folder / "xtts"
+        self.xtts_path = shared_folder / "xtts"
 
         ASCIIColors.red("   __    ___  __    __          __     __  ___   _        ")
         ASCIIColors.red("  / /   /___\/ /   / /   /\/\  / _\    \ \/ / |_| |_ ___  ")
@@ -136,41 +161,54 @@ class LollmsXTTS:
 
         # Wait until the service is available at http://127.0.0.1:7860/
         if wait_for_service:
-            self.wait_for_service(max_retries=max_retries)
+            self.wait_for_service()
+        else:
+            self.wait_for_service_in_another_thread(max_retries=max_retries)
 
 
     def run_xtts_api_server(self):
         # Get the path to the current Python interpreter
-        python_path = sys.executable
         ASCIIColors.yellow("Loading XTTS ")
         options= ""
         if self.use_deep_speed:
-            options += "--deepspeed"
+            options += " --deepspeed"
         if self.use_streaming_mode:
-            options += "--streaming-mode --streaming-mode-improve --stream-play-sync"
+            options += " --streaming-mode --streaming-mode-improve --stream-play-sync"
         process = run_python_script_in_env("xtts", f"-m xtts_api_server {options} -o {self.output_folder} -sf {self.voice_samples_path} -p {self.xtts_base_url.split(':')[-1].replace('/','')}", wait= False)
         return process
-    
+
+    def wait_for_service_in_another_thread(self, max_retries=150, show_warning=True):
+        thread = threading.Thread(target=self.wait_for_service, args=(max_retries, show_warning))
+        thread.start()
+        return thread
+
     def wait_for_service(self, max_retries = 150, show_warning=True):
+        print(f"Waiting for xtts service (max_retries={max_retries})")
         url = f"{self.xtts_base_url}/languages"
         # Adjust this value as needed
         retries = 0
 
         while retries < max_retries or max_retries<0:
-            
             try:
                 response = requests.get(url)
                 if response.status_code == 200:
+                    print(f"voices_folder is {self.voices_folder}.")
+                    if self.voices_folder is not None:
+                        print("Senerating sample audio.")
+                        voice_file =  [v for v in self.voices_folder.iterdir() if v.suffix==".wav"]
+                        self.tts_to_audio("xtts is ready",voice_file[0].name)
                     print("Service is available.")
                     if self.app is not None:
                         self.app.success("XTTS Service is now available.")
+                    self.ready = True
                     return True
-            except requests.exceptions.RequestException:
+            except:
                 pass
 
             retries += 1
-            time.sleep(3)
-            ASCIIColors.yellow("Waiting ...")
+            ASCIIColors.yellow("Waiting for xtts...")
+            time.sleep(5)
+
         if show_warning:
             print("Service did not become available within the given time.")
             if self.app is not None:
@@ -219,5 +257,34 @@ class LollmsXTTS:
         if response.status_code == 200:
             print("Request successful")
             # You can access the response data using response.json()
+        else:
+            print("Request failed with status code:", response.status_code)
+
+    def tts_to_audio(self, text, speaker_wav, file_name_or_path:Path|str=None, language="en"):
+        url = f"{self.xtts_base_url}/tts_to_audio"
+
+        # Define the request body
+        payload = {
+            "text": text,
+            "speaker_wav": speaker_wav,
+            "language": language
+        }
+        headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        # Send the POST request
+        response =  requests.post(url, headers=headers, data=json.dumps(payload))
+
+        # Check the response status code
+        if response.status_code == 200:
+            print("Request successful")
+            # You can access the response data using response.json()
+            # Open a new file in binary write mode
+            if file_name_or_path is not None:
+                with open(self.output_folder/file_name_or_path, 'wb') as file:
+                    # Write the binary content to the file
+                    file.write(response.content)
         else:
             print("Request failed with status code:", response.status_code)

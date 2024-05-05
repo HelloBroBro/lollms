@@ -114,6 +114,39 @@ def run_script_in_env(env_name, script_path, cwd=None):
     ASCIIColors.yellow(python_path)
     #run_command(Commands.RUN, "-n", env_name, str(script_path), cwd=cwd)
 
+def get_conda_path():
+    import platform
+    if platform.system() == "Windows":
+        return Path(sys.executable).parent.parent / "miniconda3" / "condabin" / "conda"
+    else:
+        return Path(sys.executable).parent.parent.parent / "miniconda3" / "bin" / "conda"
+
+def environment_exists(env_name):
+    env_name = sanitize_shell_code(env_name)
+    conda_path = get_conda_path()
+    result = subprocess.run(f'{conda_path} env list --json', shell=True, capture_output=True, text=True)
+    envs_info = json.loads(result.stdout)
+    env_names = [Path(env).name for env in envs_info['envs']]
+    return env_name in env_names
+
+def get_python_version(env_name):
+    env_name = sanitize_shell_code(env_name)
+    conda_path = get_conda_path()
+    if environment_exists(env_name):
+        result = subprocess.run(f'{conda_path} run -n {env_name} python --version', shell=True, capture_output=True, text=True)
+        return result.stdout.strip()
+    else:
+        return "Environment does not exist."
+
+def remove_environment(env_name):
+    env_name = sanitize_shell_code(env_name)
+    conda_path = get_conda_path()
+    if environment_exists(env_name):
+        process = subprocess.Popen(f'{conda_path} env remove --name {env_name} -y', shell=True)
+        process.wait()
+        return f"Environment '{env_name}' has been removed."
+    else:
+        return "Environment does not exist."
 
 def process_ai_output(output, images, output_folder):
     if not PackageManager.check_package_installed("cv2"):
@@ -145,7 +178,8 @@ def process_ai_output(output, images, output_folder):
             cv2.putText(image, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
         # Save the modified image
-        output_path = Path(output_folder)/f"image_{image_index}.jpg"
+        random_stuff = np.random
+        output_path = Path(output_folder)/f"image_{image_index}_{random_stuff}.jpg"
         cv2.imwrite(str(output_path), image)
 
     # Remove bounding box text from the output
@@ -181,13 +215,6 @@ def discussion_path_2_url(path:str|Path):
     path = str(path)
     return path[path.index('discussion_databases'):].replace('discussion_databases','discussions')
 
-def get_conda_path():
-    # Get the path to the Python executable that's running the script
-    python_executable_path = sys.executable
-    # Construct the path to the 'conda' executable based on the Python executable path
-    # Assuming that 'conda' is in the same directory as the Python executable
-    conda_executable_path = os.path.join(os.path.dirname(python_executable_path), 'conda')
-    return conda_executable_path
 
 def yes_or_no_input(prompt):
     while True:
@@ -1090,3 +1117,22 @@ class File_Path_Generator:
             
             # If the file exists, increment the index and try again
             index += 1
+
+
+def remove_text_from_string(string: str, text_to_find:str):
+    """
+    Removes everything from the first occurrence of the specified text in the string (case-insensitive).
+
+    Parameters:
+    string (str): The original string.
+    text_to_find (str): The text to find in the string.
+
+    Returns:
+    str: The updated string.
+    """
+    index = string.lower().find(text_to_find.lower())
+
+    if index != -1:
+        string = string[:index]
+
+    return string

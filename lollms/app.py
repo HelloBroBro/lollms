@@ -12,6 +12,7 @@ from lollms.types import MSG_TYPE, SENDER_TYPES
 from lollms.utilities import PromptReshaper
 from lollms.client_session import Client, Session
 from lollms.databases.skills_database import SkillsLibrary
+from lollms.tasks import TasksLibrary
 from safe_store import TextVectorizer, VectorizationMethod, VisualizationMethod
 from typing import Callable
 from pathlib import Path
@@ -63,7 +64,7 @@ class LollmsApplication(LoLLMsCom):
         self.session                    = Session(lollms_paths)
         self.skills_library             = SkillsLibrary(self.lollms_paths.personal_skills_path/(self.config.skills_lib_database_name+".db"))
 
-
+        self.tasks_library              = TasksLibrary(self)
         if not free_mode:
             try:
                 if config.auto_update:
@@ -268,8 +269,15 @@ class LollmsApplication(LoLLMsCom):
         if self.config.enable_voice_service:
             try:
                 from lollms.services.xtts.lollms_xtts import LollmsXTTS
+                voice=self.config.xtts_current_voice
+                if voice!="main_voice":
+                    voices_folder = self.lollms_paths.custom_voices_path
+                else:
+                    voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
+
                 self.tts = LollmsXTTS(
-                                        self, 
+                                        self,
+                                        voices_folder=voices_folder,
                                         voice_samples_path=self.lollms_paths.custom_voices_path, 
                                         xtts_base_url=self.config.xtts_base_url,
                                         wait_for_service=False,
@@ -352,28 +360,7 @@ class LollmsApplication(LoLLMsCom):
                 self.cancel_gen = False
                 ASCIIColors.warning("Generation canceled")
                 return False
-                
-    def learn_from_discussion(self, title, discussion, nb_gen=None, callback=None):
-        if self.config.summerize_discussion:
-            prompt = f"!@>discussion:\n--\n!@>title:{title}!@>content:\n{discussion}\n--\n!@>question:What should we learn from this discussion?!@>Summerizer: Here is a summary of the most important informations extracted from the discussion:\n"
-            if nb_gen is None:
-                nb_gen = self.config.max_summary_size
-            generated = ""
-            gen_infos={
-                "nb_received_tokens":0,
-                "generated_text":"",
-                "processing":False,
-                "first_chunk": True,
-            }
-            if callback is None:
-                callback = partial(self.default_callback, generation_infos=gen_infos)
-            self.model.generate(prompt, nb_gen, callback)
-            if self.config.debug:
-                ASCIIColors.yellow(gen_infos["generated_text"])
-            return gen_infos["generated_text"]
-        else:
-            return  discussion
-    
+   
     def remove_text_from_string(self, string, text_to_find):
         """
         Removes everything from the first occurrence of the specified text in the string (case-insensitive).
@@ -560,8 +547,6 @@ class LollmsApplication(LoLLMsCom):
         languages = []
         # Construire le chemin vers le dossier contenant les fichiers de langue pour la personnalité actuelle
         languages_dir = self.lollms_paths.personal_configuration_path / "personalities" / self.personality.name
-        if self.personality.language is None:
-            self.personality.language="english"
         default_language = self.personality.language.lower().strip().split()[0]
         # Vérifier si le dossier existe
         languages_dir.mkdir(parents=True, exist_ok=True)
@@ -586,14 +571,17 @@ class LollmsApplication(LoLLMsCom):
         if language is None or  language == "":
             return False
         language = language.lower().strip().split()[0]
+        # Build the conditionning text block
         default_language = self.personality.language.lower().strip().split()[0]
+
         if language!= default_language:
             language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{language}.yaml"
             if not language_path.exists():
                 self.ShowBlockingMessage(f"This is the first time this personality speaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
                 language_path.parent.mkdir(exist_ok=True, parents=True)
-                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n", callback=self.personality.sink)
-                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {language}:\n{self.personality.welcome_message}\n!@>translation:\n", callback=self.personality.sink)
+                # Translating
+                conditionning = self.tasks_library.translate_conditionning(self.personality._personality_conditioning, self.personality.language, language)
+                welcome_message = self.tasks_library.translate_message(self.personality.welcome_message, self.personality.language, language)
                 with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
                     yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
                 self.HideBlockingMessage()
@@ -665,8 +653,9 @@ class LollmsApplication(LoLLMsCom):
             if not language_path.exists():
                 self.info(f"This is the first time this personality speaks {current_language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {current_language} out of the box")
                 language_path.parent.mkdir(exist_ok=True, parents=True)
-                conditionning = "!@>system: "+self.personality.fast_gen(f"!@>instruction: Translate the following text to {current_language}:\n{self.personality.personality_conditioning.replace('!@>system:','')}\n!@>translation:\n", callback=self.personality.sink)
-                welcome_message = self.personality.fast_gen(f"!@>instruction: Translate the following text to {current_language}:\n{self.personality.welcome_message}\n!@>translation:\n", callback=self.personality.sink)
+                # Translating
+                conditionning = self.tasks_library.translate_conditionning(self.personality._personality_conditioning, self.personality.language, current_language)
+                welcome_message = self.tasks_library.translate_message(self.personality.welcome_message, self.personality.language, current_language)
                 with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
                     yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
             else:
@@ -674,9 +663,9 @@ class LollmsApplication(LoLLMsCom):
                     language_pack = yaml.safe_load(f)
                     conditionning = language_pack["conditionning"]
         else:
-            conditionning = self.personality.personality_conditioning
+            conditionning = self.personality._personality_conditioning
 
-        
+        conditionning = self.personality.replace_keys(conditionning, self.personality.conditionning_commands) +"" if conditionning[-1]=="\n" else "\n"
 
         # Check if there are document files to add to the prompt
         internet_search_results = ""
@@ -700,13 +689,6 @@ class LollmsApplication(LoLLMsCom):
         else:
             negative_boost=""
             n_negative_boost = 0
-
-        if self.config.current_language:
-            force_language="\n!@>important information: Answer the user in "+self.config.current_language+" and do not translate your answer to english\n"
-            n_force_language = len(self.model.tokenize(force_language))
-        else:
-            force_language=""
-            n_force_language = 0
 
         if self.config.fun_mode:
             fun_mode="\n!@>important information: Fun mode activated. In this mode you must answer in a funny playful way. Do not be serious in your answers. Each answer needs to make the user laugh.\n"
@@ -886,7 +868,7 @@ class LollmsApplication(LoLLMsCom):
 
 
         # Calculate the total number of tokens between conditionning, documentation, and knowledge
-        total_tokens = n_cond_tk + n_isearch_tk + n_doc_tk + n_history_tk + n_user_description_tk + n_positive_boost + n_negative_boost + n_force_language + n_fun_mode
+        total_tokens = n_cond_tk + n_isearch_tk + n_doc_tk + n_history_tk + n_user_description_tk + n_positive_boost + n_negative_boost + n_fun_mode
 
         # Calculate the available space for the messages
         available_space = min(self.config.ctx_size - n_tokens - total_tokens, self.config.max_n_predict)
@@ -982,7 +964,7 @@ class LollmsApplication(LoLLMsCom):
         else:
             ai_prefix = ""
         # Build the final prompt by concatenating the conditionning and discussion messages
-        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + force_language + fun_mode + ai_prefix
+        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + ai_prefix
 
         # Tokenize the prompt data
         tokens = self.model.tokenize(prompt_data)
@@ -1019,7 +1001,6 @@ class LollmsApplication(LoLLMsCom):
             "discussion_messages":discussion_messages,
             "positive_boost":positive_boost,
             "negative_boost":negative_boost,
-            "force_language":force_language,
             "fun_mode":fun_mode,
             "ai_prefix":ai_prefix
         }    

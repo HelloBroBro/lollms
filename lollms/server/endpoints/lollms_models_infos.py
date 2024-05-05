@@ -89,6 +89,8 @@ def get_model_status():
 def add_reference_to_local_model(data:ModelReferenceParams):     
    
     forbid_remote_access(lollmsElfServer)
+    data.path = sanitize_path(data.path, allow_absolute_path=True)
+    
     if data.path=="":
         return {"status": False, "error":"Empty model path"}   
 

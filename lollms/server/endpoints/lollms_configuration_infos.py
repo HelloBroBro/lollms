@@ -146,6 +146,19 @@ async def apply_settings(request: Request):
     :param request: The HTTP request object.
     :return: A JSON response with the status of the operation.
     """
+    path_traversal_prone_settings=[
+                                    "binding_name", 
+                                    "model_name", 
+                                    "model_variant", 
+                                    "app_custom_logo", 
+                                    "user_avatar", 
+                                    "debug_log_file_path", 
+                                    "petals_model_path",
+                                    "skills_lib_database_name",
+                                    "discussion_db_name"
+                                    "user_avatar",
+                                    
+                                    ]
     # Prevent all outsiders from sending something to this endpoint
     forbid_remote_access(lollmsElfServer)
     if lollmsElfServer.config.turn_on_setting_update_validation:
@@ -167,6 +180,8 @@ async def apply_settings(request: Request):
                 if key=="turn_on_setting_update_validation" and lollmsElfServer.config.config[key]==True and config.get(key, lollmsElfServer.config.config[key])==False:
                     if not show_yes_no_dialog("WARNING!!!","I received a request to deactivate settings update validation.\nAre you sure?\nThis is a very risky decision, especially if you have enabled remote access.\nDisabling this validation can allow attackers to manipulate server settings and gain unauthorized access.\nProceed only if you are completely confident in the security of your system.\nDo you want to continue despite the warning?"):
                         config["turn_on_setting_update_validation"]=False
+                if key in path_traversal_prone_settings:
+                    config[key]=sanitize_path(config.get(key, lollmsElfServer.config.config[key]))
 
                 lollmsElfServer.config.config[key] = config.get(key, lollmsElfServer.config.config[key])
             ASCIIColors.success("OK")

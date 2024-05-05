@@ -620,7 +620,21 @@ class AIPersonality:
 
         return gen
 
-    def fast_gen(self, prompt: str, max_generation_size: int=None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool  = False, callback=None, show_progress=False) -> str:
+    def fast_gen(
+                    self, 
+                    prompt: str, 
+                    max_generation_size: int=None, 
+                    placeholders: dict = {}, 
+                    sacrifice: list = ["previous_discussion"], 
+                    debug: bool  = False, 
+                    callback=None, 
+                    show_progress=False, 
+                    temperature = None, 
+                    top_k = None, 
+                    top_p=None, 
+                    repeat_penalty=None, 
+                    repeat_last_n=None
+                ) -> str:
         """
         Fast way to generate code
 
@@ -655,29 +669,13 @@ class AIPersonality:
         max_generation_size = min(self.model.config.ctx_size - ntk, max_generation_size)
         # TODO : add show progress
 
-        gen = self.generate(prompt, max_generation_size, callback=callback, show_progress=show_progress).strip().replace("</s>", "").replace("<s>", "")
+        gen = self.generate(prompt, max_generation_size, temperature = temperature, top_k = top_k, top_p=top_p, repeat_penalty=repeat_penalty, repeat_last_n=repeat_last_n, callback=callback, show_progress=show_progress).strip().replace("</s>", "").replace("<s>", "")
         if debug:
             self.print_prompt("prompt", prompt+gen)
 
         return gen
 
-    def remove_text_from_string(self, string, text_to_find):
-        """
-        Removes everything from the first occurrence of the specified text in the string (case-insensitive).
 
-        Parameters:
-        string (str): The original string.
-        text_to_find (str): The text to find in the string.
-
-        Returns:
-        str: The updated string.
-        """
-        index = string.lower().find(text_to_find.lower())
-
-        if index != -1:
-            string = string[:index]
-
-        return string
 
     def process(self, text:str, message_type:MSG_TYPE, callback=None, show_progress=False):
         if callback is None:
