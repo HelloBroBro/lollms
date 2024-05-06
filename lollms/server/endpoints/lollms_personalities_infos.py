@@ -258,9 +258,6 @@ def remove_file(data:RemoveFileData):
 
 
 # ------------------------------------------- Languages endpoints ------------------------------------------------
-class Identification(BaseModel):
-    client_id:str
-
 @router.post("/get_personality_languages_list")
 def get_current_personality_files_list(data:Identification):
     check_access(lollmsElfServer, data.client_id)

@@ -32,7 +32,7 @@ from lollms.utilities import git_pull, show_yes_no_dialog, run_script_in_env, cr
 import subprocess
 import shutil
 from tqdm import tqdm
-
+import threading
 
 def verify_sd(lollms_paths:LollmsPaths):
     # Clone repository
@@ -57,24 +57,34 @@ def download_file(url, folder_path, local_filename):
 
     return local_filename
 
+def install_model(lollms_app:LollmsApplication, model_url):
+    root_dir = lollms_app.lollms_paths.personal_path
+    shared_folder = root_dir/"shared"
+    sd_folder = shared_folder / "auto_sd"
+    download_file(model_url, sd_folder/"models/Stable-diffusion","Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors")
+
 def install_sd(lollms_app:LollmsApplication):
     root_dir = lollms_app.lollms_paths.personal_path
     shared_folder = root_dir/"shared"
     sd_folder = shared_folder / "auto_sd"
-    if sd_folder.exists():
-        if show_yes_no_dialog("warning!","I have detected that there is a previous installation of stable diffusion.\nShould I remove it and continue installing?"):
-            shutil.rmtree(sd_folder)
-        elif not show_yes_no_dialog("warning!","Continue installation?"):
-            return
-
     ASCIIColors.cyan("Installing autosd conda environment with python 3.10")
     create_conda_env("autosd","3.10")
     ASCIIColors.cyan("Done")
+    if os.path.exists(str(sd_folder)):
+        print("Repository already exists. Pulling latest changes...")
+        try:
+            subprocess.run(["git", "-C", str(sd_folder), "pull"], check=True)
+            subprocess.run(["git", "-C", str(sd_folder/"extensions/SD-CN-Animation"), "pull"])
+        except:
+            subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
+    else:
+        print("Cloning repository...")
+        subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
+        subprocess.run(["git", "clone", "https://github.com/deforum-art/sd-webui-deforum.git", str(sd_folder/"extensions/sd-webui-deforum")])
+        subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
 
-    subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
-    subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
-    if show_yes_no_dialog("warning!","Do you want to install a model from civitai?\nI suggest dreamshaper xl.\nYou can install models manually by putting them inside your persona folder/auto_sd/models/stable_diffusion"):
-        download_file("https://civitai.com/api/download/models/351306", sd_folder/"models/Stable-diffusion","dreamshaperXL_v21TurboDPMSDE.safetensors")
+    if show_yes_no_dialog("warning!","Do you want to install a model?\nI suggest Juggernaut-XL_v9.\nYou can install models manually by putting them inside your persona folder/auto_sd/models/stable_diffusion"):
+        download_file("https://huggingface.co/RunDiffusion/Juggernaut-XL-v9/resolve/main/Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors", sd_folder/"models/Stable-diffusion","Juggernaut-XL_v9_RunDiffusionPhoto_v2.safetensors")
     
     lollms_app.sd = LollmsSD(lollms_app)
     ASCIIColors.green("Stable diffusion installed successfully")
@@ -84,15 +94,29 @@ def upgrade_sd(lollms_app:LollmsApplication):
     root_dir = lollms_app.lollms_paths.personal_path
     shared_folder = root_dir/"shared"
     sd_folder = shared_folder / "auto_sd"
-    if sd_folder.exists():
-        if show_yes_no_dialog("warning!","I have detected that there is a previous installation of stable diffusion.\nShould I remove it and continue installing?"):
-            shutil.rmtree(sd_folder)
-        elif not show_yes_no_dialog("warning!","Continue installation?"):
-            return
+    if os.path.exists(str(sd_folder)):
+        print("Repository already exists. Pulling latest changes...")
+        try:
+            subprocess.run(["git", "-C", str(sd_folder), "pull"], check=True)
+        except:
+            subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
+
+        try:
+            subprocess.run(["git", "-C", str(sd_folder/"extensions/sd-webui-deforum"), "pull"])
+        except:
+            subprocess.run(["git", "clone", "https://github.com/deforum-art/sd-webui-deforum.git", str(sd_folder/"extensions/sd-webui-deforum")])
 
 
-    subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
-    subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
+        try:
+            subprocess.run(["git", "-C", str(sd_folder/"extensions/SD-CN-Animation"), "pull"])
+        except:
+            subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
+    else:
+        print("Cloning repository...")
+        subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
+        subprocess.run(["git", "clone", "https://github.com/deforum-art/sd-webui-deforum.git", str(sd_folder/"extensions/sd-webui-deforum")])
+        subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
+
 
 
 def upgrade_sd(lollms_app:LollmsApplication):
@@ -263,6 +287,7 @@ class LollmsSD:
                     ):
         if auto_sd_base_url=="" or auto_sd_base_url=="http://127.0.0.1:7860":
             auto_sd_base_url = None
+        self.ready = False
         # Get the current directory
         lollms_paths = app.lollms_paths
         self.app = app
@@ -322,7 +347,7 @@ class LollmsSD:
         if wait_for_service:
             self.wait_for_service(max_retries=max_retries)
         else:
-            ASCIIColors.warning("We are not waiting for the SD service to be up.\nThis means that you may need to wait a bit before you can use it.")
+            self.wait_for_service_in_another_thread(max_retries=max_retries)
 
         self.default_sampler = sampler
         self.default_steps = steps
@@ -1053,7 +1078,10 @@ class LollmsSD:
                 time.sleep(check_interval)
 
 
-
+    def wait_for_service_in_another_thread(self, max_retries=150, show_warning=True):
+        thread = threading.Thread(target=self.wait_for_service, args=(max_retries, show_warning))
+        thread.start()
+        return thread
 
     def wait_for_service(self, max_retries = 50, show_warning=True):
         url = f"{self.auto_sd_base_url}/internal/ping"
@@ -1067,6 +1095,7 @@ class LollmsSD:
                     print("Service is available.")
                     if self.app is not None:
                         self.app.success("SD Service is now available.")
+                    self.ready = True
                     return True
             except requests.exceptions.RequestException:
                 pass

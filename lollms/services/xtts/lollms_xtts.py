@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from PIL import Image, PngImagePlugin
 from enum import Enum
 from typing import List, Dict, Any
+import uuid
 
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
@@ -116,6 +117,7 @@ class LollmsXTTS:
                     use_deep_speed=False,
                     use_streaming_mode = True
                 ):
+        self.generation_threads = []
         self.voices_folder = voices_folder
         self.ready = False
         if xtts_base_url=="" or xtts_base_url=="http://127.0.0.1:8020":
@@ -194,7 +196,7 @@ class LollmsXTTS:
                 if response.status_code == 200:
                     print(f"voices_folder is {self.voices_folder}.")
                     if self.voices_folder is not None:
-                        print("Senerating sample audio.")
+                        print("Generating sample audio.")
                         voice_file =  [v for v in self.voices_folder.iterdir() if v.suffix==".wav"]
                         self.tts_to_audio("xtts is ready",voice_file[0].name)
                     print("Service is available.")
@@ -260,31 +262,49 @@ class LollmsXTTS:
         else:
             print("Request failed with status code:", response.status_code)
 
-    def tts_to_audio(self, text, speaker_wav, file_name_or_path:Path|str=None, language="en"):
-        url = f"{self.xtts_base_url}/tts_to_audio"
+    def tts_to_audio(self, text, speaker_wav, file_name_or_path:Path|str=None, language="en", use_threading=False):
+        def tts2_audio_th(thread_uid=None):
+            url = f"{self.xtts_base_url}/tts_to_audio"
 
-        # Define the request body
-        payload = {
-            "text": text,
-            "speaker_wav": speaker_wav,
-            "language": language
-        }
-        headers = {
-            'accept': 'application/json',
-            'Content-Type': 'application/json'
-        }
+            # Define the request body
+            payload = {
+                "text": text,
+                "speaker_wav": speaker_wav,
+                "language": language
+            }
+            headers = {
+                'accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
 
-        # Send the POST request
-        response =  requests.post(url, headers=headers, data=json.dumps(payload))
+            # Send the POST request
+            response =  requests.post(url, headers=headers, data=json.dumps(payload))
 
-        # Check the response status code
-        if response.status_code == 200:
-            print("Request successful")
-            # You can access the response data using response.json()
-            # Open a new file in binary write mode
-            if file_name_or_path is not None:
-                with open(self.output_folder/file_name_or_path, 'wb') as file:
-                    # Write the binary content to the file
-                    file.write(response.content)
+            if response.status_code == 200:
+                print("Request successful")
+                print("Response headers:", response.headers)
+                
+                # Basic logging for debugging
+                print("First 100 bytes of response content:", response.content[:100])
+                
+                if file_name_or_path is not None:
+                    try:
+                        with open(self.output_folder / file_name_or_path, 'wb') as file:
+                            # Write the binary content to the file
+                            file.write(response.content)
+                        print(f"File {file_name_or_path} written successfully.")
+                    except Exception as e:
+                        print(f"Failed to write the file. Error: {e}")
+            else:
+                print("Request failed with status code:", response.status_code)
+            if thread_uid:
+                self.generation_threads.pop(thread_uid, None)
+        if use_threading:
+            thread_uid =  str(uuid.uuid4())       
+            thread = threading.Thread(target=tts2_audio_th, args=(thread_uid))
+            self.generation_threads[thread_uid]=thread
+            thread.start()
+            ASCIIColors.green("Generation started")
+            return thread
         else:
-            print("Request failed with status code:", response.status_code)
+            return tts2_audio_th()

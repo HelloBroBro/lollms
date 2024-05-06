@@ -26,6 +26,7 @@ import sys, os
 import platform
 import gc
 import yaml
+import time
 class LollmsApplication(LoLLMsCom):
     def __init__(
                     self, 
@@ -265,8 +266,16 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
                 self.warning(f"Couldn't load vllm")
 
-
-        if self.config.enable_voice_service:
+        if self.config.whisper_activate:
+            try:
+                from lollms.media import AudioRecorder
+                self.rec = AudioRecorder(self.lollms_paths.personal_outputs_path/"test.wav")
+                self.rec.start_recording()
+                time.sleep(1)
+                self.rec.stop_recording()
+            except:
+                pass
+        if self.config.xtts_enable:
             try:
                 from lollms.services.xtts.lollms_xtts import LollmsXTTS
                 voice=self.config.xtts_current_voice
@@ -547,7 +556,10 @@ class LollmsApplication(LoLLMsCom):
         languages = []
         # Construire le chemin vers le dossier contenant les fichiers de langue pour la personnalité actuelle
         languages_dir = self.lollms_paths.personal_configuration_path / "personalities" / self.personality.name
-        default_language = self.personality.language.lower().strip().split()[0]
+        if self.personality.language:
+            default_language = self.personality.language.lower().strip().split()[0]
+        else:
+            default_language = "english"
         # Vérifier si le dossier existe
         languages_dir.mkdir(parents=True, exist_ok=True)
         
@@ -665,7 +677,8 @@ class LollmsApplication(LoLLMsCom):
         else:
             conditionning = self.personality._personality_conditioning
 
-        conditionning = self.personality.replace_keys(conditionning, self.personality.conditionning_commands) +"" if conditionning[-1]=="\n" else "\n"
+        if len(conditionning)>0:
+            conditionning = self.personality.replace_keys(conditionning, self.personality.conditionning_commands) +"" if conditionning[-1]=="\n" else "\n"
 
         # Check if there are document files to add to the prompt
         internet_search_results = ""

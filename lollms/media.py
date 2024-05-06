@@ -79,11 +79,12 @@ from scipy.io.wavfile import write
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.signal import spectrogram
-
+from pathlib import Path
 class AudioRecorder:
-    def __init__(self, sio:socketio.Client, filename, channels=1, sample_rate=16000, chunk_size=24678, silence_threshold=150.0, silence_duration=2, callback=None, lollmsCom:LoLLMsCom=None, build_spectrogram=False, model = "base", transcribe=False):
+    def __init__(self, filename:Path, sio:socketio.Client=None, channels=1, sample_rate=16000, chunk_size=24678, silence_threshold=150.0, silence_duration=2, callback=None, lollmsCom:LoLLMsCom=None, build_spectrogram=False, model = "base", transcribe=False):
         self.sio = sio
-        self.filename = filename
+        self.filename = Path(filename)
+        self.filename.parent.mkdir(exist_ok=True, parents=True)
         self.channels = channels
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
@@ -138,7 +139,8 @@ class AudioRecorder:
             with open(transcription_fn, "w", encoding="utf-8") as f:
                 f.write(result["text"])
             self.lollmsCom.info(f"File saved to {transcription_fn}")
-            run_async(partial(self.sio.emit,'transcript', result["text"]))
+            if self.sio:
+                run_async(partial(self.sio.emit,'transcript', result["text"]))
             return {"text":result["text"], "audio":transcription_fn}
         else:
             return {"text":""}
@@ -152,7 +154,8 @@ class AudioRecorder:
         plt.savefig(img_buffer, format='png')
         img_buffer.seek(0)
         img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
-        run_async(partial(self.sio.emit,'update_spectrogram', img_base64))
+        if self.sio:
+            run_async(partial(self.sio.emit,'update_spectrogram', img_base64))
         self.last_spectrogram_update = time.perf_counter()
         plt.clf()
 
@@ -207,7 +210,8 @@ class WebcamImageSender:
 
                 _, buffer = cv2.imencode('.jpg', frame)
                 image_base64 = base64.b64encode(buffer)
-                run_async(partial(self.sio.emit,"video_stream_image", image_base64.decode('utf-8')))
+                if self.sio:
+                    run_async(partial(self.sio.emit,"video_stream_image", image_base64.decode('utf-8')))
 
             cap.release()
         except Exception as ex:

@@ -13,7 +13,7 @@ from lollms.config import InstallOption, TypedConfig, BaseConfig
 from lollms.main_config import LOLLMSConfig
 from lollms.paths import LollmsPaths
 from lollms.binding import LLMBinding, BindingType
-from lollms.utilities import PromptReshaper, PackageManager, discussion_path_to_url, process_ai_output
+from lollms.utilities import PromptReshaper, PackageManager, discussion_path_to_url, process_ai_output, remove_text_from_string
 from lollms.com import NotificationType, NotificationDisplayType
 from lollms.client_session import Session, Client
 
@@ -702,7 +702,7 @@ class AIPersonality:
 
         antiprompt = self.detect_antiprompt(bot_says)
         if antiprompt:
-            self.bot_says = self.remove_text_from_string(bot_says,antiprompt)
+            self.bot_says = remove_text_from_string(bot_says,antiprompt)
             ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
             return False
         else:

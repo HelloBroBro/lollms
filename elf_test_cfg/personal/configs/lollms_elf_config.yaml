@@ -78,7 +78,7 @@ auto_show_browser: true
 copy_to_clipboard_add_all_details: false
 
 # Voice service
-enable_voice_service: false
+xtts_enable: false
 xtts_base_url: http://localhost:8020
 auto_read: false
 xtts_current_voice: null
