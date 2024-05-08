@@ -2271,11 +2271,9 @@ class APScript(StateMachine):
                                 chunk_summary_post_processing=None,
                                 summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
                             ):
-        depth=0
         tk = self.personality.model.tokenize(text)
         prev_len = len(tk)
         while len(tk)>max_summary_size:
-            self.step_start(f"Comprerssing... [depth {depth+1}]")
             chunk_size = int(self.personality.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
             text = self.summerize_chunks(
@@ -2292,8 +2290,6 @@ class APScript(StateMachine):
             dtk_ln=prev_len-len(tk)
             prev_len = len(tk)
             self.step(f"Current text size : {prev_len}, max summary size : {max_summary_size}")
-            self.step_end(f"Comprerssing... [depth {depth+1}]")
-            depth += 1
             if dtk_ln<=10: # it is not sumlmarizing
                 break
         self.step_start(f"Rewriting ...")
