@@ -91,7 +91,7 @@ def edit_skill(skillInfos:SkillUpdateInfos):
 def add_discussion_to_skills_library(discussionInfos:ClientInfos):
     lollmsElfServer.ShowBlockingMessage("Learning...")
     try:
-        client = lollmsElfServer.session.get_client(discussionInfos.client_id)
+        client = check_access(lollmsElfServer, discussionInfos.client_id)
         category, title, content = lollmsElfServer.add_discussion_to_skills_library(client)    
         lollmsElfServer.InfoMessage(f"Discussion skill added to skills library:\nTitle: {title}\nCategory: {category}")
     except Exception as ex:

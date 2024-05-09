@@ -4,14 +4,15 @@ from typing import Callable, List
 from functools import partial
 from datetime import datetime
 from ascii_colors import ASCIIColors
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_TYPE, SUMMARY_MODE
 from lollms.com import LoLLMsCom
 from lollms.utilities import PromptReshaper, remove_text_from_string
-
+from safe_store import DocumentDecomposer
 
 class TasksLibrary:
-    def __init__(self, lollms:LoLLMsCom) -> None:
+    def __init__(self, lollms:LoLLMsCom, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None) -> None:
         self.lollms = lollms
+        self.callback = callback
         self.anti_prompts = [self.lollms.config.discussion_prompt_separator]+["!@>"]
 
     def print_prompt(self, title, prompt):
@@ -143,6 +144,218 @@ class TasksLibrary:
             self.print_prompt("prompt", prompt+gen)
 
         return gen
+    
+    
+    
+    # Communications with the user
+    def step_start(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This triggers a step start
+
+        Args:
+            step_text (str): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the step start to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_START)
+
+    def step_end(self, step_text, status=True, callback: Callable[[str, int, dict, list], bool]=None):
+        """This triggers a step end
+
+        Args:
+            step_text (str): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the step end to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_END, {'status':status})
+
+    def step(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This triggers a step information
+
+        Args:
+            step_text (str): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(step_text, MSG_TYPE.MSG_TYPE_STEP)
+
+    def exception(self, ex, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends exception to the client
+
+        Args:
+            step_text (str): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(str(ex), MSG_TYPE.MSG_TYPE_EXCEPTION)
+
+    def warning(self, warning:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends exception to the client
+
+        Args:
+            step_text (str): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(warning, MSG_TYPE.MSG_TYPE_EXCEPTION)
+
+    def info(self, info:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends exception to the client
+
+        Args:
+            inf (str): The information to be sent
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(info, MSG_TYPE.MSG_TYPE_INFO)
+
+    def json(self, title:str, json_infos:dict, callback: Callable[[str, int, dict, list], bool]=None, indent=4):
+        """This sends json data to front end
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback("", MSG_TYPE.MSG_TYPE_JSON_INFOS, metadata = [{"title":title, "content":json.dumps(json_infos, indent=indent)}])
+
+    def ui(self, html_ui:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends ui elements to front end
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(html_ui, MSG_TYPE.MSG_TYPE_UI)
+
+    def code(self, code:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends code to front end
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(code, MSG_TYPE.MSG_TYPE_CODE)
+
+    def chunk(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends full text to front end
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the text to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(full_text, MSG_TYPE.MSG_TYPE_CHUNK)
+
+
+    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, msg_type:MSG_TYPE = MSG_TYPE.MSG_TYPE_FULL):
+        """This sends full text to front end
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the text to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(full_text, msg_type)
+
+    def full_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends full text to front end (INVISIBLE to AI)
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the text to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(full_text, MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_AI)
+
+    def full_invisible_to_user(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends full text to front end (INVISIBLE to user)
+
+        Args:
+            step_text (dict): The step text
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the text to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(full_text, MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_USER)
+
+
+
+
 
     def extract_code_blocks(self, text: str) -> List[dict]:
         """
@@ -243,3 +456,200 @@ class TasksLibrary:
             message_translation_text = f"!@>instruction: Translate the following message to {language}.\nDo not translate any css or code, just the text and strings.\n!@>message:\n{prompt.replace('!@>','')}\n!@>translation:\n"
             translated = self.fast_gen(message_translation_text, temperature=0.1, callback=self.sink)
         return translated
+
+    def summerize_text(
+                        self,
+                        text,
+                        summary_instruction="summerize",
+                        doc_name="chunk",
+                        answer_start="",
+                        max_generation_size=3000,
+                        max_summary_size=512,
+                        callback=None,
+                        chunk_summary_post_processing=None,
+                        summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
+                    ):
+        depth=0
+        tk = self.lollms.model.tokenize(text)
+        prev_len = len(tk)
+        document_chunks=None
+        while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
+            self.step_start(f"Comprerssing {doc_name}... [depth {depth+1}]")
+            chunk_size = int(self.lollms.config.ctx_size*0.6)
+            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.lollms.model.tokenize, self.lollms.model.detokenize, True)
+            text = self.summerize_chunks(
+                                            document_chunks,
+                                            summary_instruction, 
+                                            doc_name, 
+                                            answer_start, 
+                                            max_generation_size, 
+                                            callback, 
+                                            chunk_summary_post_processing=chunk_summary_post_processing,
+                                            summary_mode=summary_mode)
+            tk = self.lollms.model.tokenize(text)
+            tk = self.lollms.model.tokenize(text)
+            dtk_ln=prev_len-len(tk)
+            prev_len = len(tk)
+            self.step(f"Current text size : {prev_len}, max summary size : {max_summary_size}")
+            self.step_end(f"Comprerssing {doc_name}... [depth {depth+1}]")
+            depth += 1
+            if dtk_ln<=10: # it is not sumlmarizing
+                break
+        return text
+
+    def smart_data_extraction(
+                                self,
+                                text,
+                                data_extraction_instruction="summerize",
+                                final_task_instruction="reformulate with better wording",
+                                doc_name="chunk",
+                                answer_start="",
+                                max_generation_size=3000,
+                                max_summary_size=512,
+                                callback=None,
+                                chunk_summary_post_processing=None,
+                                summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
+                            ):
+        tk = self.lollms.model.tokenize(text)
+        prev_len = len(tk)
+        while len(tk)>max_summary_size:
+            chunk_size = int(self.lollms.config.ctx_size*0.6)
+            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.lollms.model.tokenize, self.lollms.model.detokenize, True)
+            text = self.summerize_chunks(
+                                            document_chunks, 
+                                            data_extraction_instruction, 
+                                            doc_name, 
+                                            answer_start, 
+                                            max_generation_size, 
+                                            callback, 
+                                            chunk_summary_post_processing=chunk_summary_post_processing, 
+                                            summary_mode=summary_mode
+                                        )
+            tk = self.lollms.model.tokenize(text)
+            dtk_ln=prev_len-len(tk)
+            prev_len = len(tk)
+            self.step(f"Current text size : {prev_len}, max summary size : {max_summary_size}")
+            if dtk_ln<=10: # it is not sumlmarizing
+                break
+        self.step_start(f"Rewriting ...")
+        text = self.summerize_chunks(
+                                        [text],
+                                        final_task_instruction, 
+                                        doc_name, answer_start, 
+                                        max_generation_size, 
+                                        callback, 
+                                        chunk_summary_post_processing=chunk_summary_post_processing
+                                    )
+        self.step_end(f"Rewriting ...")
+
+        return text
+
+    def summerize_chunks(
+                            self,
+                            chunks,
+                            summary_instruction="summerize",
+                            doc_name="chunk",
+                            answer_start="",
+                            max_generation_size=3000,
+                            callback=None,
+                            chunk_summary_post_processing=None,
+                            summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
+                        ):
+        if summary_mode==SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL:
+            summary = ""
+            for i, chunk in enumerate(chunks):
+                self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+                if summary !="":
+                    summary = f"{answer_start}"+ self.fast_gen(
+                                "\n".join([
+                                    f"!@>Document_chunk: {doc_name}:",
+                                    f"This is a cumulative summary step. Use the summary of the previous chunks and the current chunk of the document to make a new summary integrating information from both. Make sure not to loose information from previous summaries",
+                                    f"Summary of previous chunks",
+                                    f"{summary}",
+                                    f"current chunk:",
+                                    f"{chunk}",
+                                    f"!@>instruction: {summary_instruction}",
+                                    f"The summary should extract required information from the current chunk to increment the previous summary.",
+                                    f"Answer directly with the cumulative summary with no extra comments.",
+                                    f"!@>summary:",
+                                    f"{answer_start}"
+                                    ]),
+                                    max_generation_size=max_generation_size,
+                                    callback=callback)
+                else:
+                    summary = f"{answer_start}"+ self.fast_gen(
+                                "\n".join([
+                                    f"!@>Document_chunk: {doc_name}:",
+                                    f"current chunk:",
+                                    f"{chunk}",
+                                    f"!@>instruction: {summary_instruction}",
+                                    f"Answer directly with the summary with no extra comments.",
+                                    f"!@>summary:",
+                                    f"{answer_start}"
+                                    ]),
+                                    max_generation_size=max_generation_size,
+                                    callback=callback)
+                if chunk_summary_post_processing:
+                    summary = chunk_summary_post_processing(summary)
+                self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            return summary
+        else:
+            summeries = []
+            for i, chunk in enumerate(chunks):
+                self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+                summary = f"{answer_start}"+ self.fast_gen(
+                            "\n".join([
+                                f"!@>Document_chunk [{doc_name}]:",
+                                f"{chunk}",
+                                f"!@>instruction: {summary_instruction}",
+                                f"Answer directly with the summary with no extra comments.",
+                                f"!@>summary:",
+                                f"{answer_start}"
+                                ]),
+                                max_generation_size=max_generation_size,
+                                callback=callback)
+                if chunk_summary_post_processing:
+                    summary = chunk_summary_post_processing(summary)
+                summeries.append(summary)
+                self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            return "\n".join(summeries)
+
+    def sequencial_chunks_summary(
+                            self,
+                            chunks,
+                            summary_instruction="summerize",
+                            doc_name="chunk",
+                            answer_start="",
+                            max_generation_size=3000,
+                            callback=None,
+                            chunk_summary_post_processing=None
+                        ):
+        summeries = []
+        for i, chunk in enumerate(chunks):
+            if i<len(chunks)-1:
+                chunk1 = chunks[i+1]
+            else:
+                chunk1=""
+            if i>0:
+                chunk=summary
+            self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            summary = f"{answer_start}"+ self.fast_gen(
+                        "\n".join([
+                            f"!@>Document_chunk: {doc_name}:",
+                            f"Block1:",
+                            f"{chunk}",
+                            f"Block2:",
+                            f"{chunk1}",
+                            f"!@>instruction: {summary_instruction}",
+                            f"Answer directly with the summary with no extra comments.",
+                            f"!@>summary:",
+                            f"{answer_start}"
+                            ]),
+                            max_generation_size=max_generation_size,
+                            callback=callback)
+            if chunk_summary_post_processing:
+                summary = chunk_summary_post_processing(summary)
+            summeries.append(summary)
+            self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+        return "\n".join(summeries)
+

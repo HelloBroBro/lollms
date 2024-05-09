@@ -108,9 +108,9 @@ def add_events(sio:socketio):
             lollmsElfServer.ShowBlockingMessage(f"File received {file_path.name}.\nVectorizing the data ...")
 
             if lollmsElfServer.personality.processor:
-                result = client.discussion.add_file(file_path, client, partial(lollmsElfServer.process_chunk, client_id=client_id))
+                result = client.discussion.add_file(file_path, client, lollmsElfServer.tasks_library, partial(lollmsElfServer.process_chunk, client_id=client_id))
             else:
-                result = client.discussion.add_file(file_path, client, partial(lollmsElfServer.process_chunk, client_id=client_id))
+                result = client.discussion.add_file(file_path, client, lollmsElfServer.tasks_library, partial(lollmsElfServer.process_chunk, client_id=client_id))
 
             ASCIIColors.success('File processed successfully')
             run_async(partial(sio.emit,'file_received', {'status': True, 'filename': filename}))

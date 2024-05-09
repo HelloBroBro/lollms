@@ -1690,7 +1690,7 @@ class AIPersonality:
 
 
 class StateMachine:
-    def __init__(self, states_dict):
+    def __init__(self, states_list):
         """
         states structure is the following
         [
@@ -1703,7 +1703,7 @@ class StateMachine:
             }
         ]
         """
-        self.states_dict = states_dict
+        self.states_list = states_list
         self.current_state_id = 0
         self.callback = None
 
@@ -1718,12 +1718,12 @@ class StateMachine:
             ValueError: If no state is found with the given name or index.
         """
         if isinstance(state, str):
-            for i, state_dict in enumerate(self.states_dict):
+            for i, state_dict in enumerate(self.states_list):
                 if state_dict["name"] == state:
                     self.current_state_id = i
                     return
         elif isinstance(state, int):
-            if 0 <= state < len(self.states_dict):
+            if 0 <= state < len(self.states_list):
                 self.current_state_id = state
                 return
         raise ValueError(f"No state found with name or index: {state}")
@@ -1743,7 +1743,7 @@ class StateMachine:
         if callback:
             self.callback=callback
 
-        current_state = self.states_dict[self.current_state_id]
+        current_state = self.states_list[self.current_state_id]
         commands = current_state["commands"]
         command = command.strip()
 
@@ -1892,10 +1892,10 @@ class APScript(StateMachine):
                     self,
                     personality         :AIPersonality,
                     personality_config  :TypedConfig,
-                    states_dict         :dict   = {},
+                    states_list         :dict   = {},
                     callback            = None
                 ) -> None:
-        super().__init__(states_dict)
+        super().__init__(states_list)
         self.notify                             = personality.app.notify
 
         self.personality                        = personality

@@ -165,7 +165,13 @@ class LollmsApplication(LoLLMsCom):
         messages = client.discussion.get_messages()
 
         # Extract relevant information from messages
-        content = self._extract_content(messages)
+        def cb(str, MSG_TYPE_=MSG_TYPE.MSG_TYPE_FULL, dict=None, list=None):
+            if MSG_TYPE_!=MSG_TYPE.MSG_TYPE_CHUNK:
+                self.ShowBlockingMessage(f"Learning\n{str}")
+        bk_cb = self.tasks_library.callback
+        self.tasks_library.callback = cb
+        content = self._extract_content(messages, cb)
+        self.tasks_library.callback = bk_cb
 
         # Generate title
         title_prompt =  "\n".join([
@@ -181,69 +187,35 @@ class LollmsApplication(LoLLMsCom):
         title = self._generate_text(title_prompt)
 
         # Determine category
-        category_prompt = f"!@>system:Analyze the following title and content, and determine the most appropriate generic category that encompasses the main subject or theme. The category should be broad enough to include multiple related skill entries. Provide only the category name without any additional explanations or context:\n\nTitle:\n{title}\nContent:\n{content}\n\n!@>Category:\n"
+        category_prompt = f"!@>system:Analyze the following title, and determine the most appropriate generic category that encompasses the main subject or theme. The category should be broad enough to include multiple related skill entries. Provide only the category name without any additional explanations or context:\n\nTitle:\n{title}\n\n!@>Category:\n"
         category = self._generate_text(category_prompt)
 
         # Add entry to skills library
         self.skills_library.add_entry(1, category, title, content)
         return category, title, content
 
-    def _extract_content(self, messages:List[Message]):
-        ranked_messages = sorted(messages, key=lambda m: m.rank, reverse=True)
-        
-        max_chunk_size = int(self.config.ctx_size * 0.75)
-        
-        chunks = []
-        current_chunk = ""
-        current_chunk_tokens = 0
-        
-        for message in ranked_messages:
+    def _extract_content(self, messages:List[Message], callback = None):      
+        message_content = ""
+
+        for message in messages:
             rank = message.rank
             sender = message.sender
             text = message.content
-            message_content = f"Rank {rank} - {sender}: {text}\n"
-            
-            message_tokens = self.model.get_nb_tokens(message_content)
-            
-            if current_chunk_tokens + message_tokens <= max_chunk_size:
-                current_chunk += message_content
-                current_chunk_tokens += message_tokens
-            else:
-                chunks.append(current_chunk)
-                current_chunk = message_content
-                current_chunk_tokens = message_tokens
-        
-        if current_chunk:
-            chunks.append(current_chunk)
-        
-        summarized_chunks = []
-        for chunk in chunks:
-            prompt = "\n".join([
-                "!@>system:",
-                "Analyzing the discussion chunk requires careful examination of each sub-question. First, carefully examine each sub-questions to extract key information components. Then, generate two-three intermediate thoughts as bullet-points representing steps towards an answer. Evaluate clarity, relevance, logical flow, and coverage of concepts using bullet-point evaluation. If a incorrect result is detected, explain and then Backtrack and explore alternative paths by substituting different high-scoring thoughts. Throughout the reasoning process aim to provide concise and detailed explanations of key information or specific skills or methods or code sections both of the good that are kept and the low scoring ones that are filtered out to enable learning from mistakes. Once a comprehensive bullet-point summary of important information has been constructed, synthesize these insights into a final comprehensive bullet-point summary of important information. This summary includes specific skills or methods or code sections that related to each sub-question.",
-                "!@>discussion snippet:",
-                f"{chunk}",
-                "!@>analysis:\n"])
+            message_content += f"Rank {rank} - {sender}: {text}\n"
 
-            max_tokens = self.config.ctx_size - self.model.get_nb_tokens(prompt)
-            if self.config.debug:
-                ASCIIColors.yellow(prompt)
-            summarized_chunk = self.model.generate(prompt, max_tokens)
-            if summarized_chunk:
-                summarized_chunks.append(summarized_chunk.strip())
-            else:
-                raise Exception("Couldn't generate text.")
+        return self.tasks_library.summerize_text(
+            message_content, 
+            "\n".join([
+                "Extract useful information from this discussion."
+            ]),
+            doc_name="discussion",
+            callback=callback)
         
-        summarized_content = "\n".join(summarized_chunks)
-        return summarized_content
-
 
     def _generate_text(self, prompt):
         max_tokens = self.config.ctx_size - self.model.get_nb_tokens(prompt)
         generated_text = self.model.generate(prompt, max_tokens)
         return generated_text.strip()
-
-
 
 
     def get_uploads_path(self, client_id):
@@ -739,7 +711,7 @@ class LollmsApplication(LoLLMsCom):
                     docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search)
                     for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):
                         internet_search_infos.append(document_id)
-                        internet_search_results += f"search result chunk:\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}"
+                        internet_search_results += f"!@>search result chunk:\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}\n"
                     if self.config.internet_quick_search:
                         self.personality.step_end("Performing Internet search (quick mode)")
                     else:
@@ -827,7 +799,7 @@ class LollmsApplication(LoLLMsCom):
                         if knowledge=="":
                             knowledge=f"!@>knowledge:\n"
                         for i,(title, content) in enumerate(zip(skill_titles,skills)):
-                            knowledge += f"!@>knowledge {i}:\ntitle:\n{title}\ncontent:\n{content}"
+                            knowledge += f"!@>knowledge {i}:\ntitle:\n{title}\ncontent:\n{content}\n"
                     self.personality.step_end("Adding skills")
                     self.personality.step_end("Querying skills library")
                 except Exception as ex:

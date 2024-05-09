@@ -12,7 +12,7 @@ from lollms.com import LoLLMsCom
 from safe_store import TextVectorizer, VisualizationMethod, GenericDataLoader
 import json
 import shutil
-
+from lollms.tasks import TasksLibrary
 __author__ = "parisneo"
 __github__ = "https://github.com/ParisNeo/lollms-webui"
 __copyright__ = "Copyright 2023, "
@@ -626,6 +626,7 @@ class Message:
 class Discussion:
     def __init__(self, lollms:LoLLMsCom, discussion_id, discussions_db:DiscussionsDB):
         self.lollms = lollms
+        self.current_message = None
         self.discussion_id = discussion_id
         self.discussions_db = discussions_db
         self.discussion_folder = self.discussions_db.discussion_db_path/f"{discussion_id}"
@@ -643,6 +644,7 @@ class Discussion:
         self.discussion_rag_folder.mkdir(exist_ok=True)
         self.discussion_view_images_folder.mkdir(exist_ok=True)
         self.messages = self.get_messages()
+        self.whisper= None
         
         if len(self.messages)>0:
             self.current_message = self.messages[-1]
@@ -721,14 +723,14 @@ class Discussion:
         self.image_files.clear()
         self.audio_files.clear()
 
-    def add_file(self, path, client, callback=None, process=True):
+    def add_file(self, path, client, tasks_library:TasksLibrary, callback=None, process=True):
         output = ""
 
         path = Path(path)
         if path.suffix in [".wav",".mp3"]:
             self.audio_files.append(path)
             if process:
-                self.lollms.new_messagenew_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
+                self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
                 self.lollms.info(f"Transcribing ... ")
                 if self.whisper is None:
                     if not PackageManager.check_package_installed("whisper"):
@@ -745,10 +747,8 @@ class Discussion:
                 transcription_fn = str(path)+".txt"
                 with open(transcription_fn, "w", encoding="utf-8") as f:
                     f.write(result["text"])
+                tasks_library.info(f"Transcription saved to {transcription_fn}")
 
-                self.info(f"File saved to {transcription_fn}")
-                self.full(result["text"])
-                self.step_end("Transcribing ... ")
         elif path.suffix in [".png",".jpg",".jpeg",".gif",".bmp",".svg",".webp"]:
             self.image_files.append(path)
             if process:

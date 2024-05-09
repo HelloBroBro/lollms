@@ -80,6 +80,7 @@ def install_sd(lollms_app:LollmsApplication):
     else:
         print("Cloning repository...")
         subprocess.run(["git", "clone", "https://github.com/ParisNeo/stable-diffusion-webui.git", str(sd_folder)])
+        subprocess.run(["git", "clone", "https://github.com/Mikubill/sd-webui-controlnet", str(sd_folder/"extensions/sd-webui-controlnet")])        
         subprocess.run(["git", "clone", "https://github.com/deforum-art/sd-webui-deforum.git", str(sd_folder/"extensions/sd-webui-deforum")])
         subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
 
@@ -106,6 +107,10 @@ def upgrade_sd(lollms_app:LollmsApplication):
         except:
             subprocess.run(["git", "clone", "https://github.com/deforum-art/sd-webui-deforum.git", str(sd_folder/"extensions/sd-webui-deforum")])
 
+        try:
+            subprocess.run(["git", "-C", str(sd_folder/"extensions/sd-webui-controlnet"), "pull"])
+        except:
+            subprocess.run(["git", "clone", "https://github.com/Mikubill/sd-webui-controlnet", str(sd_folder/"extensions/sd-webui-controlnet")])        
 
         try:
             subprocess.run(["git", "-C", str(sd_folder/"extensions/SD-CN-Animation"), "pull"])
