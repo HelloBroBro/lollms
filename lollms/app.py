@@ -986,6 +986,7 @@ class LollmsApplication(LoLLMsCom):
             "discussion_messages":discussion_messages,
             "positive_boost":positive_boost,
             "negative_boost":negative_boost,
+            "current_language":self.config.current_language,
             "fun_mode":fun_mode,
             "ai_prefix":ai_prefix
         }    

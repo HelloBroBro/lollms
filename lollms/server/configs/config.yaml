@@ -1,5 +1,5 @@
 # =================== Lord Of Large Language Multimodal Systems Configuration file =========================== 
-version: 92
+version: 95
 binding_name: null
 model_name: null
 model_variant: null
@@ -32,7 +32,7 @@ discussion_prompt_separator: "!@>"
 seed: -1
 ctx_size: 4084
 max_n_predict: 4096
-min_n_predict: 512
+min_n_predict: 1024
 temperature: 0.9
 top_k: 50
 top_p: 0.95
@@ -53,7 +53,7 @@ user_name: user
 user_description: ""
 use_user_name_in_discussions: false
 use_model_name_in_discussions: false
-user_avatar: default_user.svg
+user_avatar: null
 use_user_informations_in_discussion: false
 
 # UI parameters
@@ -79,6 +79,10 @@ auto_show_browser: true
 
 # copy to clipboard 
 copy_to_clipboard_add_all_details: false
+
+# STT service 
+asr_enable: false
+asr_base_url: http://localhost:9000
 
 # Voice service
 xtts_enable: false
