@@ -41,6 +41,23 @@ from lollms.security import sanitize_shell_code
 
 from functools import partial
 
+def install_conda_utility():
+    import platform
+    if platform.system()=="Windows":
+        conda_path = Path(sys.executable).parent.parent/"miniconda3"/"condabin"/"conda"
+    else:
+        conda_path = Path(sys.executable).parent.parent.parent/"miniconda3"/"bin"/"conda"
+    ASCIIColors.red("Conda path:")
+    ASCIIColors.yellow(conda_path)
+    process = subprocess.Popen(f'{conda_path} install conda -y', shell=True)
+    
+    # Wait for the process to finish
+    process.wait()
+    #from conda.cli.python_api import  run_command, Commands
+    # Create a new Conda environment with the specified Python version
+    #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
+
+
 def create_conda_env(env_name, python_version):
     env_name = sanitize_shell_code(env_name)
     python_version = sanitize_shell_code(python_version)
@@ -61,7 +78,6 @@ def create_conda_env(env_name, python_version):
     #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
 
 def run_pip_in_env(env_name, pip_args, cwd=None):
-    from conda.cli.python_api import  run_command, Commands
     import platform
     # Set the current working directory if provided, otherwise use the current directory
     if cwd is None:
@@ -73,12 +89,9 @@ def run_pip_in_env(env_name, pip_args, cwd=None):
     
     # Wait for the process to finish
     process.wait()
-    #subprocess.Popen(f'conda activate {env_name} && {script_path}', shell=True, cwd=cwd)
-    #run_command(Commands.RUN, "-n", env_name, "python " + str(script_path), cwd=cwd)
 
 
 def run_python_script_in_env(env_name, script_path, cwd=None, wait=True):
-    from conda.cli.python_api import  run_command, Commands
     import platform
     # Set the current working directory if provided, otherwise use the current directory
     if cwd is None:
@@ -91,12 +104,9 @@ def run_python_script_in_env(env_name, script_path, cwd=None, wait=True):
     # Wait for the process to finish
     if wait:
         process.wait()
-    #subprocess.Popen(f'conda activate {env_name} && {script_path}', shell=True, cwd=cwd)
-    #run_command(Commands.RUN, "-n", env_name, "python " + str(script_path), cwd=cwd)
     return process
 
 def run_script_in_env(env_name, script_path, cwd=None):
-    from conda.cli.python_api import  run_command, Commands
     import platform
     # Set the current working directory if provided, otherwise use the current directory
     if cwd is None:
