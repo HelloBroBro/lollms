@@ -148,40 +148,73 @@ def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None
 
     return text_content
 
+
 def get_relevant_text_block(
-                                url,
-                                driver,
-                                internet_vectorization_chunk_size, internet_vectorization_overlap_size,
-                                vectorizer,
-                                title=None,
-                                brief=None,
-                                wait_step_delay=0.5
-                            ):
+    url,
+    driver,
+    internet_vectorization_chunk_size,
+    internet_vectorization_overlap_size,
+    vectorizer,
+    title=None,
+    brief=None,
+    wait_step_delay=0.5
+):
+    from bs4 import BeautifulSoup
+    import time
     try:
-        from bs4 import BeautifulSoup    
-        # Load the webpage
+        # Chargez la page web avec le driver passé en paramètre
         driver.get(url)
-        wait_for_page(driver, wait_step_delay)
-
-        # Wait for JavaScript to execute and get the final page source
+        # Attendez que le JavaScript s'exécute, avec un délai d'attente progressif si nécessaire
+        time.sleep(wait_step_delay)
         html_content = driver.page_source
-
-        # Parse the HTML content
         soup = BeautifulSoup(html_content, "html.parser")
-        # Example: Remove all <script> and <style> tags
-        for script in soup(["script", "style"]):
-            script.extract()
 
-        all_text = soup.get_text()
-        # Example: Remove leading/trailing whitespace and multiple consecutive line breaks
-        document_id = {
-            'url':url
-        }
-        document_id["title"] = title
-        document_id["brief"] = brief
-        vectorizer.add_document(document_id,all_text, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
-    except:
+        # Supprimez les éléments non désirés
+        for script_or_style in soup(["script", "style", "header", "footer", "nav", "aside"]):
+            script_or_style.decompose()
+
+        # Ciblez l'élément contenant le texte principal
+        article = soup.find('article')
+        if article:
+            text_block = ''
+            sections = article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li'])
+            for element in sections:
+                if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                    if text_block:
+                        text_block += '\n\n'
+                    text_block += element.get_text(strip=True)
+                    text_block += '\n'
+                else:
+                    text_block += element.get_text(strip=True) + '\n'
+
+            document_id = {
+                'url':url
+            }
+            document_id["title"] = title
+            document_id["brief"] = brief
+            text_block=text_block.strip()
+            vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
+            return True
+        else:
+            body = soup.body
+            if body:
+                text_block = body.get_text(strip=True)
+                document_id = {
+                    'url':url
+                }
+                document_id["title"] = title
+                document_id["brief"] = brief
+                text_block=text_block.strip()
+                vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
+                return True
+            else:
+                ASCIIColors.warning("No data found in his page.")
+                return False
+    except Exception as ex:
         ASCIIColors.warning(f"Couldn't scrape: {url}")
+        return False
+        
+
 
 def extract_results(url, max_num, driver=None, wait_step_delay=0.5):
     from bs4 import BeautifulSoup    

@@ -697,7 +697,7 @@ class LollmsApplication(LoLLMsCom):
                     need=True
                 if need:
                     self.personality.step_start("Crafting internet search query")
-                    query = self.personality.fast_gen(f"!@>discussion:\n{discussion[-2048:]}\n!@>system: Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.\nDo not answer the prompt. Do not add explanations.\n!@>current date: {datetime.now()}!@>websearch query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                    query = self.personality.fast_gen(f"!@>discussion:\n{discussion[-2048:]}\n!@>system: Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.\nDo not answer the prompt. Do not add explanations.\n!@>current date: {datetime.now()}\n!@>websearch query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     self.personality.step_end("Crafting internet search query")
                     self.personality.step(f"web search query: {query}")
 
@@ -706,7 +706,7 @@ class LollmsApplication(LoLLMsCom):
                     else:
                         self.personality.step_start("Performing Internet search (advanced mode: slower but more advanced)")
 
-                    internet_search_results=f"!@>important information: Use the internet search results data to answer {self.config.user_name}'s last message. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n!@>Web search results:\n"
+                    internet_search_results=f"!@>instructions: Use the internet search results data to answer {self.config.user_name}. Try to extract information from the websearch and use it to perform the requested task or answer the question. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.\n!@>Web search results:\n"
 
                     docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search)
                     for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):

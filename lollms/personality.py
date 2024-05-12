@@ -227,10 +227,11 @@ class AIPersonality:
 
             self.personality_folder_name = self.personality_package_path.stem
 
-            # Open and store the personality
-            self.load_personality()
+
             self.personality_output_folder = lollms_paths.personal_outputs_path/self.name
             self.personality_output_folder.mkdir(parents=True, exist_ok=True)
+            # Open and store the personality
+            self.load_personality()
 
 
 
@@ -858,6 +859,7 @@ class AIPersonality:
         # Get the data folder path
         self.welcome_audio_path = self.personality_package_path / "welcome_audio"
 
+
         # If not exist recreate
         self.assets_path.mkdir(parents=True, exist_ok=True)
 
@@ -912,6 +914,10 @@ class AIPersonality:
         else:
             self.persona_data_vectorizer = None
             self._data = None
+
+        self.personality_output_folder = self.lollms_paths.personal_outputs_path/self.name
+        self.personality_output_folder.mkdir(parents=True, exist_ok=True)
+
 
         if self.run_scripts:
             # Search for any processor code
@@ -1930,6 +1936,12 @@ class APScript(StateMachine):
         """
         pass
 
+    def get_welcome(self, client:Client):
+        """
+        triggered when a new conversation is created
+        """
+        return None
+        
     def selected(self):
         """
         triggered when mounted
@@ -2073,7 +2085,7 @@ class APScript(StateMachine):
     def generate(self, prompt, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
         return self.personality.generate(prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
 
-    from lollms.client_session import Client
+
     def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, context_details:dict=None, client:Client=None):
         """
         This function generates code based on the given parameters.
