@@ -1736,7 +1736,7 @@ class StateMachine:
 
 
 
-    def process_state(self, command, full_context, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, client:Client=None):
+    def process_state(self, command, full_context, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, context_state:dict=None, client:Client=None):
         """
         Process the given command based on the current state.
 
@@ -1756,14 +1756,14 @@ class StateMachine:
         for cmd, func in commands.items():
             if cmd == command[0:len(cmd)]:
                 try:
-                    func(command, full_context,client)
+                    func(command, full_context, callback, context_state, client)
                 except:# retrocompatibility
                     func(command, full_context)
                 return
 
         default_func = current_state.get("default")
         if default_func is not None:
-            default_func(command, full_context)
+            default_func(command, full_context, callback, context_state, client)
         else:
             raise ValueError(f"Command '{command}' not found in current state and no default function defined.")
 
@@ -1936,7 +1936,7 @@ class APScript(StateMachine):
         """
         pass
 
-    def get_welcome(self, client:Client):
+    def get_welcome(self, welcome_message:str, client:Client):
         """
         triggered when a new conversation is created
         """
@@ -3268,6 +3268,147 @@ The AI should respond in this format using data from actions_list:
         """
         return self.personality.fast_gen(prompt=prompt,max_generation_size=max_generation_size,placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
 
+
+
+    def generate_with_function_calls(self, prompt: str, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Performs text generation with function calls.
+
+        Args:
+            prompt (str): The full prompt (including conditioning, user discussion, extra data, and the user prompt).
+            functions (List[Dict[str, Any]]): A list of dictionaries describing functions that can be called.
+            max_answer_length (int, optional): Maximum string length allowed for the generated text.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries with the function names and parameters to execute.
+        """
+        # Upgrade the prompt with information about the function calls.
+        upgraded_prompt = self._upgrade_prompt_with_function_info(prompt, functions)
+
+        # Generate the initial text based on the upgraded prompt.
+        generated_text = self.fast_gen(upgraded_prompt, max_answer_length)
+
+        # Extract the function calls from the generated text.
+        function_calls = self.extract_function_calls_as_json(generated_text)
+
+        return generated_text, function_calls
+
+    def generate_with_function_calls_and_images(self, prompt: str, images:list, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None) -> List[Dict[str, Any]]:
+        """
+        Performs text generation with function calls.
+
+        Args:
+            prompt (str): The full prompt (including conditioning, user discussion, extra data, and the user prompt).
+            functions (List[Dict[str, Any]]): A list of dictionaries describing functions that can be called.
+            max_answer_length (int, optional): Maximum string length allowed for the generated text.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries with the function names and parameters to execute.
+        """
+        # Upgrade the prompt with information about the function calls.
+        upgraded_prompt = self._upgrade_prompt_with_function_info(prompt, functions)
+
+        # Generate the initial text based on the upgraded prompt.
+        generated_text = self.fast_gen_with_images(upgraded_prompt, images, max_answer_length)
+
+        # Extract the function calls from the generated text.
+        function_calls = self.extract_function_calls_as_json(generated_text)
+
+        return generated_text, function_calls
+
+
+    def execute_function_calls(self, function_calls: List[Dict[str, Any]], function_definitions: List[Dict[str, Any]]) -> List[Any]:
+        """
+        Executes the function calls with the parameters extracted from the generated text,
+        using the original functions list to find the right function to execute.
+
+        Args:
+            function_calls (List[Dict[str, Any]]): A list of dictionaries representing the function calls.
+            function_definitions (List[Dict[str, Any]]): The original list of functions with their descriptions and callable objects.
+
+        Returns:
+            List[Any]: A list of results from executing the function calls.
+        """
+        results = []
+        # Convert function_definitions to a dict for easier lookup
+        functions_dict = {func['function_name']: func['function'] for func in function_definitions}
+
+        for call in function_calls:
+            function_name = call.get("function_name")
+            parameters = call.get("function_parameters", [])
+            function = functions_dict.get(function_name)
+
+            if function:
+                try:
+                    # Assuming parameters is a dictionary that maps directly to the function's arguments.
+                    result = function(*parameters)
+                    results.append(result)
+                except TypeError as e:
+                    # Handle cases where the function call fails due to incorrect parameters, etc.
+                    results.append(f"Error calling {function_name}: {e}")
+            else:
+                results.append(f"Function {function_name} not found.")
+
+        return results
+
+
+    def _upgrade_prompt_with_function_info(self, prompt: str, functions: List[Dict[str, Any]]) -> str:
+        """
+        Upgrades the prompt with information about function calls.
+
+        Args:
+            prompt (str): The original prompt.
+            functions (List[Dict[str, Any]]): A list of dictionaries describing functions that can be called.
+
+        Returns:
+            str: The upgraded prompt that includes information about the function calls.
+        """
+        function_descriptions = ["!@>information: If you need to call a function to fulfull the user request, use a json markdown tag with the function call as the following json format:",
+                                 "```json",
+                                 "{",
+                                 '"function_name":the name of the function to be called,',
+                                 '"function_parameters": a list of  parameter values',
+                                 "}",
+                                 "```",
+                                 "You can call multiple functions in one generation. If you need the output of a function to proceed, then use the keyword @<NEXT>@ at the end of your message.",
+                                 "Do not add status of the execution as it will be added automatically by the system.",
+                                 "!@>List of possible functions to be called:\n"]
+        for function in functions:
+            description = f"{function['function_name']}: {function['function_description']}\nparameters:{function['function_parameters']}"
+            function_descriptions.append(description)
+
+        # Combine the function descriptions with the original prompt.
+        function_info = ' '.join(function_descriptions)
+        upgraded_prompt = f"{function_info} {prompt}"
+
+        return upgraded_prompt
+
+    def extract_function_calls_as_json(self, text: str) -> List[Dict[str, Any]]:
+        """
+        Extracts function calls formatted as JSON inside markdown code blocks.
+
+        Args:
+            text (str): The generated text containing JSON markdown entries for function calls.
+
+        Returns:
+            List[Dict[str, Any]]: A list of dictionaries representing the function calls.
+        """
+        # Extract markdown code blocks that contain JSON.
+        code_blocks = self.extract_code_blocks(text)
+
+        # Filter out and parse JSON entries.
+        function_calls = []
+        for block in code_blocks:
+            content = block.get("content", "")
+            try:
+                # Attempt to parse the JSON content of the code block.
+                function_call = json.loads(content)
+                function_calls.append(function_call)
+            except json.JSONDecodeError:
+                # If the content is not valid JSON, skip it.
+                continue
+
+        return function_calls
 
     #Helper method to convert outputs path to url
     def path2url(file):
