@@ -198,7 +198,7 @@ class LollmsXTTS:
                     if self.voices_folder is not None:
                         print("Generating sample audio.")
                         voice_file =  [v for v in self.voices_folder.iterdir() if v.suffix==".wav"]
-                        self.tts_to_audio("xtts is ready",voice_file[0].name)
+                        self.tts_to_audio("x t t s is ready",voice_file[0].name)
                     print("Service is available.")
                     if self.app is not None:
                         self.app.success("XTTS Service is now available.")

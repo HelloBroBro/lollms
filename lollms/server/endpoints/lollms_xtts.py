@@ -14,7 +14,7 @@ from starlette.responses import StreamingResponse
 from lollms.types import MSG_TYPE
 from lollms.main_config import BaseConfig
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
-from lollms.security import sanitize_path, validate_path
+from lollms.security import sanitize_path, validate_path, check_access
 from pathlib import Path
 from ascii_colors import ASCIIColors
 import os
@@ -25,6 +25,8 @@ import platform
 router = APIRouter()
 lollmsElfServer:LOLLMSWebUI = LOLLMSWebUI.get_instance()
 
+class Identification(BaseModel):
+    client_id: str
 
 # ----------------------- voice ------------------------------
 
@@ -243,8 +245,9 @@ async def text2Wav(request: LollmsText2AudioRequest):
         return {"status":False,"error":str(ex)}
     
 
-@router.get("/install_xtts")
-def install_xtts():
+@router.post("/install_xtts")
+def install_xtts(data:Identification):
+    check_access(lollmsElfServer, data.client_id)
     try:
         if lollmsElfServer.config.headless_server_mode:
             return {"status":False,"error":"Service installation is blocked when in headless mode for obvious security reasons!"}

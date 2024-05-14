@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        - BASE_IMAGE=python:3.10
+        - BASE_IMAGE=python:3.11
     ports:
       - 9601:9601
     volumes:
