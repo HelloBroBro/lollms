@@ -3384,7 +3384,7 @@ The AI should respond in this format using data from actions_list:
 
         # Combine the function descriptions with the original prompt.
         function_info = ' '.join(function_descriptions)
-        upgraded_prompt = f"{function_info} {prompt}"
+        upgraded_prompt = f"{function_info}\n{prompt}"
 
         return upgraded_prompt
 

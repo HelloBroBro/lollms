@@ -9,6 +9,7 @@ description:
 """
 
 from fastapi import APIRouter, Request, Body, Response
+from fastapi.responses import PlainTextResponse
 from lollms.server.elf_server import LOLLMSElfServer
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
@@ -23,7 +24,7 @@ import random
 import string
 import json
 from enum import Enum
-import asyncio
+import base64
 from datetime import datetime
 
 
@@ -192,7 +193,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
                                                 temperature=request.temperature or elf_server.config.temperature
                                             )
                 completion_tokens = len(elf_server.binding.tokenize(reception_manager.reception_buffer))
-                return reception_manager.reception_buffer
+                return PlainTextResponse(reception_manager.reception_buffer)
         else:
             return None
     except Exception as ex:
@@ -200,7 +201,160 @@ async def lollms_generate(request: LollmsGenerateRequest):
         elf_server.error(ex)
         return {"status":False,"error":str(ex)}
 
-    
+
+
+class LollmsGenerateRequest(BaseModel):
+    prompt: str
+    images: List[str]
+    model_name: Optional[str] = None
+    personality: Optional[int] = -1
+    n_predict: Optional[int] = 1024
+    stream: bool = False
+    temperature: float = 0.1
+    top_k: Optional[int] = 50
+    top_p: Optional[float] = 0.95
+    repeat_penalty: Optional[float] = 0.8
+    repeat_last_n: Optional[int] = 40
+    seed: Optional[int] = None
+    n_threads: Optional[int] = 8
+
+@router.post("/lollms_generate_with_images")
+async def lollms_generate_with_images(request: LollmsGenerateRequest):
+    """ Endpoint for generating text from prompts using the LoLLMs fastAPI server.
+
+    Args:
+    Data model for the Generate with images Request.
+    Attributes:
+    - prompt: str : representing the input text prompt for text generation.
+    - images: str : a list of 64 bits encoded images
+    - model_name: Optional[str] = None : The name of the model to be used (it should be one of the current models)
+    - personality : Optional[int] = None : The name of the mounted personality to be used (if a personality is None, the endpoint will just return a completion text). To get the list of mounted personalities, just use /list_mounted_personalities
+    - n_predict: int representing the number of predictions to generate.
+    - stream: bool indicating whether to stream the generated text or not.
+    - temperature: float representing the temperature parameter for text generation.
+    - top_k: int representing the top_k parameter for text generation.
+    - top_p: float representing the top_p parameter for text generation.
+    - repeat_penalty: float representing the repeat_penalty parameter for text generation.
+    - repeat_last_n: int representing the repeat_last_n parameter for text generation.
+    - seed: int representing the seed for text generation.
+    - n_threads: int representing the number of threads for text generation.
+
+    Returns:
+    - If the elf_server binding is not None:
+    - If stream is True, returns a StreamingResponse of generated text chunks.
+    - If stream is False, returns the generated text as a string.
+    - If the elf_server binding is None, returns None.
+    """
+
+    try:
+        headers = { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive',}
+        reception_manager=RECEPTION_MANAGER()
+        prompt = request.prompt
+        encoded_images = request.images
+        n_predict = request.n_predict if request.n_predict>0 else 1024
+        stream = request.stream
+        prompt_tokens = len(elf_server.binding.tokenize(prompt))
+        if elf_server.binding is not None:
+            image_files = []
+            images_path = elf_server.lollms_paths.personal_outputs_path / "tmp_images"
+            images_path.mkdir(parents=True, exist_ok=True)
+            for i, encoded_image in enumerate(encoded_images):
+                image_path = images_path/ f'image_{i}.png'
+                with open(image_path, 'wb') as image_file:
+                    image_file.write(base64.b64decode(encoded_image))
+                image_files.append(image_path)            
+            if stream:
+                new_output={"new_values":[]}
+                async def generate_chunks():
+                    lk = threading.Lock()
+
+                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                        if elf_server.cancel_gen:
+                            return False
+                        
+                        if chunk is None:
+                            return
+
+                        rx = reception_manager.new_chunk(chunk)
+                        if rx.status!=ROLE_CHANGE_DECISION.MOVE_ON:
+                            if rx.status==ROLE_CHANGE_DECISION.PROGRESSING:
+                                return True
+                            elif rx.status==ROLE_CHANGE_DECISION.ROLE_CHANGED:
+                                return False
+                            else:
+                                chunk = chunk + rx.value
+
+                        # Yield each chunk of data
+                        lk.acquire()
+                        try:
+                            new_output["new_values"].append(reception_manager.chunk)
+                            lk.release()
+                            return True
+                        except Exception as ex:
+                            trace_exception(ex)
+                            lk.release()
+                            return False
+                        
+                    def chunks_builder():
+                        if request.model_name in elf_server.binding.list_models() and elf_server.binding.model_name!=request.model_name:
+                            elf_server.binding.build_model(request.model_name)    
+
+                        elf_server.binding.generate_with_images(
+                                                prompt,
+                                                image_files,
+                                                n_predict, 
+                                                callback=callback, 
+                                                temperature=request.temperature or elf_server.config.temperature
+                                            )
+                        reception_manager.done = True
+                    thread = threading.Thread(target=chunks_builder)
+                    thread.start()
+                    current_index = 0
+                    while (not reception_manager.done and elf_server.cancel_gen == False):
+                        while (not reception_manager.done and len(new_output["new_values"])==0):
+                            time.sleep(0.001)
+                        lk.acquire()
+                        for i in range(len(new_output["new_values"])):
+                            current_index += 1                        
+                            yield (new_output["new_values"][i])
+                        new_output["new_values"]=[]
+                        lk.release()
+                    elf_server.cancel_gen = False         
+                return StreamingResponse(generate_chunks(), media_type="text/plain", headers=headers)
+            else:
+                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    # Yield each chunk of data
+                    if chunk is None:
+                        return True
+
+                    rx = reception_manager.new_chunk(chunk)
+                    if rx.status!=ROLE_CHANGE_DECISION.MOVE_ON:
+                        if rx.status==ROLE_CHANGE_DECISION.PROGRESSING:
+                            return True
+                        elif rx.status==ROLE_CHANGE_DECISION.ROLE_CHANGED:
+                            return False
+                        else:
+                            chunk = chunk + rx.value
+
+
+                    return True
+                elf_server.binding.generate_with_images(
+                                                prompt,
+                                                image_files,
+                                                n_predict, 
+                                                callback=callback,
+                                                temperature=request.temperature or elf_server.config.temperature
+                                            )
+                completion_tokens = len(elf_server.binding.tokenize(reception_manager.reception_buffer))
+                return PlainTextResponse(reception_manager.reception_buffer)
+        else:
+            return None
+    except Exception as ex:
+        trace_exception(ex)
+        elf_server.error(ex)
+        return {"status":False,"error":str(ex)}
+
+
 # ----------------------- Open AI ----------------------------------------
 class Message(BaseModel):
     role: str
