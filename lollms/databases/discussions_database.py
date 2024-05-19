@@ -1038,4 +1038,15 @@ class Discussion:
             # Append the sender and content in a Markdown format
             messages += f'{sender}: {content}\n'
         return title, messages
+ 
+    def format_discussion(self, max_allowed_tokens, splitter_text="!@>"):
+        formatted_text = ""
+        for message in reversed(self.messages):  # Start from the newest message
+            formatted_message = f"{splitter_text}{message.sender.replace(':','').replace('!@>','')}:\n{message.content}\n"
+            tokenized_message = self.lollms.model.tokenize(formatted_message)
+            if len(tokenized_message) + len(self.lollms.model.tokenize(formatted_text)) <= max_allowed_tokens:
+                formatted_text = formatted_message + formatted_text
+            else:
+                break  # Stop if adding the next message would exceed the limit
+        return formatted_text   
 # ========================================================================================================================

@@ -1,4 +1,4 @@
-# Title LollmsDalle
+# Title LollmsMidjourney
 # Licence: Apache 2.0
 # Author : Paris Neo
 
@@ -35,7 +35,7 @@ from io import BytesIO
 
 
 
-class LollmsDalle(LollmsTTI):
+class LollmsMidjourney(LollmsTTI):
     def __init__(
                     self, 
                     app:LollmsApplication, 
@@ -139,4 +139,4 @@ class LollmsDalle(LollmsTTI):
         return file_name
     @staticmethod
     def get(app:LollmsApplication):
-        return LollmsDalle
+        return LollmsMidjourney

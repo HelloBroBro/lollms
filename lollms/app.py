@@ -221,7 +221,21 @@ class LollmsApplication(LoLLMsCom):
     def get_uploads_path(self, client_id):
         return self.lollms_paths.personal_uploads_path
 
-    def start_servers(  self ):
+    def start_servers(self):
+        self.ollama = None
+        self.vllm = None
+        self.whisper = None
+        self.xtts = None
+        self.sd = None
+        self.comfyui = None
+        self.motion_ctrl = None
+
+        self.tti = None
+        self.tts = None
+        self.stt = None
+
+
+
         if self.config.enable_ollama_service:
             try:
                 from lollms.services.ollama.lollms_ollama import Service
@@ -240,13 +254,11 @@ class LollmsApplication(LoLLMsCom):
 
         if self.config.whisper_activate:
             try:
-                from lollms.media import AudioRecorder
-                self.rec = AudioRecorder(self.lollms_paths.personal_outputs_path/"test.wav")
-                self.rec.start_recording()
-                time.sleep(1)
-                self.rec.stop_recording()
-            except:
-                pass
+                from lollms.services.whisper.lollms_whisper import LollmsWhisper
+                self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
+            except Exception as ex:
+                trace_exception(ex)
+
         if self.config.xtts_enable:
             try:
                 from lollms.services.xtts.lollms_xtts import LollmsXTTS
@@ -256,7 +268,7 @@ class LollmsApplication(LoLLMsCom):
                 else:
                     voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
 
-                self.tts = LollmsXTTS(
+                self.xtts = LollmsXTTS(
                                         self,
                                         voices_folder=voices_folder,
                                         voice_samples_path=self.lollms_paths.custom_voices_path, 
@@ -290,6 +302,126 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
                 self.warning(f"Couldn't load Motion control")
 
+
+        if self.config.active_tti_service == "autosd":
+            from lollms.services.sd.lollms_sd import LollmsSD
+            self.tti = LollmsSD(self)
+        elif self.config.active_tti_service == "dall-e":
+            from lollms.services.dalle.lollms_dalle import LollmsDalle
+            self.tti = LollmsDalle(self, self.config.dall_e_key)
+        elif self.config.active_tti_service == "midjourney":
+            from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
+            self.tti = LollmsMidjourney(self, self.config.midjourney_key)
+
+        if self.config.active_tts_service == "openai_tts":
+            from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
+            self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
+        elif self.config.active_tts_service == "xtts" and self.xtts:
+            self.tts = self.xtts
+
+        if self.config.active_stt_service == "openai_whisper":
+            from lollms.services.openai_whisper.lollms_whisper import LollmsOpenAIWhisper
+            self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
+        elif self.config.active_stt_service == "whisper":
+            from lollms.services.whisper.lollms_whisper import LollmsWhisper
+            self.stt = LollmsWhisper(self, self.config.whisper_model)
+
+
+    def verify_servers(self, reload_all=False):
+
+        try:
+            if self.config.enable_ollama_service and self.ollama is None:
+                try:
+                    from lollms.services.ollama.lollms_ollama import Service
+                    self.ollama = Service(self, base_url=self.config.ollama_base_url)
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load Ollama")
+
+            if self.config.enable_vllm_service and self.vllm is None:
+                try:
+                    from lollms.services.vllm.lollms_vllm import Service
+                    self.vllm = Service(self, base_url=self.config.vllm_url)
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load vllm")
+
+            if self.config.whisper_activate and self.whisper is None:
+                try:
+                    from lollms.services.whisper.lollms_whisper import LollmsWhisper
+                    self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
+                except Exception as ex:
+                    trace_exception(ex)
+            if self.config.xtts_enable and self.xtts is None:
+                try:
+                    from lollms.services.xtts.lollms_xtts import LollmsXTTS
+                    voice=self.config.xtts_current_voice
+                    if voice!="main_voice":
+                        voices_folder = self.lollms_paths.custom_voices_path
+                    else:
+                        voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
+
+                    self.xtts = LollmsXTTS(
+                                            self,
+                                            voices_folder=voices_folder,
+                                            voice_samples_path=self.lollms_paths.custom_voices_path, 
+                                            xtts_base_url=self.config.xtts_base_url,
+                                            wait_for_service=False,
+                                            use_deep_speed=self.config.xtts_use_deepspeed,
+                                            use_streaming_mode=self.config.xtts_use_streaming_mode
+                                        )
+                except:
+                    self.warning(f"Couldn't load XTTS")
+
+            if self.config.enable_sd_service and self.sd is None:
+                try:
+                    from lollms.services.sd.lollms_sd import LollmsSD
+                    self.sd = LollmsSD(self, auto_sd_base_url=self.config.sd_base_url)
+                except:
+                    self.warning(f"Couldn't load SD")
+
+            if self.config.enable_comfyui_service and self.comfyui is None:
+                try:
+                    from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+                    self.comfyui = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
+                except:
+                    self.warning(f"Couldn't load SD")
+
+            if self.config.enable_motion_ctrl_service and self.motion_ctrl is None:
+                try:
+                    from lollms.services.motion_ctrl.lollms_motion_ctrl import Service
+                    self.motion_ctrl = Service(self, base_url=self.config.motion_ctrl_base_url)
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load Motion control")
+
+
+            if self.config.active_tti_service == "autosd":
+                from lollms.services.sd.lollms_sd import LollmsSD
+                self.tti = LollmsSD(self)
+            elif self.config.active_tti_service == "dall-e":
+                from lollms.services.dalle.lollms_dalle import LollmsDalle
+                self.tti = LollmsDalle(self, self.config.dall_e_key)
+            elif self.config.active_tti_service == "midjourney":
+                from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
+                self.tti = LollmsMidjourney(self, self.config.midjourney_key)
+
+            if self.config.active_tts_service == "openai_tts":
+                from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
+                self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
+            elif self.config.active_stt_service == "xtts" and self.xtts:
+                self.tts = self.xtts
+
+            if self.config.active_stt_service == "openai_whisper":
+                from lollms.services.openai_whisper.lollms_whisper import LollmsOpenAIWhisper
+                self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
+            elif self.config.active_stt_service == "whisper":
+                from lollms.services.whisper.lollms_whisper import LollmsWhisper
+                self.stt = LollmsWhisper(self, self.config.whisper_model)
+
+        except Exception as ex:
+            trace_exception(ex)
+            
 
     def build_long_term_skills_memory(self):
         discussion_db_name:Path = self.lollms_paths.personal_discussions_path/self.config.discussion_db_name.split(".")[0]

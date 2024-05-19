@@ -28,18 +28,14 @@ from typing import List, Dict, Any
 
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
+from lollms.tti import LollmsTTI
 from lollms.utilities import git_pull, show_yes_no_dialog, run_script_in_env, create_conda_env
 import subprocess
 import shutil
 from tqdm import tqdm
 import threading
 
-def verify_sd(lollms_paths:LollmsPaths):
-    # Clone repository
-    root_dir = lollms_paths.personal_path
-    shared_folder = root_dir/"shared"
-    sd_folder = shared_folder / "auto_sd"
-    return sd_folder.exists()
+
 
 def download_file(url, folder_path, local_filename):
     # Make sure 'folder_path' exists
@@ -137,20 +133,6 @@ def upgrade_sd(lollms_app:LollmsApplication):
     ASCIIColors.success("DONE")
 
 
-def get_sd(lollms_paths:LollmsPaths):
-    root_dir = lollms_paths.personal_path
-    shared_folder = root_dir/"shared"
-    sd_folder = shared_folder / "auto_sd"
-    sd_script_path = sd_folder / "lollms_sd.py"
-    git_pull(sd_folder)
-    
-    if sd_script_path.exists():
-        ASCIIColors.success("lollms_sd found.")
-        ASCIIColors.success("Loading source file...",end="")
-        # use importlib to load the module from the file path
-        from lollms.services.sd.lollms_sd import LollmsSD
-        ASCIIColors.success("ok")
-        return LollmsSD
 
 
 def raw_b64_img(image: Image) -> str:
@@ -274,7 +256,7 @@ class ControlNetUnit:
             "pixel_perfect": self.pixel_perfect,
         }
 
-class LollmsSD:
+class LollmsSD(LollmsTTI):
     has_controlnet = False
     def __init__(
                     self, 
@@ -290,19 +272,19 @@ class LollmsSD:
                     share=False,
                     wait_for_service=True
                     ):
+        super().__init__(app)
         if auto_sd_base_url=="" or auto_sd_base_url=="http://127.0.0.1:7860":
             auto_sd_base_url = None
         self.ready = False
         # Get the current directory
         lollms_paths = app.lollms_paths
-        self.app = app
         root_dir = lollms_paths.personal_path
         
         self.wm = wm
         # Store the path to the script
         if auto_sd_base_url is None:
             self.auto_sd_base_url = "http://127.0.0.1:7860"
-            if not verify_sd(lollms_paths):
+            if not LollmsSD.verify(app):
                 install_sd(app.lollms_paths)
         else:
             self.auto_sd_base_url = auto_sd_base_url
@@ -363,6 +345,30 @@ class LollmsSD:
             self.set_auth(username, password)
         else:
             self.check_controlnet()
+
+    @staticmethod
+    def verify(app:LollmsApplication):
+        # Clone repository
+        root_dir = app.lollms_paths.personal_path
+        shared_folder = root_dir/"shared"
+        sd_folder = shared_folder / "auto_sd"
+        return sd_folder.exists()
+    
+    def get(app:LollmsApplication):
+        root_dir = app.lollms_paths.personal_path
+        shared_folder = root_dir/"shared"
+        sd_folder = shared_folder / "auto_sd"
+        sd_script_path = sd_folder / "lollms_sd.py"
+        git_pull(sd_folder)
+        
+        if sd_script_path.exists():
+            ASCIIColors.success("lollms_sd found.")
+            ASCIIColors.success("Loading source file...",end="")
+            # use importlib to load the module from the file path
+            from lollms.services.sd.lollms_sd import LollmsSD
+            ASCIIColors.success("ok")
+            return LollmsSD
+
 
     def paint(
                 self,

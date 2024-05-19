@@ -11,7 +11,7 @@ import sys
 from lollms.app import LollmsApplication
 from lollms.paths import LollmsPaths
 from lollms.config import TypedConfig, ConfigTemplate, BaseConfig
-from lollms.utilities import PackageManager
+from lollms.utilities import PackageManager, find_first_available_file_index, add_period
 import time
 import io
 import sys
@@ -21,6 +21,7 @@ import base64
 import subprocess
 import time
 import json
+import re
 import platform
 import threading
 from dataclasses import dataclass
@@ -32,59 +33,11 @@ import uuid
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
 from lollms.utilities import git_pull, show_yes_no_dialog, run_python_script_in_env, create_conda_env, run_pip_in_env, environment_exists
+from lollms.tts import LollmsTTS
 import subprocess
 import platform
 
-def verify_xtts(lollms_paths:LollmsPaths):
-    # Clone repository
-    root_dir = lollms_paths.personal_path
-    shared_folder = root_dir/"shared"
-    xtts_path = shared_folder / "xtts"
-    return xtts_path.exists()
     
-def install_xtts(lollms_app:LollmsApplication):
-    ASCIIColors.green("XTTS installation started")
-    repo_url = "https://github.com/ParisNeo/xtts-api-server"
-    root_dir = lollms_app.lollms_paths.personal_path
-    shared_folder = root_dir/"shared"
-    xtts_path = shared_folder / "xtts"
-
-    # Step 1: Clone or update the repository
-    if os.path.exists(xtts_path):
-        print("Repository already exists. Pulling latest changes...")
-        try:
-            subprocess.run(["git", "-C", xtts_path, "pull"], check=True)
-        except:
-            subprocess.run(["git", "clone", repo_url, xtts_path], check=True)
-
-    else:
-        print("Cloning repository...")
-        subprocess.run(["git", "clone", repo_url, xtts_path], check=True)
-
-    # Step 2: Create or update the Conda environment
-    if environment_exists("xtts"):
-        print("Conda environment 'xtts' already exists. Updating...")
-        # Here you might want to update the environment, e.g., update Python or dependencies
-        # This step is highly dependent on how you manage your Conda environments and might involve
-        # running `conda update` commands or similar.
-    else:
-        print("Creating Conda environment 'xtts'...")
-        create_conda_env("xtts", "3.8")
-
-    # Step 3: Install or update dependencies using your custom function
-    requirements_path = os.path.join(xtts_path, "requirements.txt")
-    run_pip_in_env("xtts", f"install -r {requirements_path}", cwd=xtts_path)
-    run_pip_in_env("xtts", f"install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118", cwd=xtts_path)
-
-    # Step 4: Launch the server
-    # Assuming the server can be started with a Python script in the cloned repository
-    print("Launching XTTS API server...")
-    run_python_script_in_env("xtts", "xtts_api_server", cwd=xtts_path)
-
-    print("XTTS API server setup and launch completed.")
-    ASCIIColors.cyan("Done")
-    ASCIIColors.cyan("Installing xtts-api-server")
-    ASCIIColors.green("XTTS server installed successfully")
 
 
 
@@ -103,8 +56,7 @@ def get_xtts(lollms_paths:LollmsPaths):
         ASCIIColors.success("ok")
         return LollmsXTTS
 
-class LollmsXTTS:
-    has_controlnet = False
+class LollmsXTTS(LollmsTTS):
     def __init__(
                     self, 
                     app:LollmsApplication, 
@@ -117,6 +69,7 @@ class LollmsXTTS:
                     use_deep_speed=False,
                     use_streaming_mode = True
                 ):
+        super().__init__(app)
         self.generation_threads = []
         self.voices_folder = voices_folder
         self.ready = False
@@ -124,7 +77,6 @@ class LollmsXTTS:
             xtts_base_url = None
         # Get the current directory
         lollms_paths = app.lollms_paths
-        self.app = app
         root_dir = lollms_paths.personal_path
         self.voice_samples_path = voice_samples_path
         self.use_deep_speed = use_deep_speed
@@ -133,8 +85,8 @@ class LollmsXTTS:
         # Store the path to the script
         if xtts_base_url is None:
             self.xtts_base_url = "http://127.0.0.1:8020"
-            if not verify_xtts(lollms_paths):
-                install_xtts(app.lollms_paths)
+            if not LollmsXTTS.verify(lollms_paths):
+                LollmsXTTS.install(app)
         else:
             self.xtts_base_url = xtts_base_url
 
@@ -167,6 +119,57 @@ class LollmsXTTS:
         else:
             self.wait_for_service_in_another_thread(max_retries=max_retries)
 
+    def install(lollms_app:LollmsApplication):
+        ASCIIColors.green("XTTS installation started")
+        repo_url = "https://github.com/ParisNeo/xtts-api-server"
+        root_dir = lollms_app.lollms_paths.personal_path
+        shared_folder = root_dir/"shared"
+        xtts_path = shared_folder / "xtts"
+
+        # Step 1: Clone or update the repository
+        if os.path.exists(xtts_path):
+            print("Repository already exists. Pulling latest changes...")
+            try:
+                subprocess.run(["git", "-C", xtts_path, "pull"], check=True)
+            except:
+                subprocess.run(["git", "clone", repo_url, xtts_path], check=True)
+
+        else:
+            print("Cloning repository...")
+            subprocess.run(["git", "clone", repo_url, xtts_path], check=True)
+
+        # Step 2: Create or update the Conda environment
+        if environment_exists("xtts"):
+            print("Conda environment 'xtts' already exists. Updating...")
+            # Here you might want to update the environment, e.g., update Python or dependencies
+            # This step is highly dependent on how you manage your Conda environments and might involve
+            # running `conda update` commands or similar.
+        else:
+            print("Creating Conda environment 'xtts'...")
+            create_conda_env("xtts", "3.8")
+
+        # Step 3: Install or update dependencies using your custom function
+        requirements_path = os.path.join(xtts_path, "requirements.txt")
+        run_pip_in_env("xtts", f"install -r {requirements_path}", cwd=xtts_path)
+        run_pip_in_env("xtts", f"install torch==2.1.1+cu118 torchaudio==2.1.1+cu118 --index-url https://download.pytorch.org/whl/cu118", cwd=xtts_path)
+
+        # Step 4: Launch the server
+        # Assuming the server can be started with a Python script in the cloned repository
+        print("Launching XTTS API server...")
+        run_python_script_in_env("xtts", "xtts_api_server", cwd=xtts_path)
+
+        print("XTTS API server setup and launch completed.")
+        ASCIIColors.cyan("Done")
+        ASCIIColors.cyan("Installing xtts-api-server")
+        ASCIIColors.green("XTTS server installed successfully")
+
+    @staticmethod
+    def verify(lollms_paths:LollmsPaths)->bool:
+        # Clone repository
+        root_dir = lollms_paths.personal_path
+        shared_folder = root_dir/"shared"
+        xtts_path = shared_folder / "xtts"
+        return xtts_path.exists()
 
     def run_xtts_api_server(self):
         # Get the path to the current Python interpreter
@@ -198,7 +201,7 @@ class LollmsXTTS:
                     if self.voices_folder is not None:
                         print("Generating sample audio.")
                         voice_file =  [v for v in self.voices_folder.iterdir() if v.suffix==".wav"]
-                        self.tts_to_audio("x t t s is ready",voice_file[0].name)
+                        self.tts_to_audio("x t t s is ready",voice_file[0].stem)
                     print("Service is available.")
                     if self.app is not None:
                         self.app.success("XTTS Service is now available.")
@@ -237,13 +240,13 @@ class LollmsXTTS:
             print("Request failed with status code:", response.status_code)
             return False
 
-    def tts_to_file(self, text, speaker_wav, file_name_or_path, language="en"):
+    def tts_to_file(self, text, speaker, file_name_or_path, language="en"):
         url = f"{self.xtts_base_url}/tts_to_file"
 
         # Define the request body
         payload = {
             "text": text,
-            "speaker_wav": speaker_wav,
+            "speaker_wav": speaker,
             "language": language,
             "file_name_or_path": file_name_or_path
         }
@@ -262,14 +265,50 @@ class LollmsXTTS:
         else:
             print("Request failed with status code:", response.status_code)
 
-    def tts_to_audio(self, text, speaker_wav, file_name_or_path:Path|str=None, language="en", use_threading=False):
+    def tts_to_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=False):
+        voice=self.app.config.xtts_current_voice if speaker is None else speaker
+        index = find_first_available_file_index(self.output_folder, "voice_sample_",".wav")
+        output_fn=f"voice_sample_{index}.wav" if file_name_or_path is None else file_name_or_path
+        if voice is None:
+            voice = "main_voice"
+        self.app.info("Starting to build voice")
+        try:
+            from lollms.services.xtts.lollms_xtts import LollmsXTTS
+            # If the personality has a voice, then use it
+            personality_audio:Path = self.app.personality.personality_package_path/"audio"
+            if personality_audio.exists() and len([v for v in personality_audio.iterdir()])>0:
+                voices_folder = personality_audio
+            elif voice!="main_voice":
+                voices_folder = self.app.lollms_paths.custom_voices_path
+            else:
+                voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
+            language = self.app.config.xtts_current_language# convert_language_name()
+            self.set_speaker_folder(voices_folder)
+            preprocessed_text= add_period(text)
+            voice_file =  [v for v in voices_folder.iterdir() if v.stem==voice and v.suffix==".wav"]
+            if len(voice_file)==0:
+                return {"status":False,"error":"Voice not found"}
+            self.xtts_to_audio(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language)
+
+        except Exception as ex:
+            trace_exception(ex)
+            return {"status":False,"error":f"{ex}"}
+
+    def xtts_to_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=False):
+        # Remove HTML tags
+        text = re.sub(r'<.*?>', '', text)
+        # Remove code blocks (assuming they're enclosed in backticks or similar markers)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'`.*?`', '', text)
+        # Remove any remaining code-like patterns (this can be adjusted as needed)
+        text = re.sub(r'[\{\}\[\]\(\)<>]', '', text)        
         def tts2_audio_th(thread_uid=None):
             url = f"{self.xtts_base_url}/tts_to_audio"
 
             # Define the request body
             payload = {
                 "text": text,
-                "speaker_wav": speaker_wav,
+                "speaker_wav": speaker,
                 "language": language
             }
             headers = {
@@ -308,3 +347,10 @@ class LollmsXTTS:
             return thread
         else:
             return tts2_audio_th()
+        
+    def get_voices(self):
+        ASCIIColors.yellow("Listing voices")
+        voices=["main_voice"]
+        voices_dir:Path=self.app.lollms_paths.custom_voices_path
+        voices += [v.stem for v in voices_dir.iterdir() if v.suffix==".wav"]
+        return voices

@@ -92,8 +92,8 @@ def start_sd(data: Identification):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Starting SD api server\nPlease stand by")
-        from lollms.services.sd.lollms_sd import get_sd
-        lollmsElfServer.sd = get_sd(lollmsElfServer.lollms_paths)(lollmsElfServer, lollmsElfServer.personality.name if lollmsElfServer.personality is not None else "Artbot")
+        from lollms.services.sd.lollms_sd import LollmsSD
+        lollmsElfServer.sd = LollmsSD.get(lollmsElfServer)(lollmsElfServer, lollmsElfServer.personality.name if lollmsElfServer.personality is not None else "Artbot")
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
         return {"status":True}

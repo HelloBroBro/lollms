@@ -186,6 +186,7 @@ async def apply_settings(request: Request):
                 lollmsElfServer.config.config[key] = config.get(key, lollmsElfServer.config.config[key])
             ASCIIColors.success("OK")
             lollmsElfServer.rebuild_personalities()
+            lollmsElfServer.verify_servers()
             if lollmsElfServer.config.auto_save:
                 lollmsElfServer.config.save_config()
             return {"status":True}

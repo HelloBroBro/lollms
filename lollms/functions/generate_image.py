@@ -13,13 +13,14 @@ import sys
 
 def build_image(prompt, width, height, self:APScript, client:Client):
     try:
-        if self.personality_config.image_generation_engine=="autosd":
-            if not hasattr(self, "sd"):
+        if self.personality.config.active_tti_service=="autosd":
+            if not self.personality.app.tti:
                 from lollms.services.sd.lollms_sd import LollmsSD
                 self.step_start("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
-                self.sd = LollmsSD(self.personality.app, self.personality.name, max_retries=-1,auto_sd_base_url=self.personality.config.sd_base_url)
+                self.personality.app.tti = LollmsSD(self.personality.app, self.personality.name, max_retries=-1,auto_sd_base_url=self.personality.config.sd_base_url)
+                self.personality.app.sd = self.personality.app.tti
                 self.step_end("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
-            file, infos = self.sd.paint(
+            file, infos = self.personality.app.tti.paint(
                             prompt, 
                             "",
                             self.personality.image_files,
@@ -28,13 +29,14 @@ def build_image(prompt, width, height, self:APScript, client:Client):
                             output_path=client.discussion.discussion_folder
                         )
         elif self.personality_config.image_generation_engine in ["dall-e-2", "dall-e-3"]:
-            if not hasattr(self, "dalle"):
+            if not self.personality.app.tti:
                 from lollms.services.dalle.lollms_dalle import LollmsDalle
                 self.step_start("Loading dalle service")
-                self.dalle = LollmsDalle(self.personality.app, self.personality.config.dall_e_key, self.personality_config.image_generation_engine)
+                self.personality.app.tti = LollmsDalle(self.personality.app, self.personality.config.dall_e_key, self.personality_config.image_generation_engine)
+                self.personality.app.dalle = self.personality.app.tti
                 self.step_end("Loading dalle service")
             self.step_start("Painting")
-            file = self.dalle.paint(
+            file = self.personality.app.tti.paint(
                             prompt, 
                             width = width,
                             height = height,

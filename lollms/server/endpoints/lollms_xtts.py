@@ -8,6 +8,7 @@ description:
 
 """
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from fastapi.responses import PlainTextResponse
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
@@ -39,10 +40,7 @@ def list_voices():
         return {"status":False,"error":"Code execution is blocked when the server is exposed outside for very obvious reasons!"}
 
     ASCIIColors.yellow("Listing voices")
-    voices=["main_voice"]
-    voices_dir:Path=lollmsElfServer.lollms_paths.custom_voices_path
-    voices += [v.stem for v in voices_dir.iterdir() if v.suffix==".wav"]
-    return {"voices":voices}
+    return {"voices":lollmsElfServer.tts.get_voices()}
 
 @router.post("/set_voice")
 async def set_voice(request: Request):
@@ -70,6 +68,24 @@ async def set_voice(request: Request):
         return {"status":False,"error":str(ex)}
 
 
+class LollmsAudio2TextRequest(BaseModel):
+    wave_file_path: str
+    voice: str = None
+    fn:str = None
+
+@router.post("/audio2text")
+async def audio2text(request: LollmsAudio2TextRequest):
+    if lollmsElfServer.config.headless_server_mode:
+        return {"status":False,"error":"Code execution is blocked when in headless mode for obvious security reasons!"}
+
+    if lollmsElfServer.config.host!="localhost" and lollmsElfServer.config.host!="127.0.0.1":
+        return {"status":False,"error":"Code execution is blocked when the server is exposed outside for very obvious reasons!"}
+
+    result = lollmsElfServer.whisper.transcribe(str(request.wave_file_path))
+    return PlainTextResponse(result)
+
+
+
 class LollmsText2AudioRequest(BaseModel):
     text: str
     voice: str = None
@@ -94,67 +110,13 @@ async def text2Audio(request: LollmsText2AudioRequest):
         validate_path(request.fn,[str(lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")])
         
     try:
-        # Get the JSON data from the POST request.
-        try:
-            from lollms.services.xtts.lollms_xtts import LollmsXTTS
-            voice=lollmsElfServer.config.xtts_current_voice
-            if lollmsElfServer.tts is None:
-                voice=lollmsElfServer.config.xtts_current_voice
-                if voice!="main_voice":
-                    voices_folder = lollmsElfServer.lollms_paths.custom_voices_path
-                else:
-                    voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
-
-                lollmsElfServer.tts = LollmsXTTS(
-                    lollmsElfServer, 
-                    voices_folder=voices_folder,
-                    voice_samples_path=Path(__file__).parent/"voices", 
-                    xtts_base_url= lollmsElfServer.config.xtts_base_url,
-                    use_deep_speed= lollmsElfServer.config.xtts_use_deep_speed,
-                    use_streaming_mode= lollmsElfServer.config.xtts_use_streaming_mode,
-                )
-        except Exception as ex:
-            return {"url": None, "error":f"{ex}"}
-            
-        voice=lollmsElfServer.config.xtts_current_voice if request.voice is None else request.voice
-        index = find_first_available_file_index(lollmsElfServer.tts.output_folder, "voice_sample_",".wav")
-        output_fn=f"voice_sample_{index}.wav" if request.fn is None else request.fn
-        if voice is None:
-            voice = "main_voice"
-        lollmsElfServer.info("Starting to build voice")
-        try:
-            from lollms.services.xtts.lollms_xtts import LollmsXTTS
-            # If the personality has a voice, then use it
-            personality_audio:Path = lollmsElfServer.personality.personality_package_path/"audio"
-            if personality_audio.exists() and len([v for v in personality_audio.iterdir()])>0:
-                voices_folder = personality_audio
-            elif voice!="main_voice":
-                voices_folder = lollmsElfServer.lollms_paths.custom_voices_path
-            else:
-                voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
-            if lollmsElfServer.tts is None:
-                lollmsElfServer.tts = LollmsXTTS(
-                                                    lollmsElfServer, 
-                                                    voices_folder=voices_folder,
-                                                    voice_samples_path=Path(__file__).parent/"voices", 
-                                                    xtts_base_url= lollmsElfServer.config.xtts_base_url,
-                                                    use_deep_speed=lollmsElfServer.config.xtts_use_deepspeed,
-                                                    use_streaming_mode=lollmsElfServer.config.xtts_use_streaming_mode                                                    
-                                                )
-            if lollmsElfServer.tts.ready:
-                language = lollmsElfServer.config.xtts_current_language# convert_language_name()
-                lollmsElfServer.tts.set_speaker_folder(voices_folder)
-                preprocessed_text= add_period(request.text)
-                voice_file =  [v for v in voices_folder.iterdir() if v.stem==voice and v.suffix==".wav"]
-                if len(voice_file)==0:
-                    return {"status":False,"error":"Voice not found"}
-                lollmsElfServer.tts.tts_to_audio(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language)
-            else:
-                lollmsElfServer.InfoMessage("xtts is not up yet.\nPlease wait for it to load then try again. This may take some time.") 
-                return  {"status":False, "error":"Service not ready yet"} 
-        except Exception as ex:
-            trace_exception(ex)
-            return {"url": None}
+        if lollmsElfServer.tts is None:
+            return {"url": None, "error":f"No TTS service is on"}
+        if lollmsElfServer.tts.ready:
+            response = lollmsElfServer.tts.tts_to_audio(request.text, request.voice, file_name_or_path=request.fn)
+            return response
+        else:
+            return {"url": None, "error":f"TTS service is not ready yet"}
     except Exception as ex:
         trace_exception(ex)
         lollmsElfServer.error(ex)
@@ -255,9 +217,9 @@ def install_xtts(data:Identification):
         if lollmsElfServer.config.host!="localhost" and lollmsElfServer.config.host!="127.0.0.1":
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
         
-        from lollms.services.xtts.lollms_xtts import install_xtts
+        from lollms.services.xtts.lollms_xtts import LollmsTTS
         lollmsElfServer.ShowBlockingMessage("Installing xTTS api server\nPlease stand by")
-        install_xtts(lollmsElfServer)
+        LollmsTTS.install(lollmsElfServer)
         lollmsElfServer.HideBlockingMessage()
         return {"status":True}
     except Exception as ex:

@@ -9,10 +9,13 @@ License: Apache 2.0
 from lollms.utilities import PackageManager
 from lollms.com import LoLLMsCom
 from lollms.utilities import trace_exception, run_async
+from lollms.types import MSG_TYPE, SENDER_TYPES
+from lollms.client_session import Session
 from ascii_colors import ASCIIColors
 import platform
 from functools import partial
 import subprocess
+from collections import deque
 
 import os
 import threading
@@ -80,84 +83,325 @@ from matplotlib import pyplot as plt
 import numpy as np
 from scipy.signal import spectrogram
 from pathlib import Path
+
+from lollms.app import LollmsApplication
+from lollms.tasks import TasksLibrary
+from lollms.tts import LollmsTTS
+from lollms.personality import AIPersonality
+from lollms.function_call import FunctionCalling_Library
+from lollms.databases.discussions_database import Discussion, DiscussionsDB
+from datetime import datetime
+
+import math
+
 class AudioRecorder:
-    def __init__(self, filename:Path, sio:socketio.Client=None, channels=1, sample_rate=16000, chunk_size=24678, silence_threshold=150.0, silence_duration=2, callback=None, lollmsCom:LoLLMsCom=None, build_spectrogram=False, model = "base", transcribe=False):
+    def __init__(
+                        self, 
+                        lc:LollmsApplication, 
+                        sio:socketio.Client,  
+                        personality:AIPersonality,
+                        discussion_database:DiscussionsDB,
+                        threshold=1000, silence_duration=2, sound_threshold_percentage=10, gain=1.0, rate=44100, channels=1, buffer_size=10, model="small.en", snd_device=None, logs_folder="logs", voice=None, block_while_talking=True, context_size=4096):
         self.sio = sio
-        self.filename = Path(filename)
-        self.filename.parent.mkdir(exist_ok=True, parents=True)
+        self.lc = lc
+        self.discussion_database = discussion_database
+        self.tts = LollmsTTS(self.lc)
+        self.tl = TasksLibrary(self.lc)
+        self.fn = FunctionCalling_Library(self.tl)
+
+        self.fn.register_function(
+                                        "calculator_function", 
+                                        self.calculator_function, 
+                                        "returns the result of a calculation passed through the expression string parameter",
+                                        [{"name": "expression", "type": "str"}]
+                                    )
+        self.fn.register_function(
+                                        "get_date_time", 
+                                        self.get_date_time, 
+                                        "returns the current date and time",
+                                        []
+                                    )
+        self.fn.register_function(
+                                        "take_a_photo", 
+                                        self.take_a_photo, 
+                                        "Takes a photo and returns the status",
+                                        []
+                                    )
+
+        self.block_listening = False
+        if not voice:
+            voices = self.get_voices()
+            voice = voices[0]
+        self.voice = voice
+        self.context_size = context_size
+        self.personality = personality
+        self.rate = rate
         self.channels = channels
-        self.sample_rate = sample_rate
-        self.chunk_size = chunk_size
-        self.silence_threshold = silence_threshold
+        self.threshold = threshold
         self.silence_duration = silence_duration
-        self.callback = callback
-        self.lollmsCom = lollmsCom
-        self.buffer = []
-        self.is_recording = False
-        self.start_time = time.time()
-        self.last_time = time.time()
-        self.build_spectrogram = build_spectrogram
-        self.transcribe = transcribe
-        if transcribe:
-            self.whisper = whisper.load_model(model)
+        self.buffer_size = buffer_size
+        self.gain = gain
+        self.sound_threshold_percentage = sound_threshold_percentage
+        self.block_while_talking = block_while_talking
+        self.image_shot = None
 
+        if snd_device is None:
+            devices = sd.query_devices()
+            snd_device = [device['name'] for device in devices][0]
 
-    def audio_callback(self, indata, frames, time_, status):
-        volume_norm = np.linalg.norm(indata)*10
-        # if volume_norm > self.silence_threshold:
-        #     self.last_sound_time = time.time()
-        #     if not self.is_recording:
-        #         self.is_recording = True
-        #         self.start_time = time.time()
-        if self.is_recording:
-            self.buffer = np.append(self.buffer, indata.copy())
-            if self.build_spectrogram:
-                if (time.time() - self.last_time) > self.silence_duration:
-                    self.update_spectrogram()
+        self.snd_device = snd_device
+        self.logs_folder = logs_folder
+
+        self.frames = []
+        self.silence_counter = 0
+        self.current_silence_duration = 0
+        self.longest_silence_duration = 0
+        self.sound_frames = 0
+        self.audio_values = []
+
+        self.max_audio_value = 0
+        self.min_audio_value = 0
+        self.total_frames = 0  # Initialize total_frames
+
+        self.file_index = 0
+        self.recording = False
+        self.stop_flag = False
+
+        self.buffer = deque(maxlen=buffer_size)
+        self.transcribed_files = deque()
+        self.buffer_lock = threading.Condition()
+        self.transcribed_lock = threading.Condition()
+        ASCIIColors.info("Loading whisper...",end="",flush=True)
+
+        self.model = model
+        self.whisper = whisper.load_model(model)
+        ASCIIColors.success("OK")
+        self.discussion = discussion_database.create_discussion("RT_chat")
+    
+    def get_date_time(self):
+        now = datetime.now()
+        return now.strftime("%Y-%m-%d %H:%M:%S")        
+    
+    def calculator_function(self, expression: str) -> float:
+        try:
+            # Add the math module functions to the local namespace
+            allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}
+            
+            # Evaluate the expression safely using the allowed names
+            result = eval(expression, {"__builtins__": None}, allowed_names)
+            return result
+        except Exception as e:
+            return str(e)
+        
+    def take_a_photo(self):
+        return "Couldn't take a photo"
+
 
     def start_recording(self):
-        try:
-            self.is_recording = True
-            self.buffer = np.array([], dtype=np.float32)
-            self.audio_stream = sd.InputStream(callback=self.audio_callback, channels=self.channels, samplerate=self.sample_rate)
-            self.audio_stream.start()
-        except Exception as ex:
-            self.lollmsCom.InfoMessage("Couldn't start recording.\nMake sure your input device is connected and operational")
-            trace_exception(ex)
-            
+        self.recording = True
+        self.stop_flag = False
+
+        threading.Thread(target=self._record).start()
+        threading.Thread(target=self._process_files).start()
+
     def stop_recording(self):
-        self.is_recording = False
-        self.audio_stream.stop()
-        self.audio_stream.close()
-        write(self.filename, self.sample_rate, self.buffer)
-        self.lollmsCom.info(f"Saved to {self.filename}")
+        self.stop_flag = True
 
-        if self.transcribe:
-            self.lollmsCom.info(f"Transcribing ... ")
-            result = self.whisper.transcribe(str(self.filename))
-            transcription_fn = str(self.filename)+".txt"
-            with open(transcription_fn, "w", encoding="utf-8") as f:
-                f.write(result["text"])
-            self.lollmsCom.info(f"File saved to {transcription_fn}")
-            if self.sio:
-                run_async(partial(self.sio.emit,'transcript', result["text"]))
-            return {"text":result["text"], "audio":transcription_fn}
+    def _record(self):
+        sd.default.device = self.snd_device
+        with sd.InputStream(channels=self.channels, samplerate=self.rate, callback=self.callback, dtype='int16'):
+            while not self.stop_flag:
+                time.sleep(0.1)
+
+        if self.frames:
+            self._save_wav(self.frames)
+        self.recording = False
+
+        # self._save_histogram(self.audio_values)
+
+    def callback(self, indata, frames, time, status):
+        if not self.block_listening:
+            audio_data = np.frombuffer(indata, dtype=np.int16)
+            max_value = np.max(audio_data)
+            min_value = np.min(audio_data)
+
+            if max_value > self.max_audio_value:
+                self.max_audio_value = max_value
+            if min_value < self.min_audio_value:
+                self.min_audio_value = min_value
+
+            self.audio_values.extend(audio_data)
+
+            self.total_frames += frames
+            if max_value < self.threshold:
+                self.silence_counter += 1
+                self.current_silence_duration += frames
+            else:
+                self.silence_counter = 0
+                self.current_silence_duration = 0
+                self.sound_frames += frames
+
+            if self.current_silence_duration > self.longest_silence_duration:
+                self.longest_silence_duration = self.current_silence_duration
+
+            if self.silence_counter > (self.rate / frames * self.silence_duration):
+                trimmed_frames = self._trim_silence(self.frames)
+                sound_percentage = self._calculate_sound_percentage(trimmed_frames)
+                if sound_percentage >= self.sound_threshold_percentage:
+                    self._save_wav(self.frames)
+                self.frames = []
+                self.silence_counter = 0
+                self.total_frames = 0
+                self.sound_frames = 0
+            else:
+                self.frames.append(indata.copy())
         else:
-            return {"text":""}
+            self.frames = []
+            self.silence_counter = 0
+            self.current_silence_duration = 0
+            self.longest_silence_duration = 0
+            self.sound_frames = 0
+            self.audio_values = []
 
+            self.max_audio_value = 0
+            self.min_audio_value = 0
+            self.total_frames = 0  # Initialize total_frames
 
-    def update_spectrogram(self):
-        f, t, Sxx = spectrogram(self.buffer[-30*self.sample_rate:], self.sample_rate)
-        plt.pcolormesh(t, f, 10 * np.log10(Sxx))
-        # Convert plot to base64 image
-        img_buffer = io.BytesIO()
-        plt.savefig(img_buffer, format='png')
-        img_buffer.seek(0)
-        img_base64 = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
-        if self.sio:
-            run_async(partial(self.sio.emit,'update_spectrogram', img_base64))
-        self.last_spectrogram_update = time.perf_counter()
-        plt.clf()
+    def _apply_gain(self, frames):
+        audio_data = np.frombuffer(b''.join(frames), dtype=np.int16)
+        audio_data = audio_data * self.gain
+        audio_data = np.clip(audio_data, -32768, 32767)
+        return audio_data.astype(np.int16).tobytes()
+
+    def _trim_silence(self, frames):
+        audio_data = np.frombuffer(b''.join(frames), dtype=np.int16)
+        non_silent_indices = np.where(np.abs(audio_data) >= self.threshold)[0]
+
+        if non_silent_indices.size:
+            start_index = max(non_silent_indices[0] - self.rate, 0)
+            end_index = min(non_silent_indices[-1] + self.rate, len(audio_data))
+            trimmed_data = audio_data[start_index:end_index]
+        else:
+            trimmed_data = np.array([], dtype=np.int16)
+
+        return trimmed_data.tobytes()
+
+    def _calculate_sound_percentage(self, frames):
+        audio_data = np.frombuffer(frames, dtype=np.int16)
+        num_bins = len(audio_data) // self.rate
+        sound_count = 0
+
+        for i in range(num_bins):
+            bin_data = audio_data[i * self.rate: (i + 1) * self.rate]
+            if np.max(bin_data) >= self.threshold:
+                sound_count += 1
+
+        sound_percentage = (sound_count / num_bins) * 100 if num_bins > 0 else 0
+        return sound_percentage
+
+    def _save_wav(self, frames):
+        ASCIIColors.green("<<SEGMENT_RECOVERED>>")
+        # Todo annouce
+        # self.transcription_signal.update_status.emit("Segment detected and saved")
+        filename = f"recording_{self.file_index}.wav"
+        self.file_index += 1
+
+        amplified_frames = self._apply_gain(frames)
+        trimmed_frames = self._trim_silence([amplified_frames])
+        logs_file = Path(self.logs_folder)/filename
+        logs_file.parent.mkdir(exist_ok=True, parents=True)
+
+        wf = wave.open(str(logs_file), 'wb')
+        wf.setnchannels(self.channels)
+        wf.setsampwidth(2)
+        wf.setframerate(self.rate)
+        wf.writeframes(trimmed_frames)
+        wf.close()
+
+        with self.buffer_lock:
+            while len(self.buffer) >= self.buffer.maxlen:
+                self.buffer_lock.wait()
+            self.buffer.append(filename)
+            self.buffer_lock.notify()
+
+    def _save_histogram(self, audio_values):
+        plt.hist(audio_values, bins=50, edgecolor='black')
+        plt.title('Histogram of Audio Values')
+        plt.xlabel('Audio Value')
+        plt.ylabel('Frequency')
+        plt.savefig('audio_values_histogram.png')
+        plt.close()
+
+    def fix_string_for_xtts(self, input_string):
+        # Remove excessive exclamation marks
+        fixed_string = input_string.rstrip('!')
+        
+        return fixed_string
+    
+    def _process_files(self):
+        while not self.stop_flag:
+            with self.buffer_lock:
+                while not self.buffer and not self.stop_flag:
+                    self.buffer_lock.wait()
+                if self.buffer:
+                    filename = self.buffer.popleft()
+                    self.buffer_lock.notify()
+            if self.block_while_talking:
+                self.block_listening = True
+            try:
+                if filename:
+                    user_name = self.lc.config.user_name if self.lc.config.use_user_name_in_discussions else "user"
+                    user_description = "\n!@>user information:" + self.lc.config.user_description if self.lc.config.use_user_informations_in_discussion else ""
+                    # TODO: send signal
+                    # self.transcription_signal.update_status.emit("Transcribing")
+                    ASCIIColors.green("<<TRANSCRIBING>>")
+                    result = self.whisper.transcribe(str(Path(self.logs_folder)/filename))
+                    transcription_fn = str(Path(self.logs_folder)/filename) + ".txt"
+                    with open(transcription_fn, "w", encoding="utf-8") as f:
+                        f.write(result["text"])
+
+                    with self.transcribed_lock:
+                        self.transcribed_files.append((filename, result["text"]))
+                        self.transcribed_lock.notify()
+                    if result["text"]!="":
+                        # TODO : send the output
+                        # self.transcription_signal.new_user_transcription.emit(filename, result["text"])
+                        self.discussion.add_message(MSG_TYPE.MSG_TYPE_FULL.value, SENDER_TYPES.SENDER_TYPES_USER.value, user_name, result["text"])
+                        discussion = self.discussion.format_discussion(self.context_size)
+                        full_context = self.personality.personality_conditioning + user_description +"\n" + discussion+f"\n!@>{self.personality.name}:"
+                        ASCIIColors.red(" ---------------- Discussion ---------------------")
+                        ASCIIColors.yellow(full_context)
+                        ASCIIColors.red(" -------------------------------------------------")
+                        # TODO : send the output
+                        # self.transcription_signal.update_status.emit("Generating answer")
+                        ASCIIColors.green("<<RESPONDING>>")
+                        lollms_text, function_calls =self.fn.generate_with_functions(full_context)
+                        if len(function_calls)>0:
+                            responses = self.fn.execute_function_calls(function_calls=function_calls)
+                            if self.image_shot:
+                                lollms_text = self.tl.fast_gen_with_images(full_context+f"!@>{self.personality.name}: "+ lollms_text + "\n!@>functions outputs:\n"+ "\n".join(responses) +"!@>lollms:", [self.image_shot])
+                            else:
+                                lollms_text = self.tl.fast_gen(full_context+f"!@>{self.personality.name}: "+ lollms_text + "\n!@>functions outputs:\n"+ "\n".join(responses) +"!@>lollms:")
+                        lollms_text = self.fix_string_for_xtts(lollms_text)
+                        self.discussion.add_message(MSG_TYPE.MSG_TYPE_FULL.value, SENDER_TYPES.SENDER_TYPES_AI.value, self.personality.name,lollms_text)
+                        ASCIIColors.red(" -------------- LOLLMS answer -------------------")
+                        ASCIIColors.yellow(lollms_text)
+                        ASCIIColors.red(" -------------------------------------------------")
+                        self.lc.info("Talking")
+                        ASCIIColors.green("<<TALKING>>")
+                        self.lc.tts.tts_to_audio(lollms_text, speaker=self.voice)
+            except Exception as ex:
+                trace_exception(ex)
+            self.block_listening = False
+            ASCIIColors.green("<<LISTENING>>")
+            # TODO : send the output
+            #self.transcription_signal.update_status.emit("Listening")
+
+    def get_voices(self):
+        if self.lc.tts:
+            voices = self.lc.tts.get_voices()  # Assuming the response is in JSON format
+            return voices
+
 
 class WebcamImageSender:
     """
