@@ -8,6 +8,12 @@ import os
 import re
 import platform
 import string
+from lollms.utilities import PackageManager
+
+if not PackageManager.check_package_installed("lxml"):
+    PackageManager.install_package("lxml")
+
+import lxml.etree as ET
 
 def check_access(lollmsElfServer, client_id):
     client = lollmsElfServer.session.get_client(client_id)
@@ -58,6 +64,30 @@ def sanitize_after_whitelisted_command(line, command):
         # If rest_of_line starts directly with separators followed by malicious commands, sanitized_rest will be empty
         # This means we should only return the part up to the whitelisted command
         return line[:command_end_index + len(sanitized_rest)].strip()
+
+
+def sanitize_svg(svg_content):
+    try:
+        parser = ET.XMLParser(remove_comments=True, remove_pis=True)
+        tree = ET.fromstring(svg_content, parser=parser)
+
+        # Remove any script elements
+        for script in tree.xpath('//svg:script', namespaces={'svg': 'http://www.w3.org/2000/svg'}):
+            parent = script.getparent()
+            if parent is not None:
+                parent.remove(script)
+
+        # Remove any 'on*' event attributes
+        for element in tree.xpath('//*[@*[starts-with(name(), "on")]]'):
+            for attr in list(element.attrib):
+                if attr.startswith('on'):
+                    del element.attrib[attr]
+
+        # Convert the tree back to an SVG string
+        sanitized_svg = ET.tostring(tree, encoding='unicode', method='xml')
+        return sanitized_svg
+    except ET.XMLSyntaxError as e:
+        raise ValueError("Invalid SVG content") from e
 
 
 def sanitize_shell_code(code, whitelist=None):

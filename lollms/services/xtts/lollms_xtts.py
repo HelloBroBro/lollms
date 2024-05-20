@@ -37,24 +37,7 @@ from lollms.tts import LollmsTTS
 import subprocess
 import platform
 
-    
 
-
-
-def get_xtts(lollms_paths:LollmsPaths):
-    root_dir = lollms_paths.personal_path
-    shared_folder = root_dir/"shared"
-    xtts_path = shared_folder / "xtts"
-    xtts_script_path = xtts_path / "lollms_xtts.py"
-    git_pull(xtts_path)
-    
-    if xtts_script_path.exists():
-        ASCIIColors.success("lollms_xtts found.")
-        ASCIIColors.success("Loading source file...",end="")
-        # use importlib to load the module from the file path
-        from lollms.services.xtts.lollms_xtts import LollmsXTTS
-        ASCIIColors.success("ok")
-        return LollmsXTTS
 
 class LollmsXTTS(LollmsTTS):
     def __init__(
@@ -170,6 +153,22 @@ class LollmsXTTS(LollmsTTS):
         shared_folder = root_dir/"shared"
         xtts_path = shared_folder / "xtts"
         return xtts_path.exists()
+    
+    @staticmethod
+    def get(app: LollmsApplication) -> 'LollmsXTTS':
+        root_dir = app.lollms_paths.personal_path
+        shared_folder = root_dir/"shared"
+        xtts_path = shared_folder / "xtts"
+        xtts_script_path = xtts_path / "lollms_xtts.py"
+        git_pull(xtts_path)
+        
+        if xtts_script_path.exists():
+            ASCIIColors.success("lollms_xtts found.")
+            ASCIIColors.success("Loading source file...",end="")
+            # use importlib to load the module from the file path
+            from lollms.services.xtts.lollms_xtts import LollmsXTTS
+            ASCIIColors.success("ok")
+            return LollmsXTTS
 
     def run_xtts_api_server(self):
         # Get the path to the current Python interpreter
@@ -187,6 +186,25 @@ class LollmsXTTS(LollmsTTS):
         thread.start()
         return thread
 
+    def update_settings(self):
+        try:
+            settings = {
+                "stream_chunk_size": self.app.config.xtts_stream_chunk_size,
+                "temperature": self.app.config.xtts_temperature,
+                "speed": self.app.config.xtts_speed,
+                "length_penalty": self.app.config.xtts_length_penalty,
+                "repetition_penalty": self.app.config.xtts_repetition_penalty,
+                "top_p": self.app.config.xtts_top_p,
+                "top_k": self.app.config.xtts_top_k,
+                "enable_text_splitting": self.app.config.xtts_enable_text_splitting
+            }             
+            response = requests.post(f"{self.xtts_base_url}/set_tts_settings", settings)
+            if response.status_code == 200:
+                ASCIIColors.success("XTTS updated successfully")
+        except Exception as ex:
+            trace_exception(ex)
+            pass
+
     def wait_for_service(self, max_retries = 150, show_warning=True):
         print(f"Waiting for xtts service (max_retries={max_retries})")
         url = f"{self.xtts_base_url}/languages"
@@ -197,6 +215,7 @@ class LollmsXTTS(LollmsTTS):
             try:
                 response = requests.get(url)
                 if response.status_code == 200:
+                    self.update_settings()
                     print(f"voices_folder is {self.voices_folder}.")
                     if self.voices_folder is not None:
                         print("Generating sample audio.")
@@ -301,7 +320,8 @@ class LollmsXTTS(LollmsTTS):
         text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
         text = re.sub(r'`.*?`', '', text)
         # Remove any remaining code-like patterns (this can be adjusted as needed)
-        text = re.sub(r'[\{\}\[\]\(\)<>]', '', text)        
+        text = re.sub(r'[\{\}\[\]\(\)<>]', '', text)  
+        text = text.replace("\\","")      
         def tts2_audio_th(thread_uid=None):
             url = f"{self.xtts_base_url}/tts_to_audio"
 

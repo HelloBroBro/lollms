@@ -37,7 +37,6 @@ import git
 
 import mimetypes
 import subprocess
-from lollms.security import sanitize_shell_code
 
 from functools import partial
 
@@ -59,6 +58,7 @@ def install_conda_utility():
 
 
 def create_conda_env(env_name, python_version):
+    from lollms.security import sanitize_shell_code
     env_name = sanitize_shell_code(env_name)
     python_version = sanitize_shell_code(python_version)
     # Activate the Conda environment
@@ -132,6 +132,7 @@ def get_conda_path():
         return Path(sys.executable).parent.parent.parent / "miniconda3" / "bin" / "conda"
 
 def environment_exists(env_name):
+    from lollms.security import sanitize_shell_code
     env_name = sanitize_shell_code(env_name)
     conda_path = get_conda_path()
     result = subprocess.run(f'{conda_path} env list --json', shell=True, capture_output=True, text=True)
@@ -140,6 +141,7 @@ def environment_exists(env_name):
     return env_name in env_names
 
 def get_python_version(env_name):
+    from lollms.security import sanitize_shell_code
     env_name = sanitize_shell_code(env_name)
     conda_path = get_conda_path()
     if environment_exists(env_name):
@@ -149,6 +151,7 @@ def get_python_version(env_name):
         return "Environment does not exist."
 
 def remove_environment(env_name):
+    from lollms.security import sanitize_shell_code
     env_name = sanitize_shell_code(env_name)
     conda_path = get_conda_path()
     if environment_exists(env_name):
@@ -953,6 +956,10 @@ class PackageManager:
             importlib.import_module(package_name)
             return True
         except ImportError:
+            return False
+        except Exception as ex:
+            trace_exception(ex)
+            ASCIIColors.error("Something is wrong with your library.\nIt looks installed, but I am not able to call it.\nTry to reinstall it.")
             return False
         
     @staticmethod

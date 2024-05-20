@@ -9,6 +9,10 @@ import pyautogui
 from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtCore import Qt
 import sys
+
+from functools import partial
+
+
 class ScreenshotWindow(QtWidgets.QWidget):
     def __init__(self, client, screenshot, fn_view, fn):
         super().__init__()
@@ -60,3 +64,14 @@ def take_screenshot(self, client: Client, use_ui: bool = False):
         screenshot.save(fn)
         client.discussion.image_files.append(fn)
         return f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>'
+
+def take_screenshot_function(client):
+    return {
+            "function_name": "take_screenshot",
+            "function": partial(take_screenshot, client=client),
+            "function_description": "Takes a screenshot of the current screen. Optionally allows user interface for image cropping and saving.",
+            "function_parameters": [
+                {"name": "client", "type": "Client", "description": "The client object managing the discussion and images."},
+                {"name": "use_ui", "type": "bool", "default": False, "description": "Flag to determine if a user interface should be used for editing the screenshot."}
+            ]                
+        }

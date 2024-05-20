@@ -30,13 +30,13 @@ class LollmsWhisper(LollmsSTT):
                     model="small",
                     output_path=None
                     ):
-        self.app = app
-        self.output_path = output_path
+        super().__init__(app, model, output_path)
         self.whisper = whisper.load_model(model)
+        self.ready = True
 
     def transcribe(
                 self,
-                wav_path: str|Path
+                wave_path: str|Path
                 ):
-        result = self.whisper.transcribe(str(wav_path))
+        result = self.whisper.transcribe(str(wave_path))
         return result

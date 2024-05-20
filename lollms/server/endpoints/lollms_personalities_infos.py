@@ -16,7 +16,7 @@ from lollms.server.elf_server import LOLLMSElfServer
 from lollms.personality import AIPersonality, InstallOption
 from ascii_colors import ASCIIColors
 from lollms.utilities import load_config, trace_exception, gc, show_yes_no_dialog
-from lollms.security import check_access
+from lollms.security import check_access, forbid_remote_access
 from pathlib import Path
 from typing import List, Optional
 import psutil
@@ -329,6 +329,8 @@ def get_personality_config(data:PersonalityDataRequest):
     print("- Recovering personality config")
     category = sanitize_path(data.category)
     name = sanitize_path(data.name)
+    if category=="":
+        return {"status":False, "error":"category must not be empty."}
 
     package_path = f"{category}/{name}"
     if category=="custom_personalities":
@@ -352,12 +354,15 @@ class PersonalityConfig(BaseModel):
 
 @router.post("/set_personality_config")
 def set_personality_config(data:PersonalityConfig):
+    forbid_remote_access(lollmsElfServer)
     check_access(lollmsElfServer, data.client_id)
     print("- Recovering personality config")
     category = sanitize_path(data.category)
     name = sanitize_path(data.name)
     config = data.config
-
+    if category=="":
+        return {"status":False, "error":"category must not be empty."}
+    
     package_path = f"{category}/{name}"
     if category=="custom_personalities":
         package_full_path = lollmsElfServer.lollms_paths.custom_personalities_path/f"{name}"
@@ -388,6 +393,8 @@ def mount_personality(data:PersonalityMountingInfos):
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
     language = data.language #.get('language', None)
+    if category=="":
+        return {"status":False, "error":"category must not be empty."}
 
     package_path = f"{category}/{name}"
     if category=="custom_personalities":
@@ -443,6 +450,8 @@ def remount_personality(data:PersonalityMountingInfos):
     name = sanitize_path(data.folder)
     language = data.language #.get('language', None)
 
+    if category=="":
+        return {"status":False, "error":"category must not be empty."}
 
     package_path = f"{category}/{name}"
     if category=="custom_personalities":
@@ -496,6 +505,9 @@ def unmount_personality(data:PersonalityMountingInfos):
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
     language = data.language #.get('language', None)
+
+    if category=="":
+        return {"status":False, "error":"category must not be empty."}
 
     try:
         personality_id = f"{category}/{name}" if language is None or language=="" else f"{category}/{name}:{language}"
@@ -595,6 +607,8 @@ def get_personality_settings(data:PersonalityMountingInfos):
     print("- Retreiving personality settings")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
+    if category=="":
+        return {"status":False, "error":"category must not be empty."}
 
     if category == "custom_personalities":
         personality_folder = lollmsElfServer.lollms_paths.personal_personalities_path/f"{name}"

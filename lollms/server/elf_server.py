@@ -47,7 +47,7 @@ class LOLLMSElfServer(LollmsApplication):
             )
         return LOLLMSElfServer.__instance
     @staticmethod
-    def get_instance():
+    def get_instance()->'LOLLMSElfServer':
         return LOLLMSElfServer.__instance
 
     def __init__(

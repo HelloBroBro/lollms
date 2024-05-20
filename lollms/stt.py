@@ -24,7 +24,8 @@ class LollmsSTT:
                     self, 
                     app: LollmsApplication, 
                     model="",
-                    output_path=None
+                    output_path=None,
+                    models=[]
                     ):
         """
         Initializes the LollmsSTT class with the given parameters.
@@ -38,6 +39,7 @@ class LollmsSTT:
         self.app = app
         self.output_path = output_path
         self.model = model
+        self.models = models
 
     def transcribe(
                 self,
@@ -52,7 +54,10 @@ class LollmsSTT:
             prompt (str, optional): An optional prompt to guide the transcription. Defaults to an empty string.
         """
         pass
-
+    
+    def get_models(self):
+        return self.models
+    
     @staticmethod
     def verify(app: LollmsApplication) -> bool:
         """

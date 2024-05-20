@@ -9,6 +9,7 @@ import cv2
 import time
 from PyQt5 import QtWidgets, QtGui, QtCore
 import sys
+from functools import partial
 
 class CameraWindow(QtWidgets.QWidget):
     def __init__(self):
@@ -71,7 +72,7 @@ class CameraWindow(QtWidgets.QWidget):
         self.cap.release()
         event.accept()
 
-def take_photo(client, use_ui=False):
+def take_photo(processor, client, use_ui=False):
     if use_ui:
         def run_app():
             app = QtWidgets.QApplication(sys.argv)
@@ -112,4 +113,15 @@ def take_photo(client, use_ui=False):
     fn = image/f"screen_shot_{index}.png"
     cv2.imwrite(str(fn), frame)
     client.discussion.image_files.append(fn)
-    return f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>'
+    processor.full(f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>')
+    processor.new_message("")
+    return "Image shot successful"
+
+
+def take_a_photo_function(processor, client, use_ui = False):
+    return {
+            "function_name": "take_photo",
+            "function": partial(take_photo, processor=processor, client=client, use_ui = use_ui),
+            "function_description": "Uses the webcam to take a photo, displays it so that you can take a look.",
+            "function_parameters": []                
+        }

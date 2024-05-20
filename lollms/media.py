@@ -89,44 +89,37 @@ from lollms.tasks import TasksLibrary
 from lollms.tts import LollmsTTS
 from lollms.personality import AIPersonality
 from lollms.function_call import FunctionCalling_Library
-from lollms.databases.discussions_database import Discussion, DiscussionsDB
+from lollms.client_session import Client
 from datetime import datetime
 
 import math
 
-class AudioRecorder:
+class RTCom:
     def __init__(
                         self, 
                         lc:LollmsApplication, 
                         sio:socketio.Client,  
                         personality:AIPersonality,
-                        discussion_database:DiscussionsDB,
-                        threshold=1000, silence_duration=2, sound_threshold_percentage=10, gain=1.0, rate=44100, channels=1, buffer_size=10, model="small.en", snd_device=None, logs_folder="logs", voice=None, block_while_talking=True, context_size=4096):
+                        client:Client,
+                        threshold=1000, 
+                        silence_duration=2, 
+                        sound_threshold_percentage=10, 
+                        gain=1.0, 
+                        rate=44100, 
+                        channels=1, 
+                        buffer_size=10, 
+                        model="small.en", 
+                        snd_device=None, 
+                        logs_folder="logs", 
+                        voice=None, 
+                        block_while_talking=True, 
+                        context_size=4096
+                    ):
         self.sio = sio
         self.lc = lc
-        self.discussion_database = discussion_database
+        self.client = client
         self.tts = LollmsTTS(self.lc)
         self.tl = TasksLibrary(self.lc)
-        self.fn = FunctionCalling_Library(self.tl)
-
-        self.fn.register_function(
-                                        "calculator_function", 
-                                        self.calculator_function, 
-                                        "returns the result of a calculation passed through the expression string parameter",
-                                        [{"name": "expression", "type": "str"}]
-                                    )
-        self.fn.register_function(
-                                        "get_date_time", 
-                                        self.get_date_time, 
-                                        "returns the current date and time",
-                                        []
-                                    )
-        self.fn.register_function(
-                                        "take_a_photo", 
-                                        self.take_a_photo, 
-                                        "Takes a photo and returns the status",
-                                        []
-                                    )
 
         self.block_listening = False
         if not voice:
@@ -176,7 +169,6 @@ class AudioRecorder:
         self.model = model
         self.whisper = whisper.load_model(model)
         ASCIIColors.success("OK")
-        self.discussion = discussion_database.create_discussion("RT_chat")
     
     def get_date_time(self):
         now = datetime.now()
@@ -201,11 +193,17 @@ class AudioRecorder:
         self.recording = True
         self.stop_flag = False
 
-        threading.Thread(target=self._record).start()
-        threading.Thread(target=self._process_files).start()
+        self.recording_thread = threading.Thread(target=self._record)
+        self.transcription_thread = threading.Thread(target=self._process_files)
+        self.recording_thread.start()
+        self.transcription_thread.start()
 
     def stop_recording(self):
+        self.recording = False
         self.stop_flag = True
+        self.recording_thread.join()
+        self.transcription_thread.join()
+        ASCIIColors.green("<<RTCOM off>>")
 
     def _record(self):
         sd.default.device = self.snd_device
@@ -354,8 +352,9 @@ class AudioRecorder:
                     user_description = "\n!@>user information:" + self.lc.config.user_description if self.lc.config.use_user_informations_in_discussion else ""
                     # TODO: send signal
                     # self.transcription_signal.update_status.emit("Transcribing")
+                    self.lc.info("Transcribing")
                     ASCIIColors.green("<<TRANSCRIBING>>")
-                    result = self.whisper.transcribe(str(Path(self.logs_folder)/filename))
+                    result = self.lc.tts.transcribe(str(Path(self.logs_folder)/filename))
                     transcription_fn = str(Path(self.logs_folder)/filename) + ".txt"
                     with open(transcription_fn, "w", encoding="utf-8") as f:
                         f.write(result["text"])
@@ -364,26 +363,18 @@ class AudioRecorder:
                         self.transcribed_files.append((filename, result["text"]))
                         self.transcribed_lock.notify()
                     if result["text"]!="":
+                        current_prompt = result["text"]
                         # TODO : send the output
                         # self.transcription_signal.new_user_transcription.emit(filename, result["text"])
-                        self.discussion.add_message(MSG_TYPE.MSG_TYPE_FULL.value, SENDER_TYPES.SENDER_TYPES_USER.value, user_name, result["text"])
-                        discussion = self.discussion.format_discussion(self.context_size)
-                        full_context = self.personality.personality_conditioning + user_description +"\n" + discussion+f"\n!@>{self.personality.name}:"
-                        ASCIIColors.red(" ---------------- Discussion ---------------------")
-                        ASCIIColors.yellow(full_context)
-                        ASCIIColors.red(" -------------------------------------------------")
                         # TODO : send the output
                         # self.transcription_signal.update_status.emit("Generating answer")
+                        self.lc.new_block(client_id=self.client.client_id,sender=self.lc.config.user_name, content=current_prompt)
                         ASCIIColors.green("<<RESPONDING>>")
-                        lollms_text, function_calls =self.fn.generate_with_functions(full_context)
-                        if len(function_calls)>0:
-                            responses = self.fn.execute_function_calls(function_calls=function_calls)
-                            if self.image_shot:
-                                lollms_text = self.tl.fast_gen_with_images(full_context+f"!@>{self.personality.name}: "+ lollms_text + "\n!@>functions outputs:\n"+ "\n".join(responses) +"!@>lollms:", [self.image_shot])
-                            else:
-                                lollms_text = self.tl.fast_gen(full_context+f"!@>{self.personality.name}: "+ lollms_text + "\n!@>functions outputs:\n"+ "\n".join(responses) +"!@>lollms:")
-                        lollms_text = self.fix_string_for_xtts(lollms_text)
-                        self.discussion.add_message(MSG_TYPE.MSG_TYPE_FULL.value, SENDER_TYPES.SENDER_TYPES_AI.value, self.personality.name,lollms_text)
+                        self.lc.info("Responding")
+                        self.lc.handle_generate_msg(self.client.client_id, {"prompt": current_prompt})
+                        while self.lc.busy:
+                            time.sleep(0.01)
+                        lollms_text = self.fix_string_for_xtts(self.client.generated_text)
                         ASCIIColors.red(" -------------- LOLLMS answer -------------------")
                         ASCIIColors.yellow(lollms_text)
                         ASCIIColors.red(" -------------------------------------------------")
@@ -394,6 +385,7 @@ class AudioRecorder:
                 trace_exception(ex)
             self.block_listening = False
             ASCIIColors.green("<<LISTENING>>")
+            self.lc.info(f"Listening.\nYou can talk to {self.personality.name}")
             # TODO : send the output
             #self.transcription_signal.update_status.emit("Listening")
 

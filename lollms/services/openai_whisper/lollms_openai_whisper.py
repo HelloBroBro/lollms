@@ -26,6 +26,7 @@ from typing import List, Dict, Any
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
 from lollms.utilities import PackageManager, find_next_available_filename
+from lollms.stt import LollmsSTT
 import subprocess
 import shutil
 from tqdm import tqdm
@@ -34,10 +35,7 @@ from io import BytesIO
 from openai import OpenAI
 
 
-def get_Whisper(lollms_paths:LollmsPaths):
-    return LollmsOpenAIWhisper
-
-class LollmsOpenAIWhisper:
+class LollmsOpenAIWhisper(LollmsSTT):
     def __init__(
                     self, 
                     app:LollmsApplication, 
@@ -45,10 +43,8 @@ class LollmsOpenAIWhisper:
                     api_key="",
                     output_path=None
                     ):
+        super().__init__(app, model, output_path)
         self.client = OpenAI(api_key=api_key)
-        self.app = app
-        self.model = model
-        self.output_path = output_path
         self.ready = True
 
     def transcribe(
