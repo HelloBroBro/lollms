@@ -73,7 +73,7 @@ class LollmsOpenAITTS(LollmsTTS):
         self.ready = True
 
 
-    def tts_to_file(self, text, speaker, file_name_or_path, language="en"):
+    def tts_file(self, text, speaker, file_name_or_path, language="en"):
         speech_file_path = file_name_or_path
         response = self.client.audio.speech.create(
         model=self.model,
@@ -85,7 +85,7 @@ class LollmsOpenAITTS(LollmsTTS):
 
         response.write_to_file(speech_file_path)
 
-    def tts_to_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=False):
+    def tts_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=False):
         speech_file_path = file_name_or_path
         response = self.client.audio.speech.create(
         model=self.model,
@@ -106,3 +106,17 @@ class LollmsOpenAITTS(LollmsTTS):
 
         # Example usage
         play_audio(speech_file_path)
+
+    def tts_file(self, text, speaker=None, file_name_or_path:Path|str=None, language="en", use_threading=False):
+        speech_file_path = file_name_or_path
+        text = self.clean_text(text)
+        response = self.client.audio.speech.create(
+        model=self.model,
+        voice=self.voice,
+        input=text,
+        response_format="wav"
+        
+        )
+
+        response.write_to_file(speech_file_path)
+        return file_name_or_path

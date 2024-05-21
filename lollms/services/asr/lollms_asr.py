@@ -186,7 +186,7 @@ class LollmsASR:
                     if self.voices_folder is not None:
                         print("Generating sample audio.")
                         voice_file =  [v for v in self.voices_folder.iterdir() if v.suffix==".wav"]
-                        self.tts_to_audio("asr is ready",voice_file[0].name)
+                        self.tts_audio("asr is ready",voice_file[0].name)
                     print("Service is available.")
                     if self.app is not None:
                         self.app.success("asr Service is now available.")

@@ -121,14 +121,20 @@ async def text2Audio(request: LollmsText2AudioRequest):
         return {"status":False,"error":"Code execution is blocked when the server is exposed outside for very obvious reasons!"}
 
     if request.fn:
-        request.fn = os.path.realpath(str((lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")/request.fn))
+        request.fn = sanitize_path(request.fn)
+        request.fn = (lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")/request.fn
         validate_path(request.fn,[str(lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")])
-        
+    else:
+        request.fn = lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out"/"tts2audio.wav"
+    
+    # Verify the path exists
+    request.fn.parent.mkdir(exist_ok=True, parents=True)
+
     try:
         if lollmsElfServer.tts is None:
             return {"url": None, "error":f"No TTS service is on"}
         if lollmsElfServer.tts.ready:
-            response = lollmsElfServer.tts.tts_to_audio(request.text, request.voice, file_name_or_path=request.fn)
+            response = lollmsElfServer.tts.tts_audio(request.text, request.voice, file_name_or_path=request.fn)
             return response
         else:
             return {"url": None, "error":f"TTS service is not ready yet"}
@@ -152,70 +158,23 @@ async def text2Wav(request: LollmsText2AudioRequest):
         return {"status":False,"error":"Code execution is blocked when the server is exposed outside for very obvious reasons!"}
 
     if request.fn:
-        request.fn = os.path.realpath(str((lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")/request.fn))
+        request.fn = sanitize_path(request.fn)
+        request.fn = (lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")/request.fn
         validate_path(request.fn,[str(lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")])
-        
+    else:
+        request.fn = lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out"/"tts2audio.wav"
+
+    # Verify the path exists
+    request.fn.parent.mkdir(exist_ok=True, parents=True)
+
     try:
         # Get the JSON data from the POST request.
-        try:
-            from lollms.services.xtts.lollms_xtts import LollmsXTTS
-            voice=lollmsElfServer.config.xtts_current_voice
-            if lollmsElfServer.tts is None:
-                voice=lollmsElfServer.config.xtts_current_voice
-                if voice!="main_voice":
-                    voices_folder = lollmsElfServer.lollms_paths.custom_voices_path
-                else:
-                    voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
+        if lollmsElfServer.tts.ready:
+            response = lollmsElfServer.tts.tts_file(request.text, request.voice, file_name_or_path=request.fn)
+            return response
+        else:
+            return {"url": None, "error":f"TTS service is not ready yet"}
 
-                lollmsElfServer.tts = LollmsXTTS(
-                    lollmsElfServer, 
-                    voices_folder=voices_folder,
-                    voice_samples_path=Path(__file__).parent/"voices", 
-                    xtts_base_url= lollmsElfServer.config.xtts_base_url,
-                    use_deep_speed= lollmsElfServer.config.xtts_use_deep_speed,
-                    use_streaming_mode= lollmsElfServer.config.xtts_use_streaming_mode,
-                )
-        except Exception as ex:
-            return {"url": None, "error":f"{ex}"}
-            
-        voice=lollmsElfServer.config.xtts_current_voice if request.voice is None else request.voice
-        index = find_first_available_file_index(lollmsElfServer.tts.output_folder, "voice_sample_",".wav")
-        output_fn=f"voice_sample_{index}.wav" if request.fn is None else request.fn
-        if voice is None:
-            voice = "main_voice"
-        lollmsElfServer.info("Starting to build voice")
-        try:
-            from lollms.services.xtts.lollms_xtts import LollmsXTTS
-            if voice!="main_voice":
-                voices_folder = lollmsElfServer.lollms_paths.custom_voices_path
-            else:
-                voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
-            if lollmsElfServer.tts is None:
-                lollmsElfServer.tts = LollmsXTTS(
-                                                    lollmsElfServer, 
-                                                    voices_folder=voices_folder,
-                                                    voice_samples_path=Path(__file__).parent/"voices", 
-                                                    xtts_base_url= lollmsElfServer.config.xtts_base_url,
-                                                    use_deep_speed=lollmsElfServer.config.xtts_use_deepspeed,
-                                                    use_streaming_mode=lollmsElfServer.config.xtts_use_streaming_mode                                                    
-                                                )
-            if lollmsElfServer.tts.ready:
-                language = lollmsElfServer.config.xtts_current_language# convert_language_name()
-                lollmsElfServer.tts.set_speaker_folder(voices_folder)
-                url = f"audio/{output_fn}"
-                preprocessed_text= add_period(request.text)
-                voice_file =  [v for v in voices_folder.iterdir() if v.stem==voice and v.suffix==".wav"]
-                if len(voice_file)==0:
-                    return {"status":False,"error":"Voice not found"}
-                lollmsElfServer.tts.tts_to_file(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language)
-                lollmsElfServer.info(f"Voice file ready at {url}")
-            else:
-                lollmsElfServer.InfoMessage("xtts is not up yet.\nPlease wait for it to load then try again. This may take some time.") 
-                return  {"status":False, "error":"Service not ready yet"} 
-            return {"url": url}
-        except Exception as ex:
-            trace_exception(ex)
-            return {"url": None}
     except Exception as ex:
         trace_exception(ex)
         lollmsElfServer.error(ex)
@@ -304,3 +263,13 @@ def tts_is_ready():
         if lollmsElfServer.tts.ready:
             return {"status":True}
     return {"status":False}
+
+
+@router.get("/get_snd_input_devices")
+def get_snd_input_devices():
+    return lollmsElfServer.stt.get_devices()
+
+@router.get("/get_snd_output_devices")
+def get_snd_output_devices():
+    return lollmsElfServer.tts.get_devices()
+

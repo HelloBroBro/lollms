@@ -14,12 +14,13 @@ from functools import partial
 
 
 class ScreenshotWindow(QtWidgets.QWidget):
-    def __init__(self, client, screenshot, fn_view, fn):
+    def __init__(self, client, screenshot, fn_view, fn, use_a_single_photo_at_a_time= True):
         super().__init__()
         self.client = client
         self.screenshot = screenshot
         self.fn_view = fn_view
         self.fn = fn
+        self.use_a_single_photo_at_a_time = use_a_single_photo_at_a_time
         
         self.initUI()
 
@@ -42,10 +43,13 @@ class ScreenshotWindow(QtWidgets.QWidget):
         self.screenshot.save(self.fn_view)
         self.screenshot.save(self.fn)
         self.client.discussion.image_files.append(self.fn)
+        if self.use_a_single_photo_at_a_time:
+            self.client.discussion.image_files = [self.client.discussion.image_files[-1]]
+
         self.close()
 
 
-def take_screenshot(self, client: Client, use_ui: bool = False):
+def take_screenshot(client: Client, use_ui: bool = False, use_a_single_photo_at_a_time= True):
     screenshot = pyautogui.screenshot()
     view_image = client.discussion.discussion_folder / "view_images"
     image = client.discussion.discussion_folder / "images"
@@ -55,7 +59,7 @@ def take_screenshot(self, client: Client, use_ui: bool = False):
 
     if use_ui:
         app = QtWidgets.QApplication(sys.argv)
-        window = ScreenshotWindow(client, screenshot, fn_view, fn)
+        window = ScreenshotWindow(client, screenshot, fn_view, fn, use_a_single_photo_at_a_time)
         window.show()
         app.exec_()
         return f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>'
@@ -63,15 +67,15 @@ def take_screenshot(self, client: Client, use_ui: bool = False):
         screenshot.save(fn_view)
         screenshot.save(fn)
         client.discussion.image_files.append(fn)
+        if use_a_single_photo_at_a_time:
+            client.discussion.image_files = [client.discussion.image_files[-1]]
+
         return f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>'
 
-def take_screenshot_function(client):
+def take_screenshot_function(client, use_ui=True, use_a_single_photo_at_a_time= True):
     return {
             "function_name": "take_screenshot",
-            "function": partial(take_screenshot, client=client),
-            "function_description": "Takes a screenshot of the current screen. Optionally allows user interface for image cropping and saving.",
-            "function_parameters": [
-                {"name": "client", "type": "Client", "description": "The client object managing the discussion and images."},
-                {"name": "use_ui", "type": "bool", "default": False, "description": "Flag to determine if a user interface should be used for editing the screenshot."}
-            ]                
+            "function": partial(take_screenshot, client=client, use_ui = use_ui, use_a_single_photo_at_a_time= use_a_single_photo_at_a_time),
+            "function_description": "Takes a screenshot of the current screen.",
+            "function_parameters": []                
         }

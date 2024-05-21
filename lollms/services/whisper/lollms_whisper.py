@@ -7,7 +7,7 @@ from pathlib import Path
 from lollms.app import LollmsApplication
 from lollms.paths import LollmsPaths
 from lollms.config import TypedConfig, ConfigTemplate, BaseConfig
-from lollms.utilities import PackageManager
+from lollms.utilities import PackageManager, install_conda_package
 from lollms.stt import LollmsSTT
 from dataclasses import dataclass
 from PIL import Image, PngImagePlugin
@@ -19,6 +19,7 @@ from lollms.paths import LollmsPaths
 import subprocess
 
 if not PackageManager.check_package_installed("whisper"):
+    install_conda_package("ffmpeg")
     PackageManager.install_package("whisper")
 import whisper
 
@@ -37,6 +38,6 @@ class LollmsWhisper(LollmsSTT):
     def transcribe(
                 self,
                 wave_path: str|Path
-                ):
+                )->str:
         result = self.whisper.transcribe(str(wave_path))
-        return result
+        return result["text"]

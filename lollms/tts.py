@@ -7,8 +7,24 @@ This module is part of the Lollms library, designed to provide Text-to-Speech (T
 Author: ParisNeo, a computer geek passionate about AI
 """
 from lollms.app import LollmsApplication
+from lollms.utilities import PackageManager
 from pathlib import Path
-
+from ascii_colors import ASCIIColors
+import re
+try:
+    if not PackageManager.check_package_installed("sounddevice"):
+        # os.system("sudo apt-get install portaudio19-dev")
+        PackageManager.install_package("sounddevice")
+        PackageManager.install_package("wave")
+except:
+    # os.system("sudo apt-get install portaudio19-dev -y")
+    PackageManager.install_package("sounddevice")
+    PackageManager.install_package("wave")
+try:
+    import sounddevice as sd
+    import wave
+except:
+    ASCIIColors.error("Couldn't load sound tools")
 class LollmsTTS:
     """
     LollmsTTS is a base class for implementing Text-to-Speech (TTS) functionalities within the LollmsApplication.
@@ -47,7 +63,7 @@ class LollmsTTS:
         self.voices = [] # To be filled by the child class
         self.models = [] # To be filled by the child class
 
-    def tts_to_file(self, text, speaker, file_name_or_path, language="en"):
+    def tts_file(self, text, file_name_or_path, speaker=None, language="en")->str:
         """
         Converts the given text to speech and saves it to a file.
 
@@ -59,7 +75,7 @@ class LollmsTTS:
         """
         pass
 
-    def tts_to_audio(self, text, speaker, file_name_or_path: Path | str = None, language="en", use_threading=False):
+    def tts_audio(self, text, speaker, file_name_or_path: Path | str = None, language="en", use_threading=False):
         """
         Converts the given text to speech and returns the audio data.
 
@@ -72,6 +88,11 @@ class LollmsTTS:
         """
         pass
 
+    def stop(self):
+        """
+        Stops the current generation
+        """
+        pass
 
     @staticmethod
     def verify(app: LollmsApplication) -> bool:
@@ -120,3 +141,23 @@ class LollmsTTS:
             list: A list of available voices.
         """
         return self.voices
+    
+    def get_devices(self):
+        devices =  sd.query_devices()
+
+        return {
+            "status": True,
+            "device_names": [device['name'] for device in devices if device["max_output_channels"]>0]
+        }
+    
+    @staticmethod
+    def clean_text(text):
+        # Remove HTML tags
+        text = re.sub(r'<.*?>', '', text)
+        # Remove code blocks (assuming they're enclosed in backticks or similar markers)
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'`.*?`', '', text)
+        # Remove any remaining code-like patterns (this can be adjusted as needed)
+        text = re.sub(r'[\{\}\[\]\(\)<>]', '', text)  
+        text = text.replace("\\","")      
+        return text

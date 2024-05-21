@@ -644,7 +644,6 @@ class Discussion:
         self.discussion_rag_folder.mkdir(exist_ok=True)
         self.discussion_view_images_folder.mkdir(exist_ok=True)
         self.messages = self.get_messages()
-        self.whisper= None
         
         if len(self.messages)>0:
             self.current_message = self.messages[-1]
@@ -731,22 +730,14 @@ class Discussion:
             self.audio_files.append(path)
             if process:
                 self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
+                if self.lollms.stt is None:
+                    self.lollms.info("Please select an stt engine in the services settings first")
                 self.lollms.info(f"Transcribing ... ")
-                if self.whisper is None:
-                    if not PackageManager.check_package_installed("whisper"):
-                        PackageManager.install_package("openai-whisper")
-                        try:
-                            import conda.cli
-                            conda.cli.main("install", "conda-forge::ffmpeg", "-y")
-                        except:
-                            ASCIIColors.bright_red("Couldn't install ffmpeg. whisper won't work. Please install it manually")
-
-                    import whisper
-                    self.whisper = whisper.load_model("base")
-                result = self.whisper.transcribe(str(path))
-                transcription_fn = str(path)+".txt"
+                transcription = self.lollms.stt.transcribe(str(path))
+                transcription_fn = self.discussion_text_folder/(path.stem+".txt")
                 with open(transcription_fn, "w", encoding="utf-8") as f:
-                    f.write(result["text"])
+                    f.write(transcription)
+                self.text_files.append(transcription_fn)
                 tasks_library.info(f"Transcription saved to {transcription_fn}")
 
         elif path.suffix in [".png",".jpg",".jpeg",".gif",".bmp",".svg",".webp"]:

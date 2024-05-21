@@ -99,7 +99,7 @@ async def text2Audio(request: LollmsAudio2TextRequest):
                 voice_file =  [v for v in voices_folder.iterdir() if v.stem==voice and v.suffix==".wav"]
                 if len(voice_file)==0:
                     return {"status":False,"error":"Voice not found"}
-                lollmsElfServer.asr.tts_to_audio(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language)
+                lollmsElfServer.asr.tts_audio(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language)
             else:
                 lollmsElfServer.InfoMessage("asr is not up yet.\nPlease wait for it to load then try again. This may take some time.") 
                 return  {"status":False, "error":"Service not ready yet"} 

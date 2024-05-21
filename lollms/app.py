@@ -71,6 +71,20 @@ class LollmsApplication(LoLLMsCom):
         self.generate_msg_with_internet: Callable[[str, Dict], None]        = None
         self.handle_continue_generate_msg_from: Callable[[str, Dict], None] = None
         
+
+        # services
+        self.ollama = None
+        self.vllm = None
+        self.whisper = None
+        self.xtts = None
+        self.sd = None
+        self.comfyui = None
+        self.motion_ctrl = None
+
+        self.tti = None
+        self.tts = None
+        self.stt = None
+
         self.rt_com = None
         if not free_mode:
             try:
@@ -228,17 +242,7 @@ class LollmsApplication(LoLLMsCom):
         return self.lollms_paths.personal_uploads_path
 
     def start_servers(self):
-        self.ollama = None
-        self.vllm = None
-        self.whisper = None
-        self.xtts = None
-        self.sd = None
-        self.comfyui = None
-        self.motion_ctrl = None
 
-        self.tti = None
-        self.tts = None
-        self.stt = None
 
 
 

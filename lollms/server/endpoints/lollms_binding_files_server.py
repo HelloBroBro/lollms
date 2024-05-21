@@ -19,6 +19,7 @@ from ascii_colors import ASCIIColors
 from lollms.utilities import load_config, trace_exception, gc
 from pathlib import Path
 from typing import List
+from lollms.security import sanitize_svg
 import os
 import re
 
@@ -273,6 +274,19 @@ async def serve_discussions(path: str):
 
     if not Path(file_path).exists():
         raise HTTPException(status_code=404, detail="File not found")
+
+    # Check if the file is an SVG
+    if file_path.suffix.lower() == '.svg':
+        with open(file_path, 'r', encoding='utf-8') as file:
+            svg_content = file.read()
+        sanitized_svg_content = sanitize_svg(svg_content)
+        
+        # Save the sanitized SVG content to a temporary file
+        temp_svg_path = file_path.with_suffix('.sanitized.svg')
+        with open(temp_svg_path, 'w', encoding='utf-8') as file:
+            file.write(sanitized_svg_content)
+        
+        return FileResponse(str(temp_svg_path))
 
     return FileResponse(str(file_path))
 

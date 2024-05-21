@@ -72,7 +72,7 @@ class CameraWindow(QtWidgets.QWidget):
         self.cap.release()
         event.accept()
 
-def take_photo(processor, client, use_ui=False):
+def take_photo(processor, client, use_ui=False, use_a_single_photo_at_a_time=True):
     if use_ui:
         def run_app():
             app = QtWidgets.QApplication(sys.argv)
@@ -113,15 +113,17 @@ def take_photo(processor, client, use_ui=False):
     fn = image/f"screen_shot_{index}.png"
     cv2.imwrite(str(fn), frame)
     client.discussion.image_files.append(fn)
+    if use_a_single_photo_at_a_time:
+        client.discussion.image_files = [client.discussion.image_files[-1]]
     processor.full(f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>')
     processor.new_message("")
     return "Image shot successful"
 
 
-def take_a_photo_function(processor, client, use_ui = False):
+def take_a_photo_function(processor, client, use_ui = False, use_a_single_photo_at_a_time=True):
     return {
             "function_name": "take_photo",
-            "function": partial(take_photo, processor=processor, client=client, use_ui = use_ui),
+            "function": partial(take_photo, processor=processor, client=client, use_ui = use_ui, use_a_single_photo_at_a_time = use_a_single_photo_at_a_time),
             "function_description": "Uses the webcam to take a photo, displays it so that you can take a look.",
             "function_parameters": []                
         }

@@ -8,7 +8,24 @@ Author: ParisNeo, a computer geek passionate about AI
 """
 
 from lollms.app import LollmsApplication
+from lollms.utilities import PackageManager
 from pathlib import Path
+from ascii_colors import ASCIIColors
+
+try:
+    if not PackageManager.check_package_installed("sounddevice"):
+        # os.system("sudo apt-get install portaudio19-dev")
+        PackageManager.install_package("sounddevice")
+        PackageManager.install_package("wave")
+except:
+    # os.system("sudo apt-get install portaudio19-dev -y")
+    PackageManager.install_package("sounddevice")
+    PackageManager.install_package("wave")
+try:
+    import sounddevice as sd
+    import wave
+except:
+    ASCIIColors.error("Couldn't load sound tools")
 
 class LollmsSTT:
     """
@@ -44,8 +61,8 @@ class LollmsSTT:
     def transcribe(
                 self,
                 wav_path: str | Path,
-                prompt=""
-                ):
+                prompt:str=""
+                )->str:
         """
         Transcribes the given audio file to text.
 
@@ -55,6 +72,13 @@ class LollmsSTT:
         """
         pass
     
+    def stop(self):
+        """
+        Stops the current generation
+        """
+        pass
+    
+
     def get_models(self):
         return self.models
     
@@ -96,3 +120,12 @@ class LollmsSTT:
             LollmsSTT: The LollmsSTT class.
         """
         return LollmsSTT
+
+
+    def get_devices(self):
+        devices =  sd.query_devices()
+        print(devices)
+        return {
+            "status": True,
+            "device_names": [device['name'] for device in devices if device["max_input_channels"]>0]
+        }

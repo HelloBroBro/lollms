@@ -56,6 +56,26 @@ def install_conda_utility():
     # Create a new Conda environment with the specified Python version
     #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
 
+def install_conda_package(package_name):
+    try:
+        import platform
+        if platform.system()=="Windows":
+            conda_path = Path(sys.executable).parent.parent/"miniconda3"/"condabin"/"conda"
+        else:
+            conda_path = Path(sys.executable).parent.parent.parent/"miniconda3"/"bin"/"conda"
+        ASCIIColors.red("Conda path:")
+        ASCIIColors.yellow(conda_path)
+        process = subprocess.Popen(f'{conda_path} install {package_name} -y', shell=True)
+        
+        # Wait for the process to finish
+        process.wait()
+        #from conda.cli.python_api import  run_command, Commands
+        # Create a new Conda environment with the specified Python version
+        #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
+        return True
+    except Exception as ex:
+        trace_exception(ex)
+        return False
 
 def create_conda_env(env_name, python_version):
     from lollms.security import sanitize_shell_code

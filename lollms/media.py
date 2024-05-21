@@ -109,7 +109,8 @@ class RTCom:
                         channels=1, 
                         buffer_size=10, 
                         model="small.en", 
-                        snd_device=None, 
+                        snd_input_device=None,
+                        snd_output_device=None,
                         logs_folder="logs", 
                         voice=None, 
                         block_while_talking=True, 
@@ -138,12 +139,18 @@ class RTCom:
         self.block_while_talking = block_while_talking
         self.image_shot = None
 
-        if snd_device is None:
+        if snd_input_device is None:
             devices = sd.query_devices()
-            snd_device = [device['name'] for device in devices][0]
+            snd_input_device = [device['name'] for device in devices if device['type'] == 'input'][0]
+        if snd_output_device is None:
+            devices = sd.query_devices()
+            snd_output_device = [device['name'] for device in devices if device['type'] == 'output'][0]
 
-        self.snd_device = snd_device
-        self.logs_folder = logs_folder
+        self.snd_input_device = snd_input_device
+        self.snd_output_device = snd_output_device
+        self.logs_folder = Path(logs_folder)
+
+        self.logs_folder.mkdir(exist_ok=True, parents=True)
 
         self.frames = []
         self.silence_counter = 0
@@ -206,8 +213,7 @@ class RTCom:
         ASCIIColors.green("<<RTCOM off>>")
 
     def _record(self):
-        sd.default.device = self.snd_device
-        with sd.InputStream(channels=self.channels, samplerate=self.rate, callback=self.callback, dtype='int16'):
+        with sd.InputStream(channels=self.channels, device=self.snd_input_device, samplerate=self.rate, callback=self.callback, dtype='int16'):
             while not self.stop_flag:
                 time.sleep(0.1)
 
@@ -348,26 +354,20 @@ class RTCom:
                 self.block_listening = True
             try:
                 if filename:
-                    user_name = self.lc.config.user_name if self.lc.config.use_user_name_in_discussions else "user"
-                    user_description = "\n!@>user information:" + self.lc.config.user_description if self.lc.config.use_user_informations_in_discussion else ""
-                    # TODO: send signal
-                    # self.transcription_signal.update_status.emit("Transcribing")
                     self.lc.info("Transcribing")
                     ASCIIColors.green("<<TRANSCRIBING>>")
-                    result = self.lc.tts.transcribe(str(Path(self.logs_folder)/filename))
+                    wav_file_path = str(Path(self.logs_folder)/filename)
+                    ASCIIColors.cyan(f"Logging to : {wav_file_path}")
+                    transcription = self.lc.stt.transcribe(wav_file_path)
                     transcription_fn = str(Path(self.logs_folder)/filename) + ".txt"
                     with open(transcription_fn, "w", encoding="utf-8") as f:
-                        f.write(result["text"])
+                        f.write(transcription)
 
                     with self.transcribed_lock:
-                        self.transcribed_files.append((filename, result["text"]))
+                        self.transcribed_files.append((filename, transcription))
                         self.transcribed_lock.notify()
-                    if result["text"]!="":
-                        current_prompt = result["text"]
-                        # TODO : send the output
-                        # self.transcription_signal.new_user_transcription.emit(filename, result["text"])
-                        # TODO : send the output
-                        # self.transcription_signal.update_status.emit("Generating answer")
+                    if transcription!="":
+                        current_prompt = transcription
                         self.lc.new_block(client_id=self.client.client_id,sender=self.lc.config.user_name, content=current_prompt)
                         ASCIIColors.green("<<RESPONDING>>")
                         self.lc.info("Responding")
@@ -380,7 +380,7 @@ class RTCom:
                         ASCIIColors.red(" -------------------------------------------------")
                         self.lc.info("Talking")
                         ASCIIColors.green("<<TALKING>>")
-                        self.lc.tts.tts_to_audio(lollms_text, speaker=self.voice)
+                        self.lc.tts.tts_audio(lollms_text, speaker=self.voice, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wave")
             except Exception as ex:
                 trace_exception(ex)
             self.block_listening = False
@@ -567,7 +567,7 @@ class RealTimeTranscription:
                 
                 # If the result is not empty, call the callback
                 if result:
-                    self.callback(result["text"])
+                    self.callback(transcription)
         except KeyboardInterrupt:
             # If the user hits Ctrl+C, stop the stream
             self.stop()
