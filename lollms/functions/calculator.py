@@ -1,7 +1,7 @@
 import math
 from functools import partial
 
-def calculate(expression: str) -> float:
+def calculate(expression: str) -> float:    
     try:
         # Add the math module functions to the local namespace
         allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}

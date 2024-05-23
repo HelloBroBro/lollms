@@ -18,8 +18,7 @@ def summon_personality(member_id:int, prompt: str, previous_discussion_text:str,
     members:List[AIPersonality] = processor.personality.app.mounted_personalities
     processor.personality.app.personality = members[member_id]
     members[member_id].callback=callback
-    members[member_id].new_message("")
-    processor.personality.app.handle_generate_msg(client.client_id, {"prompt":prompt})
+    processor.personality.app.handle_generate_msg(client.client_id, {"prompt":prompt}, False)
     processor.personality.app.personality = processor.personality
     return "Execution done"
 
