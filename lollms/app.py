@@ -243,7 +243,7 @@ class LollmsApplication(LoLLMsCom):
 
     def start_servers(self):
 
-
+        ASCIIColors.yellow("* - * - * - Starting services - * - * - *")
 
 
         if self.config.enable_ollama_service:
@@ -262,14 +262,17 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
                 self.warning(f"Couldn't load vllm")
 
-        if self.config.whisper_activate:
+        if self.config.whisper_activate or self.config.active_stt_service == "whisper":
             try:
                 from lollms.services.whisper.lollms_whisper import LollmsWhisper
                 self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
             except Exception as ex:
                 trace_exception(ex)
 
-        if self.config.xtts_enable:
+        ASCIIColors.yellow(f" -> self.config.xtts_enable: {self.config.xtts_enable}")
+        ASCIIColors.yellow(f" -> self.config.active_stt_service: {self.config.active_stt_service}")
+        if self.config.xtts_enable or self.config.active_tts_service == "xtts":
+            ASCIIColors.yellow("Loading XTTS")
             try:
                 from lollms.services.xtts.lollms_xtts import LollmsXTTS
                 voice=self.config.xtts_current_voice
@@ -338,6 +341,7 @@ class LollmsApplication(LoLLMsCom):
 
 
     def verify_servers(self, reload_all=False):
+        ASCIIColors.yellow("* - * - * - Verifying services - * - * - *")
 
         try:
             if self.config.enable_ollama_service and self.ollama is None:
@@ -362,7 +366,8 @@ class LollmsApplication(LoLLMsCom):
                     self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
                 except Exception as ex:
                     trace_exception(ex)
-            if self.config.xtts_enable and self.xtts is None:
+            if (self.config.xtts_enable or self.config.active_tts_service == "xtts") and self.xtts is None:
+                ASCIIColors.yellow("Loading XTTS")
                 try:
                     from lollms.services.xtts.lollms_xtts import LollmsXTTS
                     voice=self.config.xtts_current_voice
@@ -405,7 +410,6 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load Motion control")
 
-
             if self.config.active_tti_service == "autosd":
                 from lollms.services.sd.lollms_sd import LollmsSD
                 self.tti = LollmsSD(self)
@@ -419,7 +423,7 @@ class LollmsApplication(LoLLMsCom):
             if self.config.active_tts_service == "openai_tts":
                 from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
-            elif self.config.active_stt_service == "xtts" and self.xtts:
+            elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
             if self.config.active_stt_service == "openai_whisper":
@@ -848,12 +852,16 @@ class LollmsApplication(LoLLMsCom):
                     else:
                         self.personality.step_start("Performing Internet search (advanced mode: slower but more advanced)")
 
-                    internet_search_results=f"!@>instructions: Use the internet search results data to answer {self.config.user_name}. Try to extract information from the websearch and use it to perform the requested task or answer the question. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.\n!@>Web search results:\n"
+                    internet_search_results=f"!@>instructions: Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.\n!@>Web search results:\n"
 
                     docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search)
-                    for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):
-                        internet_search_infos.append(document_id)
-                        internet_search_results += f"!@>search result chunk:\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}\n"
+                    
+                    if len(docs)>0:
+                        for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):
+                            internet_search_infos.append(document_id)
+                            internet_search_results += f"!@>search result chunk:\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}\n"
+                    else:
+                        internet_search_results += "The search response was empty!\nFailed to recover useful information from the search engine.\n"
                     if self.config.internet_quick_search:
                         self.personality.step_end("Performing Internet search (quick mode)")
                     else:

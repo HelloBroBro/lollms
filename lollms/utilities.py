@@ -87,7 +87,7 @@ def create_conda_env(env_name, python_version):
         conda_path = Path(sys.executable).parent.parent/"miniconda3"/"condabin"/"conda"
     else:
         conda_path = Path(sys.executable).parent.parent.parent/"miniconda3"/"bin"/"conda"
-    ASCIIColors.red("Conda path:")
+    ASCIIColors.red("Conda path: ",flush=True, end="")
     ASCIIColors.yellow(conda_path)
     process = subprocess.Popen(f'{conda_path} create --name {env_name} python={python_version} -y', shell=True)
     
@@ -105,6 +105,7 @@ def run_pip_in_env(env_name, pip_args, cwd=None):
     
     # Activate the Conda environment
     python_path = Path(sys.executable).parent.parent/"miniconda3"/"envs"/env_name/"python"
+    ASCIIColors.yellow(f"Executing: {python_path} -m pip {pip_args}")
     process = subprocess.Popen(f'{python_path} -m pip {pip_args}', shell=True)
     
     # Wait for the process to finish
@@ -119,6 +120,7 @@ def run_python_script_in_env(env_name, script_path, cwd=None, wait=True):
     
     # Activate the Conda environment
     python_path = Path(sys.executable).parent.parent/"miniconda3"/"envs"/env_name/"python"
+    ASCIIColors.yellow(f"Executing: {python_path} {script_path}")
     process = subprocess.Popen(f'{python_path} {script_path}', shell=True)
     
     # Wait for the process to finish
@@ -154,7 +156,10 @@ def get_conda_path():
 def environment_exists(env_name):
     from lollms.security import sanitize_shell_code
     env_name = sanitize_shell_code(env_name)
+    env_name = Path(sys.executable).parent.parent / "miniconda3" / "env" / env_name
     conda_path = get_conda_path()
+    ASCIIColors.yellow(f"Using conda from : {conda_path}")
+
     result = subprocess.run(f'{conda_path} env list --json', shell=True, capture_output=True, text=True)
     envs_info = json.loads(result.stdout)
     env_names = [Path(env).name for env in envs_info['envs']]

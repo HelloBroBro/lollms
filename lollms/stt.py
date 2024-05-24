@@ -127,5 +127,6 @@ class LollmsSTT:
         print(devices)
         return {
             "status": True,
-            "device_names": [device['name'] for device in devices if device["max_input_channels"]>0]
+            "device_names": [device['name'] for device in devices if device["max_input_channels"]>0],
+            "device_indexes": [device['index'] for device in devices if device["max_input_channels"]>0]
         }

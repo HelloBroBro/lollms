@@ -191,9 +191,9 @@ def install_xtts(data:Identification):
         if lollmsElfServer.config.host!="localhost" and lollmsElfServer.config.host!="127.0.0.1":
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
         
-        from lollms.services.xtts.lollms_xtts import LollmsTTS
+        from lollms.services.xtts.lollms_xtts import LollmsXTTS
         lollmsElfServer.ShowBlockingMessage("Installing xTTS api server\nPlease stand by")
-        LollmsTTS.install(lollmsElfServer)
+        LollmsXTTS.install(lollmsElfServer)
         lollmsElfServer.HideBlockingMessage()
         return {"status":True}
     except Exception as ex:
@@ -267,9 +267,14 @@ def tts_is_ready():
 
 @router.get("/get_snd_input_devices")
 def get_snd_input_devices():
-    return lollmsElfServer.stt.get_devices()
-
+    if lollmsElfServer.stt:
+        return lollmsElfServer.stt.get_devices()
+    else:
+        return []
 @router.get("/get_snd_output_devices")
 def get_snd_output_devices():
-    return lollmsElfServer.tts.get_devices()
+    if lollmsElfServer.tts:
+        return lollmsElfServer.tts.get_devices()
+    else:
+        return []
 

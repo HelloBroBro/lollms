@@ -171,7 +171,7 @@ class RTCom:
         self.transcribed_files = deque()
         self.buffer_lock = threading.Condition()
         self.transcribed_lock = threading.Condition()
-        ASCIIColors.info("Loading whisper...",end="",flush=True)
+        ASCIIColors.info("Loading whisper...", end="",flush=True)
 
         self.model = model
         self.whisper = whisper.load_model(model)
@@ -208,8 +208,6 @@ class RTCom:
     def stop_recording(self):
         self.recording = False
         self.stop_flag = True
-        self.recording_thread.join()
-        self.transcription_thread.join()
         ASCIIColors.green("<<RTCOM off>>")
 
     def _record(self):

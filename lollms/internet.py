@@ -336,6 +336,7 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
                             )
     
     for i, result in enumerate(results):
+        ASCIIColors.orange(f"Processing result:{result['title']}")
         title = result["title"]
         brief = result["brief"]
         href = result["href"]
