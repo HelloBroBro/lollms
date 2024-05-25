@@ -326,6 +326,7 @@ class PersonalityDataRequest(BaseModel):
 
 @router.post("/get_personality_config")
 def get_personality_config(data:PersonalityDataRequest):
+    check_access(lollmsElfServer, data.client_id)
     print("- Recovering personality config")
     category = sanitize_path(data.category)
     name = sanitize_path(data.name)

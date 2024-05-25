@@ -192,8 +192,8 @@ class LollmsASR:
                         self.app.success("asr Service is now available.")
                     self.ready = True
                     return True
-            except:
-                pass
+            except Exception as ex:
+                trace_exception(ex)
 
             retries += 1
             ASCIIColors.yellow("Waiting for asr...")

@@ -141,10 +141,10 @@ class RTCom:
 
         if snd_input_device is None:
             devices = sd.query_devices()
-            snd_input_device = [device['name'] for device in devices if device['type'] == 'input'][0]
+            snd_input_device = [device['name'] for device in devices  if device["max_input_channels"]>0][0]
         if snd_output_device is None:
             devices = sd.query_devices()
-            snd_output_device = [device['name'] for device in devices if device['type'] == 'output'][0]
+            snd_output_device = [device['name'] for device in devices  if device["max_output_channels"]>0][0]
 
         self.snd_input_device = snd_input_device
         self.snd_output_device = snd_output_device
@@ -213,7 +213,7 @@ class RTCom:
     def _record(self):
         with sd.InputStream(channels=self.channels, device=self.snd_input_device, samplerate=self.rate, callback=self.callback, dtype='int16'):
             while not self.stop_flag:
-                time.sleep(0.1)
+                time.sleep(1)
 
         if self.frames:
             self._save_wav(self.frames)
@@ -378,7 +378,7 @@ class RTCom:
                         ASCIIColors.red(" -------------------------------------------------")
                         self.lc.info("Talking")
                         ASCIIColors.green("<<TALKING>>")
-                        self.lc.tts.tts_audio(lollms_text, speaker=self.voice, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wave")
+                        self.lc.tts.tts_audio(lollms_text, speaker=self.voice, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wav")
             except Exception as ex:
                 trace_exception(ex)
             self.block_listening = False
@@ -388,9 +388,10 @@ class RTCom:
             #self.transcription_signal.update_status.emit("Listening")
 
     def get_voices(self):
-        if self.lc.tts:
+        if self.lc.tts and self.lc.tts.ready:
             voices = self.lc.tts.get_voices()  # Assuming the response is in JSON format
             return voices
+        return []
 
 
 class WebcamImageSender:

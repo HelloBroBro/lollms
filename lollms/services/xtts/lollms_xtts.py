@@ -218,14 +218,17 @@ class LollmsXTTS(LollmsTTS):
                 if response.status_code == 200:
                     self.update_settings()
                     print(f"voices_folder is {self.voices_folder}.")
+                    self.ready = True
                     if self.voices_folder is not None:
                         print("Generating sample audio.")
                         voice_file =  [v for v in self.voices_folder.iterdir() if v.suffix==".wav"]
-                        self.tts_audio("x t t s is ready",voice_file[0].stem)
+                        try:
+                            self.tts_audio("x t t s is ready",voice_file[0].stem)
+                        except Exception as ex:
+                            return True
                     print("Service is available.")
                     if self.app is not None:
                         self.app.success("XTTS Service is now available.")
-                    self.ready = True
                     return True
             except:
                 pass
@@ -311,13 +314,13 @@ class LollmsXTTS(LollmsTTS):
             voice_file =  [v for v in voices_folder.iterdir() if v.stem==voice and v.suffix==".wav"]
             if len(voice_file)==0:
                 return {"status":False,"error":"Voice not found"}
-            self.xtts_audio(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language)
+            self.xtts_audio(preprocessed_text, voice_file[0].name, f"{output_fn}", language=language, use_threading=use_threading)
 
         except Exception as ex:
             trace_exception(ex)
             return {"status":False,"error":f"{ex}"}
 
-    def xtts_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=True):
+    def xtts_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=False):
         text = self.clean_text(text)
         def tts2_audio_th(thread_uid=None):
             url = f"{self.xtts_base_url}/tts_to_audio"
