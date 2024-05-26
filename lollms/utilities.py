@@ -998,6 +998,55 @@ class PackageManager:
         globals()[module_name] = importlib.import_module(module_name)
         print(f"{module_name} module imported successfully.")
 
+    @staticmethod
+    def get_installed_version(package):
+        """
+        Get the installed version of a Python package.
+
+        Args:
+            package (str): The name of the package to check.
+
+        Returns:
+            str: The installed version of the package, or None if the package is not installed.
+        """
+        try:
+            output = subprocess.check_output([sys.executable, "-m", "pip", "show", package], universal_newlines=True)
+            for line in output.splitlines():
+                if line.startswith("Version:"):
+                    version = line.split(":", 1)[1].strip()
+                    print(f"The installed version of {package} is {version}. It's like finding out your favorite ice cream flavor!")
+                    return version
+            return None
+        except subprocess.CalledProcessError as e:
+            print(f"Error getting version for {package}: {e}. The version is playing hide and seek!")
+            return None
+
+    @staticmethod
+    def install_or_update(package):
+        """
+        Install or update a Python package.
+
+        Args:
+            package (str): The name of the package to install or update.
+
+        Returns:
+            bool: True if the package was installed or updated successfully, False otherwise.
+        """
+        if PackageManager.check_package_installed(package):
+            print(f"{package} is already installed. Let's see if it needs a makeover!")
+            installed_version = PackageManager.get_installed_version(package)
+            if installed_version:
+                print(f"Updating {package} from version {installed_version}. It's like a software spa day!")
+                try:
+                    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", package], check=True)
+                    print(f"Successfully updated {package}. New version, who dis?")
+                    return True
+                except subprocess.CalledProcessError as e:
+                    print(f"Error updating {package}: {e}. The update fairy took a day off!")
+                    return False
+        else:
+            print(f"{package} is not installed. Time to add it to your collection!")
+            return PackageManager.install_package(package)
 
 class GitManager:
     @staticmethod

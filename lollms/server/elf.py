@@ -48,7 +48,6 @@ def main():
     from lollms.server.endpoints.lollms_binding_infos import router as lollms_binding_infos_router
     from lollms.server.endpoints.lollms_models_infos import router as lollms_models_infos_router
     from lollms.server.endpoints.lollms_personalities_infos import router as lollms_personalities_infos_router
-    from lollms.server.endpoints.lollms_extensions_infos import router as lollms_extensions_infos_router
 
     from lollms.server.endpoints.lollms_configuration_infos import router as lollms_configuration_infos_router
     
@@ -69,7 +68,6 @@ def main():
     app.include_router(lollms_binding_infos_router)
     app.include_router(lollms_models_infos_router)
     app.include_router(lollms_personalities_infos_router)
-    app.include_router(lollms_extensions_infos_router)
     
     
     app.include_router(lollms_generator_router)
