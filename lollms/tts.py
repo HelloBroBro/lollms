@@ -75,7 +75,7 @@ class LollmsTTS:
         """
         pass
 
-    def tts_audio(self, text, speaker, file_name_or_path: Path | str = None, language="en", use_threading=False):
+    def tts_audio(self, text, speaker=None, file_name_or_path: Path | str = None, language="en", use_threading=False):
         """
         Converts the given text to speech and returns the audio data.
 

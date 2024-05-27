@@ -167,6 +167,10 @@ class LoLLMsCom:
         """
         pass
 
+    
+    def emit_socket_io_info(self, name, data, client_id):
+        pass
+
     def notify(
                 self, 
                 content:str, 

@@ -291,7 +291,7 @@ class LollmsXTTS(LollmsTTS):
 
         return file_name_or_path
 
-    def tts_audio(self, text, speaker, file_name_or_path:Path|str=None, language="en", use_threading=False):
+    def tts_audio(self, text, speaker=None, file_name_or_path:Path|str=None, language="en", use_threading=False):
         voice=self.app.config.xtts_current_voice if speaker is None else speaker
         index = find_first_available_file_index(self.output_folder, "voice_sample_",".wav")
         output_fn=f"voice_sample_{index}.wav" if file_name_or_path is None else file_name_or_path

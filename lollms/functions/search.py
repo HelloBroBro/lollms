@@ -7,7 +7,7 @@ from lollms.utilities import PackageManager
 from ascii_colors import trace_exception
 
 # Ensure necessary packages are installed
-if not PackageManager.check_package_installed("beautifulsoup4"):
+if not PackageManager.check_package_installed("bs4"):
     PackageManager.install_package("beautifulsoup4")
 if not PackageManager.check_package_installed("html2text"):
     PackageManager.install_package("html2text")

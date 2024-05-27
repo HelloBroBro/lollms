@@ -18,9 +18,18 @@ from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
 import subprocess
 
-if not PackageManager.check_package_installed("whisper"):
-    install_conda_package("ffmpeg")
-    PackageManager.install_package("whisper")
+try:
+    if not PackageManager.check_package_installed("whisper"):
+        PackageManager.install_package("openai-whisper")
+        try:
+            install_conda_package("conda-forge::ffmpeg")
+        except Exception as ex:
+            trace_exception(ex)
+            ASCIIColors.red("Couldn't install ffmpeg")
+except:
+        PackageManager.install_package("git+https://github.com/openai/whisper.git")
+
+
 import whisper
 
 

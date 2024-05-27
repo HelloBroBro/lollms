@@ -995,24 +995,16 @@ class AIPersonality:
                 self.new_message("")
                 self.info(f"Transcribing ... ")
                 self.step_start("Transcribing ... ")
-                if self.whisper is None:
-                    if not PackageManager.check_package_installed("whisper"):
-                        PackageManager.install_package("openai-whisper")
-                        try:
-                            import conda.cli
-                            conda.cli.main("install", "conda-forge::ffmpeg", "-y")
-                        except:
-                            ASCIIColors.bright_red("Couldn't install ffmpeg. whisper won't work. Please install it manually")
-
-                    import whisper
-                    self.whisper = whisper.load_model("base")
-                result = self.whisper.transcribe(str(path))
+                if self.app.stt is None:
+                    self.InfoMessage("No STT service is up.\nPlease configure your default STT service in the settings page.")
+                    return
+                text = self.app.stt.transcribe(str(path))
                 transcription_fn = str(path)+".txt"
                 with open(transcription_fn, "w", encoding="utf-8") as f:
-                    f.write(result["text"])
+                    f.write(text)
 
                 self.info(f"File saved to {transcription_fn}")
-                self.full(result["text"])
+                self.full(text)
                 self.step_end("Transcribing ... ")
         elif path.suffix in [".png",".jpg",".jpeg",".gif",".bmp",".svg",".webp"]:
             self.image_files.append(path)

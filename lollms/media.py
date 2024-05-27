@@ -8,7 +8,7 @@ License: Apache 2.0
 """
 from lollms.utilities import PackageManager
 from lollms.com import LoLLMsCom
-from lollms.utilities import trace_exception, run_async
+from lollms.utilities import trace_exception, run_async, install_conda_package
 from lollms.types import MSG_TYPE, SENDER_TYPES
 from lollms.client_session import Session
 from ascii_colors import ASCIIColors
@@ -16,9 +16,11 @@ import platform
 from functools import partial
 import subprocess
 from collections import deque
+from scipy.signal import butter, lfilter
 
 import os
 import threading
+import re
 
 if not PackageManager.check_package_installed("cv2"):
     if platform.system() == "Darwin":
@@ -47,15 +49,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 
-if not PackageManager.check_package_installed("whisper"):
-    PackageManager.install_package("openai-whisper")
-    try:
-        import conda.cli
-        conda.cli.main("install", "conda-forge::ffmpeg", "-y")
-    except:
-        ASCIIColors.bright_red("Couldn't install ffmpeg. whisper won't work. Please install it manually")
 
-import whisper
 
 import socketio
 from lollms.com import LoLLMsCom
@@ -92,7 +86,37 @@ from lollms.function_call import FunctionCalling_Library
 from lollms.client_session import Client
 from datetime import datetime
 
-import math
+import sys
+
+def update_progress_bar(silence_counter, max_silence):
+    bar_length = 40  # Length of the progress bar
+    progress = silence_counter / max_silence
+    block = int(round(bar_length * progress))
+    
+    # Determine the color based on progress
+    if progress < 0.5:
+        color = ASCIIColors.color_bright_green
+    else:
+        color = ASCIIColors.color_bright_red
+    
+    bar = "#" * block + "-" * (bar_length - block)
+    
+    sys.stdout.write("\r")
+    ASCIIColors.print(f"silence_counter: {silence_counter} |{bar}| {round(progress * 100, 2)}%", color=color, end="")
+    sys.stdout.flush()
+
+# Step 1: Define your high-pass and low-pass filters (they’re like the bouncers for your audio club)
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b, a = butter(order, [low, high], btype='band')
+    return b, a
+
+def bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
 
 class RTCom:
     def __init__(
@@ -108,26 +132,17 @@ class RTCom:
                         rate=44100, 
                         channels=1, 
                         buffer_size=10, 
-                        model="small.en", 
                         snd_input_device=None,
                         snd_output_device=None,
                         logs_folder="logs", 
-                        voice=None, 
-                        block_while_talking=True, 
-                        context_size=4096
+                        block_while_talking=True,
+                        use_keyword_audio=False,
+                        keyword_audio_path=None
                     ):
         self.sio = sio
         self.lc = lc
         self.client = client
-        self.tts = LollmsTTS(self.lc)
-        self.tl = TasksLibrary(self.lc)
-
         self.block_listening = False
-        if not voice:
-            voices = self.get_voices()
-            voice = voices[0]
-        self.voice = voice
-        self.context_size = context_size
         self.personality = personality
         self.rate = rate
         self.channels = channels
@@ -138,6 +153,14 @@ class RTCom:
         self.sound_threshold_percentage = sound_threshold_percentage
         self.block_while_talking = block_while_talking
         self.image_shot = None
+        self.use_keyword_audio=use_keyword_audio,
+        self.keyword_audio_path=keyword_audio_path
+        self.summoned = False
+        self.sample_mfccs = None
+        if self.use_keyword_audio and self.keyword_audio_path:
+            self.sample_features = self.load_and_extract_features()
+
+
 
         if snd_input_device is None:
             devices = sd.query_devices()
@@ -171,33 +194,37 @@ class RTCom:
         self.transcribed_files = deque()
         self.buffer_lock = threading.Condition()
         self.transcribed_lock = threading.Condition()
-        self.lc.ShowBlockingMessage("Loading whisper...")
-        ASCIIColors.info("Loading whisper...", end="",flush=True)
 
-        self.model = model
-        self.whisper = whisper.load_model(model)
-        self.lc.HideBlockingMessage()
-        ASCIIColors.success("OK")
+    def load_and_extract_features(self, file_path):
+        if not PackageManager.check_package_installed("librosa"):
+            PackageManager.install_package(librosa)
+        import librosa
+        y, sr = librosa.load(file_path, sr=None)
+        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        return np.mean(mfccs.T, axis=0)
+
+    def extract_features(self, buffer):
+        if not PackageManager.check_package_installed("librosa"):
+            PackageManager.install_package("librosa")
+        import librosa
+        y, sr = librosa.load(buffer, sr=self.rate)
+        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+        return np.mean(mfccs.T, axis=0)
     
-    def get_date_time(self):
-        now = datetime.now()
-        return now.strftime("%Y-%m-%d %H:%M:%S")        
-    
-    def calculator_function(self, expression: str) -> float:
-        try:
-            # Add the math module functions to the local namespace
-            allowed_names = {k: v for k, v in math.__dict__.items() if not k.startswith("__")}
-            
-            # Evaluate the expression safely using the allowed names
-            result = eval(expression, {"__builtins__": None}, allowed_names)
-            return result
-        except Exception as e:
-            return str(e)
+    def compare_voices(self, sample_features, realtime_features, th = 20):
+        if not PackageManager.check_package_installed("scipy"):
+            PackageManager.install_package("scipy")
+        from scipy.spatial.distance import euclidean
+        # Calculate the Euclidean distance between the features
+        distance = euclidean(sample_features, realtime_features)
         
-    def take_a_photo(self):
-        return "Couldn't take a photo"
-
-
+        # If the distance is smaller than the threshold, we have a match!
+        if distance < th:
+            print(f"Voice match found! (distance: {distance}) 🎉🤡")
+            return True
+        else:
+            print(f"No match found. (distance: {distance}) 😢🤡")
+            return False
     def start_recording(self):
         self.recording = True
         self.stop_flag = False
@@ -216,16 +243,17 @@ class RTCom:
         with sd.InputStream(channels=self.channels, device=self.snd_input_device, samplerate=self.rate, callback=self.callback, dtype='int16'):
             while not self.stop_flag:
                 time.sleep(1)
-
-        if self.frames:
-            self._save_wav(self.frames)
         self.recording = False
 
         # self._save_histogram(self.audio_values)
 
     def callback(self, indata, frames, time, status):
+        max_scilence = int((self.rate / frames) * self.silence_duration)
         if not self.block_listening:
+            # Transform the buffer into a numpy array (like turning a frog into a prince)
             audio_data = np.frombuffer(indata, dtype=np.int16)
+            # Apply the bandpass filter to the incoming audio data
+            audio_data = bandpass_filter(audio_data, lowcut=300, highcut=3000, fs=self.rate)
             max_value = np.max(audio_data)
             min_value = np.min(audio_data)
 
@@ -237,6 +265,7 @@ class RTCom:
             self.audio_values.extend(audio_data)
 
             self.total_frames += frames
+            ASCIIColors.red(f" max_value: {max_value}", end="")
             if max_value < self.threshold:
                 self.silence_counter += 1
                 self.current_silence_duration += frames
@@ -248,21 +277,27 @@ class RTCom:
             if self.current_silence_duration > self.longest_silence_duration:
                 self.longest_silence_duration = self.current_silence_duration
 
-            if self.silence_counter > (self.rate / frames) * self.silence_duration:
-                ASCIIColors.red("Silence counter reached threshold")
+            if self.silence_counter > max_scilence:
                 trimmed_frames = self._trim_silence(self.frames)
+                ASCIIColors.yellow(f"\nsound duration: {len(trimmed_frames)/self.rate}")
                 sound_percentage = self._calculate_sound_percentage(trimmed_frames)
-                ASCIIColors.red(f"Sound percentage {sound_percentage}")
                 if sound_percentage >= self.sound_threshold_percentage:
-                    self._save_wav(self.frames)
+                    ASCIIColors.red(f"Sound percentage {sound_percentage}")
+                    ASCIIColors.red("\nSilence counter reached threshold")
+
+                    if self.use_keyword_audio and self.keyword_audio_path and self.summoned == False:
+                        features = self.extract_features(self.frames)
+                        if self.compare_voices(self.sample_features, features):
+                            self.summoned = True
+                    else:
+                        self._save_wav(self.frames)
+                        self.summoned = False
                 self.frames = []
                 self.silence_counter = 0
                 self.total_frames = 0
                 self.sound_frames = 0
             else:
-                ASCIIColors.red(f"Appending data")
-                ASCIIColors.yellow(f"silence_counter: {self.silence_counter}")
-                print(f"silence duration: {(self.rate / frames) * self.silence_duration}")
+                update_progress_bar(self.silence_counter, max_scilence)
                 self.frames.append(indata.copy())
         else:
             self.frames = []
@@ -307,6 +342,21 @@ class RTCom:
 
         sound_percentage = (sound_count / num_bins) * 100 if num_bins > 0 else 0
         return sound_percentage
+
+    def contains_unwanted_special_characters(self, s):
+        # Define a regex pattern to match any character that is not a Unicode letter, digit, punctuation, or whitespace
+        pattern = re.compile(r'[^a-zA-Z0-9\s.,!?;:()\'"“”‘’—\-\u00C0-\u017F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\u4E00-\u9FFF]', re.UNICODE)
+        # Search for the pattern in the string
+        if pattern.search(s):
+            return True
+        return False
+
+    def remove_special_characters(self, s:str)->str:
+        # Define a regex pattern to match any character that is not a Unicode letter, digit, punctuation, or whitespace
+        pattern = re.compile(r'[^a-zA-Z0-9\s.,!?;:()\'"“”‘’—\-\u00C0-\u017F\u0400-\u04FF\u0600-\u06FF\u3040-\u30FF\u4E00-\u9FFF]', re.UNICODE)
+        # Substitute the matched characters with an empty string
+        cleaned_string = pattern.sub('', s)
+        return cleaned_string
 
     def _save_wav(self, frames):
         ASCIIColors.green("<<SEGMENT_RECOVERED>>")
@@ -364,14 +414,16 @@ class RTCom:
                     wav_file_path = str(Path(self.logs_folder)/filename)
                     ASCIIColors.cyan(f"Logging to : {wav_file_path}")
                     transcription = self.lc.stt.transcribe(wav_file_path)
-                    transcription_fn = str(Path(self.logs_folder)/filename) + ".txt"
-                    with open(transcription_fn, "w", encoding="utf-8") as f:
-                        f.write(transcription)
+                    transcription = self.remove_special_characters(transcription).strip()
+                    if len(transcription)>0:
+                        transcription_fn = str(Path(self.logs_folder)/filename) + ".txt"
+                        with open(transcription_fn, "w", encoding="utf-8") as f:
+                            f.write(transcription)
 
-                    with self.transcribed_lock:
-                        self.transcribed_files.append((filename, transcription))
-                        self.transcribed_lock.notify()
-                    if transcription!="":
+                        with self.transcribed_lock:
+                            self.transcribed_files.append((filename, transcription))
+                            self.transcribed_lock.notify()
+
                         current_prompt = transcription
                         self.lc.new_block(client_id=self.client.client_id,sender=self.lc.config.user_name, content=current_prompt)
                         ASCIIColors.green("<<RESPONDING>>")
@@ -385,7 +437,7 @@ class RTCom:
                         ASCIIColors.red(" -------------------------------------------------")
                         self.lc.info("Talking")
                         ASCIIColors.green("<<TALKING>>")
-                        self.lc.tts.tts_audio(lollms_text, speaker=self.voice, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wav")
+                        self.lc.tts.tts_audio(lollms_text, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wav")
             except Exception as ex:
                 trace_exception(ex)
             self.block_listening = False
@@ -399,6 +451,82 @@ class RTCom:
             voices = self.lc.tts.get_voices()  # Assuming the response is in JSON format
             return voices
         return []
+
+from pathlib import Path
+import os
+import sounddevice as sd
+import threading
+import datetime
+import wave
+
+class AudioNinja:
+    def __init__(self, lc:LollmsApplication, logs_folder='logs', device=None):
+        """
+        Initialize the AudioNinja with a LollmsApplication object,
+        a log folder, and an optional recording device.
+
+        Args:
+            lc (LollmsApplication): The LollmsApplication object for communication.
+            logs_folder (str): The folder to save recordings. Default is 'logs'.
+            device (int or str): The recording device index or name. Default is None.
+        """
+        self.lc = lc
+        self.logs_folder = Path(logs_folder)
+        self.device = device
+        self.recording_thread = None
+        self.is_recording = False
+        self.frames = []
+        if not self.logs_folder.exists():
+            self.logs_folder.mkdir(parents=True, exist_ok=True)
+        self.lc.info(f"AudioNinja is ready to strike from the shadows! Logging to '{self.logs_folder}' with device '{self.device}'")
+
+    def _record_audio(self):
+        """
+        Internal method to handle audio recording callback.
+        """
+        def callback(indata, frames, time, status):
+            if self.is_recording:
+                self.frames.append(indata.copy())
+    
+        with sd.InputStream(callback=callback, device=self.device):
+            while self.is_recording:
+                sd.sleep(1000)
+
+    def start_recording(self):
+        """
+        Start the audio recording.
+        """
+        if not self.is_recording:
+            self.is_recording = True
+            self.frames = []
+            self.recording_thread = threading.Thread(target=self._record_audio)
+            self.recording_thread.start()
+            self.lc.info("Ninja recording started! 🥷🔴")
+
+    def stop_recording(self):
+        """
+        Stop the audio recording.
+        """
+        if self.is_recording:
+            self.is_recording = False
+            self.recording_thread.join()
+            filename = self._save_recording()
+            self.lc.info("Ninja recording stopped! 🥷⚪️")
+            return filename
+
+    def _save_recording(self):
+        """
+        Save the recorded audio to a .wav file.
+        """
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = self.logs_folder / f"recording_{timestamp}.wav"
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(sd.default.dtype[0].itemsize)
+            wf.setframerate(44100)
+            wf.writeframes(b''.join(self.frames))
+        self.lc.info(f"Ninja stored the audio file at '{filename}'! 🥷📂")
+        return filename
 
 
 class WebcamImageSender:
@@ -535,17 +663,6 @@ class MusicPlayer(threading.Thread):
 
 class RealTimeTranscription:
     def __init__(self, callback):
-        if not PackageManager.check_package_installed('pyaudio'):
-            try:
-                import conda.cli
-                conda.cli.main("install", "anaconda::pyaudio", "-y")
-            except:
-                ASCIIColors.bright_red("Couldn't install pyaudio. whisper won't work. Please install it manually")
-        import pyaudio
-        # Initialize Whisper ASR
-        print("Loading whisper ...", end="")
-        self.whisper = whisper.load_model("base")
-        print("ok")
 
         # Set up PyAudio
         self.p = pyaudio.PyAudio()
