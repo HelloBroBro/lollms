@@ -315,8 +315,11 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
                 self.warning(f"Couldn't load Motion control")
 
-
-        if self.config.active_tti_service == "autosd":
+        
+        if self.config.active_tti_service == "diffusers":
+            from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
+            self.tti = LollmsDiffusers(self)
+        elif self.config.active_tti_service == "autosd":
             from lollms.services.sd.lollms_sd import LollmsSD
             self.tti = LollmsSD(self)
         elif self.config.active_tti_service == "dall-e":
@@ -410,7 +413,10 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load Motion control")
 
-            if self.config.active_tti_service == "autosd":
+            if self.config.active_tti_service == "diffusers":
+                from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
+                self.tti = LollmsDiffusers(self)
+            elif self.config.active_tti_service == "autosd":
                 from lollms.services.sd.lollms_sd import LollmsSD
                 self.tti = LollmsSD(self)
             elif self.config.active_tti_service == "dall-e":

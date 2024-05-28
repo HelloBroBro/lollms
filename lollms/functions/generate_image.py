@@ -14,7 +14,22 @@ from functools import partial
 
 def build_image(prompt, antiprompt, width, height, processor:APScript, client:Client):
     try:
-        if processor.personality.config.active_tti_service=="autosd":
+        if processor.personality.config.active_tti_service=="diffusers":
+            if not processor.personality.app.tti:
+                from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
+                processor.step_start("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
+                processor.personality.app.tti = LollmsDiffusers(processor.personality.app, processor.personality.name, max_retries=-1,auto_sd_base_url=processor.personality.config.sd_base_url)
+                processor.personality.app.sd = processor.personality.app.tti
+                processor.step_end("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
+            file, infos = processor.personality.app.tti.paint(
+                            prompt, 
+                            antiprompt,
+                            processor.personality.image_files,
+                            width = width,
+                            height = height,
+                            output_path=client.discussion.discussion_folder
+                        )
+        elif processor.personality.config.active_tti_service=="autosd":
             if not processor.personality.app.tti:
                 from lollms.services.sd.lollms_sd import LollmsSD
                 processor.step_start("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")

@@ -199,7 +199,10 @@ class LollmsXTTS(LollmsTTS):
                 "top_k": self.app.config.xtts_top_k,
                 "enable_text_splitting": self.app.config.xtts_enable_text_splitting
             }             
-            response = requests.post(f"{self.xtts_base_url}/set_tts_settings", settings)
+            response = requests.post(f"{self.xtts_base_url}/set_tts_settings", settings,headers={
+                'accept': 'application/json',
+                'Content-Type': 'application/json'
+            })
             if response.status_code == 200:
                 ASCIIColors.success("XTTS updated successfully")
         except Exception as ex:

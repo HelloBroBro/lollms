@@ -119,22 +119,6 @@ def upgrade_sd(lollms_app:LollmsApplication):
         subprocess.run(["git", "clone", "https://github.com/ParisNeo/SD-CN-Animation.git", str(sd_folder/"extensions/SD-CN-Animation")])
 
 
-
-def upgrade_sd(lollms_app:LollmsApplication):
-    root_dir = lollms_app.lollms_paths.personal_path
-    shared_folder = root_dir/"shared"
-    sd_folder = shared_folder / "auto_sd"
-    if not sd_folder.exists():
-        lollms_app.InfoMessage("Comfyui is not installed, install it first")
-        return
-
-    subprocess.run(["git", "pull", str(sd_folder)])
-    subprocess.run(["git", "pull", str(sd_folder/"extensions/SD-CN-Animation")])
-    ASCIIColors.success("DONE")
-
-
-
-
 def raw_b64_img(image: Image) -> str:
     # XXX controlnet only accepts RAW base64 without headers
     with io.BytesIO() as output_bytes:
