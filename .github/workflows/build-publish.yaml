@@ -19,8 +19,7 @@ jobs:
         cmake-version: 3.x  # Specify your desired CMake version
 
     - name: Build and Test (Linux)
-      run: |
-        mkdir build
+      run: |   mkdir build
         cd build
         cmake ..
         make
@@ -46,8 +45,7 @@ jobs:
         cmake-version: 3.0  # cmake version
 
     - name: Build and Test (Windows)
-      run: |
-        mkdir build
+      run: |   mkdir build
         cd build
         cmake ..
         cmake --build . --config Release

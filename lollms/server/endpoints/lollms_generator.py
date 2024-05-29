@@ -457,12 +457,12 @@ async def v1_chat_completions(request: ChatGenerationRequest):
         roles= False
         for message in messages:
             if message.role!="":
-                prompt += f"!@>{message.role}: {message.content}\n"
+                prompt += f"{elf_server.config.discussion_prompt_separator}{message.role}: {message.content}\n"
                 roles = True
             else:
                 prompt += f"{message.content}\n"
         if roles:
-            prompt += "!@>assistant:"
+            prompt += f"{elf_server.config.discussion_prompt_separator}assistant:"
         n_predict = max_tokens if max_tokens>0 else 1024
         stream = request.stream
         prompt_tokens = len(elf_server.binding.tokenize(prompt))
@@ -599,12 +599,12 @@ async def ollama_chat_completion(request: ChatGenerationRequest):
         roles= False
         for message in messages:
             if message.role!="":
-                prompt += f"!@>{message.role}: {message.content}\n"
+                prompt += f"{elf_server.config.discussion_prompt_separator}{message.role}: {message.content}\n"
                 roles = True
             else:
                 prompt += f"{message.content}\n"
         if roles:
-            prompt += "!@>assistant:"
+            prompt += f"{elf_server.config.discussion_prompt_separator}assistant:"
         n_predict = max_tokens if max_tokens>0 else 1024
         stream = request.stream
         prompt_tokens = len(elf_server.binding.tokenize(prompt))

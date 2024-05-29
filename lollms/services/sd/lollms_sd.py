@@ -356,8 +356,8 @@ class LollmsSD(LollmsTTI):
 
     def paint(
                 self,
-                sd_positive_prompt,
-                sd_negative_prompt,
+                positive_prompt,
+                negative_prompt,
                 files=[],
                 sampler_name="Euler",
                 seed=-1,
@@ -376,8 +376,8 @@ class LollmsSD(LollmsTTI):
         if len(files)>0:
             try:
                 generated = self.img2img(
-                            sd_positive_prompt,
-                            sd_negative_prompt, 
+                            positive_prompt,
+                            negative_prompt, 
                             [self.loadImage(files[-1])],
                             sampler_name=sampler_name,
                             seed=seed,
@@ -405,8 +405,8 @@ class LollmsSD(LollmsTTI):
         else:
             try:
                 generated = self.txt2img(
-                            sd_positive_prompt,
-                            negative_prompt=sd_negative_prompt, 
+                            positive_prompt,
+                            negative_prompt=negative_prompt, 
                             sampler_name=sampler_name,
                             seed=seed,
                             cfg_scale=scale,

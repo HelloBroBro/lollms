@@ -76,6 +76,9 @@ def add_events(sio:socketio):
                 prompt          = model.detokenize(tokenized[-n_crop:])
 
             n_predicts      = data["n_predicts"]
+            if n_predicts is None:
+                n_predicts = lollmsElfServer.config.max_n_predict
+                
             parameters      = data.get("parameters",{
                 "temperature":lollmsElfServer.config["temperature"],
                 "top_k":lollmsElfServer.config["top_k"],
@@ -176,7 +179,7 @@ def add_events(sio:socketio):
 
                         tk = personality.model.tokenize(full_discussion)
                         n_tokens = len(tk)
-                        fd = personality.model.detokenize(tk[-min(lollmsElfServer.config.ctx_size-n_cond_tk-personality.model_n_predicts,n_tokens):])
+                        fd = personality.model.detokenize(tk[-min(lollmsElfServer.config.ctx_size-n_cond_tk-n_predicts, n_tokens):])
                         
                         if personality.processor is not None and personality.processor_cfg["custom_workflow"]:
                             ASCIIColors.info("processing...")
@@ -188,7 +191,7 @@ def add_events(sio:socketio):
                             ASCIIColors.info("generating...")
                             generated_text = personality.model.generate(
                                                                         personality.personality_conditioning+fd, 
-                                                                        n_predict=personality.model_n_predicts, 
+                                                                        n_predict=n_predicts, 
                                                                         callback=callback)
 
                         if personality.processor is not None and personality.processor_cfg["process_model_output"]: 

@@ -182,6 +182,13 @@ class LollmsApplication(LoLLMsCom):
             return False
         
     def add_discussion_to_skills_library(self, client: Client):
+        discussion_prompt_separator = self.config.discussion_prompt_separator
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        separator_template          = self.config.separator_template
+        system_message_template     = self.config.system_message_template
+
+
         messages = client.discussion.get_messages()
 
         # Extract relevant information from messages
@@ -194,20 +201,20 @@ class LollmsApplication(LoLLMsCom):
         self.tasks_library.callback = bk_cb
 
         # Generate title
-        title_prompt =  "\n".join([
-            f"!@>system:Generate a concise and descriptive title for the following content.",
+        title_prompt =  f"{separator_template}".join([
+            f"{start_header_id_template}{system_message_template}{end_header_id_template}Generate a concise and descriptive title for the following content.",
             "The title should summarize the main topic or subject of the content.",
             "Do not mention the format of the content (e.g., bullet points, discussion, etc.) in the title.",
             "Provide only the title without any additional explanations or context.",
-            "!@>content:",
+            f"{start_header_id_template}content{end_header_id_template}",
             f"{content}",
-            "!@>title:"
+            f"{start_header_id_template}title{end_header_id_template}"
             ])
 
         title = self._generate_text(title_prompt)
 
         # Determine category
-        category_prompt = f"!@>system:Analyze the following title, and determine the most appropriate generic category that encompasses the main subject or theme. The category should be broad enough to include multiple related skill entries. Provide only the category name without any additional explanations or context:\n\nTitle:\n{title}\n\n!@>Category:\n"
+        category_prompt = f"{start_header_id_template}{system_message_template}{end_header_id_template}Analyze the following title, and determine the most appropriate generic category that encompasses the main subject or theme. The category should be broad enough to include multiple related skill entries. Provide only the category name without any additional explanations or context:\n\nTitle:\n{title}\n{separator_template}{start_header_id_template}Category:\n"
         category = self._generate_text(category_prompt)
 
         # Add entry to skills library
@@ -763,6 +770,14 @@ class LollmsApplication(LoLLMsCom):
         Returns:
             Tuple[str, str, List[str]]: The prepared query, original message content, and tokenized query.
         """
+        discussion_prompt_separator = self.config.discussion_prompt_separator
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        separator_template          = self.config.separator_template
+        system_message_template     = self.config.system_message_template
+
+
+
         if self.personality.callback is None:
             self.personality.callback = partial(self.process_chunk, client_id=client_id)
         # Get the list of messages
@@ -802,7 +817,7 @@ class LollmsApplication(LoLLMsCom):
             conditionning = self.personality._personality_conditioning
 
         if len(conditionning)>0:
-            conditionning = self.personality.replace_keys(conditionning, self.personality.conditionning_commands) +"" if conditionning[-1]=="\n" else "\n"
+            conditionning =  start_header_id_template + system_message_template + end_header_id_template + self.personality.replace_keys(conditionning, self.personality.conditionning_commands) + ("" if conditionning[-1]==separator_template else separator_template)
 
         # Check if there are document files to add to the prompt
         internet_search_results = ""
@@ -814,21 +829,21 @@ class LollmsApplication(LoLLMsCom):
 
         # boosting information
         if self.config.positive_boost:
-            positive_boost="\n!@>important information: "+self.config.positive_boost+"\n"
+            positive_boost=f"{separator_template}{start_header_id_template}important information: "+self.config.positive_boost+"\n"
             n_positive_boost = len(self.model.tokenize(positive_boost))
         else:
             positive_boost=""
             n_positive_boost = 0
 
         if self.config.negative_boost:
-            negative_boost="\n!@>important information: "+self.config.negative_boost+"\n"
+            negative_boost=f"{separator_template}{start_header_id_template}important information: "+self.config.negative_boost+"\n"
             n_negative_boost = len(self.model.tokenize(negative_boost))
         else:
             negative_boost=""
             n_negative_boost = 0
 
         if self.config.fun_mode:
-            fun_mode="\n!@>important information: Fun mode activated. In this mode you must answer in a funny playful way. Do not be serious in your answers. Each answer needs to make the user laugh.\n"
+            fun_mode=f"{separator_template}{start_header_id_template}important information: Fun mode activated. In this mode you must answer in a funny playful way. Do not be serious in your answers. Each answer needs to make the user laugh.\n"
             n_fun_mode = len(self.model.tokenize(positive_boost))
         else:
             fun_mode=""
@@ -842,14 +857,14 @@ class LollmsApplication(LoLLMsCom):
                     discussion = self.recover_discussion(client_id)
                 if self.config.internet_activate_search_decision:
                     self.personality.step_start(f"Requesting if {self.personality.name} needs to search internet to answer the user")
-                    need = not self.personality.yes_no(f"!@>system: Answer the question with yes or no. Don't add any extra explanation.\n!@>user: Do you have enough information to give a satisfactory answer to {self.config.user_name}'s request without internet search? (If you do not know or you can't answer 0 (no)", discussion)
+                    need = not self.personality.yes_no(f"{start_header_id_template}{system_message_template}{end_header_id_template}Answer the question with yes or no. Don't add any extra explanation.{separator_template}{start_header_id_template}user: Do you have enough information to give a satisfactory answer to {self.config.user_name}'s request without internet search? (If you do not know or you can't answer 0 (no)", discussion)
                     self.personality.step_end(f"Requesting if {self.personality.name} needs to search internet to answer the user")
                     self.personality.step("Yes" if need else "No")
                 else:
                     need=True
                 if need:
                     self.personality.step_start("Crafting internet search query")
-                    query = self.personality.fast_gen(f"!@>discussion:\n{discussion[-2048:]}\n!@>system: Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.\nDo not answer the prompt. Do not add explanations.\n!@>current date: {datetime.now()}\n!@>websearch query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                    query = self.personality.fast_gen(f"{start_header_id_template}discussion{end_header_id_template}\n{discussion[-2048:]}{separator_template}{start_header_id_template}system: Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}current date: {datetime.now()}{separator_template}{start_header_id_template}websearch query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     self.personality.step_end("Crafting internet search query")
                     self.personality.step(f"web search query: {query}")
 
@@ -858,14 +873,14 @@ class LollmsApplication(LoLLMsCom):
                     else:
                         self.personality.step_start("Performing Internet search (advanced mode: slower but more advanced)")
 
-                    internet_search_results=f"!@>instructions: Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.\n!@>Web search results:\n"
+                    internet_search_results=f"{start_header_id_template}instructions{end_header_id_template}Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.{separator_template}{start_header_id_template}Web search results:\n"
 
                     docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search)
                     
                     if len(docs)>0:
                         for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):
                             internet_search_infos.append(document_id)
-                            internet_search_results += f"!@>search result chunk:\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}\n"
+                            internet_search_results += f"{start_header_id_template}search result chunk{end_header_id_template}\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}\n"
                     else:
                         internet_search_results += "The search response was empty!\nFailed to recover useful information from the search engine.\n"
                     if self.config.internet_quick_search:
@@ -875,12 +890,12 @@ class LollmsApplication(LoLLMsCom):
 
             if self.personality.persona_data_vectorizer:
                 if documentation=="":
-                    documentation="\n!@>Documentation:\n"
+                    documentation=f"{separator_template}{start_header_id_template}Documentation:\n"
 
                 if self.config.data_vectorization_build_keys_words:
                     if discussion is None:
                         discussion = self.recover_discussion(client_id)
-                    query = self.personality.fast_gen(f"\n!@>instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.\n!@>discussion:\n{discussion[-2048:]}\n!@>enhanced query: ", max_generation_size=256, show_progress=True)
+                    query = self.personality.fast_gen(f"{separator_template}{start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True)
                     ASCIIColors.cyan(f"Query:{query}")
                 else:
                     query = current_message.content
@@ -888,9 +903,9 @@ class LollmsApplication(LoLLMsCom):
                     docs, sorted_similarities, document_ids = self.personality.persona_data_vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
                     for doc, infos, doc_id in zip(docs, sorted_similarities, document_ids):
                         if self.config.data_vectorization_put_chunk_informations_into_context:
-                            documentation += f"!@>document chunk:\nchunk_infos:{infos}\ncontent:{doc}\n"
+                            documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk_infos:{infos}\ncontent:{doc}\n"
                         else:
-                            documentation += f"!@>chunk:\n{doc}\n"
+                            documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{doc}\n"
 
                 except Exception as ex:
                     trace_exception(ex)
@@ -901,11 +916,11 @@ class LollmsApplication(LoLLMsCom):
                     discussion = self.recover_discussion(client_id)
 
                 if documentation=="":
-                    documentation="\n!@>important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n!@>Documentation:\n"
+                    documentation=f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.{separator_template}{start_header_id_template}Documentation:\n"
 
                 if self.config.data_vectorization_build_keys_words:
                     self.personality.step_start("Building vector store query")
-                    query = self.personality.fast_gen(f"\n!@>instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.\n!@>discussion:\n{discussion[-2048:]}\n!@>enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                    query = self.personality.fast_gen(f"{separator_template}{start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     self.personality.step_end("Building vector store query")
                     ASCIIColors.cyan(f"Query: {query}")
                 else:
@@ -919,20 +934,20 @@ class LollmsApplication(LoLLMsCom):
                         content = client.discussion.vectorizer.chunks[doc_index]['chunk_text']
                         
                         if self.config.data_vectorization_put_chunk_informations_into_context:
-                            documentation += f"!@>document chunk:\nchunk_infos:{doc_id}\ncontent:{content}\n"
+                            documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk_infos:{doc_id}\ncontent:{content}\n"
                         else:
-                            documentation += f"!@>chunk:\n{content}\n"
+                            documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{content}\n"
 
                     docs, sorted_similarities, document_ids = client.discussion.vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
                     for doc, infos in zip(docs, sorted_similarities):
                         if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0 and infos[0]==doc_id:
                             continue
                         if self.config.data_vectorization_put_chunk_informations_into_context:
-                            documentation += f"!@>document chunk:\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
+                            documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
                         else:
-                            documentation += f"!@>chunk:\n{doc}\n"
+                            documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{doc}\n"
 
-                    documentation += "\n!@>important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
+                    documentation += f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
                 except Exception as ex:
                     trace_exception(ex)
                     self.warning("Couldn't add documentation to the context. Please verify the vector database")
@@ -943,7 +958,7 @@ class LollmsApplication(LoLLMsCom):
                     if discussion is None:
                         discussion = self.recover_discussion(client_id)
                     self.personality.step_start("Building query")
-                    query = self.personality.fast_gen(f"!@>Your task is to carefully read the provided discussion and reformulate {self.config.user_name}'s request concisely. Return only the reformulated request without any additional explanations, commentary, or output.\n!@>discussion:\n{discussion[-2048:]}\n!@>search query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                    query = self.personality.fast_gen(f"{start_header_id_template}{system_message_template}{end_header_id_template}Your task is to carefully read the provided discussion and reformulate {self.config.user_name}'s request concisely. Return only the reformulated request without any additional explanations, commentary, or output.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}search query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     self.personality.step_end("Building query")
                     # skills = self.skills_library.query_entry(query)
                     self.personality.step_start("Adding skills")
@@ -953,9 +968,9 @@ class LollmsApplication(LoLLMsCom):
                     knowledge_infos={"titles":skill_titles,"contents":skills}
                     if len(skills)>0:
                         if knowledge=="":
-                            knowledge=f"!@>knowledge:\n"
+                            knowledge=f"{start_header_id_template}knowledge{end_header_id_template}\n"
                         for i,(title, content) in enumerate(zip(skill_titles,skills)):
-                            knowledge += f"!@>knowledge {i}:\ntitle:\n{title}\ncontent:\n{content}\n"
+                            knowledge += f"{start_header_id_template}knowledge {i}{end_header_id_template}\ntitle:\n{title}\ncontent:\n{content}\n"
                     self.personality.step_end("Adding skills")
                     self.personality.step_end("Querying skills library")
                 except Exception as ex:
@@ -965,7 +980,7 @@ class LollmsApplication(LoLLMsCom):
                     self.personality.step_end("Querying skills library",False)
         user_description=""
         if self.config.use_user_informations_in_discussion:
-            user_description="!@>User description:\n"+self.config.user_description+"\n"
+            user_description=f"{start_header_id_template}User description{end_header_id_template}\n"+self.config.user_description+"\n"
 
 
         # Tokenize the conditionning text and calculate its number of tokens
@@ -1121,9 +1136,9 @@ class LollmsApplication(LoLLMsCom):
             ASCIIColors.bold("HISTORY")
             ASCIIColors.yellow(knowledge)
             ASCIIColors.bold("DISCUSSION")
-            ASCIIColors.hilight(discussion_messages,"!@>",ASCIIColors.color_yellow,ASCIIColors.color_bright_red,False)
+            ASCIIColors.hilight(discussion_messages,f"{start_header_id_template}",ASCIIColors.color_yellow,ASCIIColors.color_bright_red,False)
             ASCIIColors.bold("Final prompt")
-            ASCIIColors.hilight(prompt_data,"!@>",ASCIIColors.color_yellow,ASCIIColors.color_bright_red,False)
+            ASCIIColors.hilight(prompt_data,f"{start_header_id_template}",ASCIIColors.color_yellow,ASCIIColors.color_bright_red,False)
             ASCIIColors.info(f"prompt size:{len(tokens)} tokens") 
             ASCIIColors.info(f"available space after doc and knowledge:{available_space} tokens") 
 

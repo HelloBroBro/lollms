@@ -50,7 +50,8 @@ class LollmsMidjourney(LollmsTTI):
 
     def paint(
                 self,
-                prompt,
+                positive_prompt,
+                negative_prompt,
                 width=512,
                 height=512,
                 images = [],
@@ -111,7 +112,7 @@ class LollmsMidjourney(LollmsTTI):
         else:
             response = openai.images.generate(
                 model=generation_engine,
-                prompt=prompt.strip(),
+                positive_prompt=positive_prompt.strip(),
                 quality="standard",
                 size=f"{width}x{height}",
                 n=1,

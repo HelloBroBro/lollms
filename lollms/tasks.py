@@ -12,8 +12,11 @@ import json
 class TasksLibrary:
     def __init__(self, lollms:LoLLMsCom, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None) -> None:
         self.lollms = lollms
+        self.config = lollms.config
         self.callback = callback
-        self.anti_prompts = [self.lollms.config.discussion_prompt_separator]+["!@>"]
+        self.anti_prompts = [lollms.config.discussion_prompt_separator]
+        if lollms.config.separator_template!="\n":
+            self.anti_prompts.append(lollms.config.separator_template)
 
     def print_prompt(self, title, prompt):
         ASCIIColors.red("*-*-*-*-*-*-*-* ", end="")
@@ -182,8 +185,12 @@ class TasksLibrary:
         Returns:
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template
         prompt = "\n".join([
-            "!@>system: I am an AI assistant that can converse and analyze images. When asked to locate something in an image you send, I will reply with:",
+            f"{start_header_id_template}{system_message_template}{end_header_id_template}I am an AI assistant that can converse and analyze images. When asked to locate something in an image you send, I will reply with:",
             "boundingbox(image_index, label, left, top, width, height)",
             "Where:",
             "image_index: 0-based index of the image",
@@ -510,25 +517,33 @@ class TasksLibrary:
         return code_blocks
 
     def translate_conditionning(self, prompt, original_language, language):
-        conditionning_translation_text = f"!@>instruction: Translate the following prompt to {language}.\nDo not translate any css or code, just the text and strings.\n!@>prompt:\n```{original_language}\n{prompt.replace('!@>','')}\n```\n!@>translation:\nHere is the translated prompt:\n```{language}\n"
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template        
+        conditionning_translation_text = f"{start_header_id_template}{system_message_template}{end_header_id_template}Translate the following prompt to {language}.\nDo not translate any css or code, just the text and strings.{separator_template}{start_header_id_template}prompt{end_header_id_template}\n```{original_language}\n{prompt.replace(f'{start_header_id_template}','')}\n```{separator_template}{start_header_id_template}translation{end_header_id_template}\nHere is the translated prompt:\n```{language}\n"
         cond_translation = f"```{language}\n"+self.fast_gen(conditionning_translation_text, temperature=0.1, callback=self.sink)
         response = self.extract_code_blocks(cond_translation)
         if len(response)>0 and len(response[0]["content"])>0:
-            conditionning = "!@>system: "+response[0]["content"]
+            conditionning = response[0]["content"]
         else:
             ASCIIColors.print(f"Failed to translate the conditionning message. Reverting to english conditionning with a request to use the lanuage {language}")
             conditionning = prompt + f"\nAlways answer in {language}\n"
         return conditionning
 
     def translate_message(self, prompt, original_language, language):
-        message_translation_text = f"!@>instruction: Translate the following message to {language}.\nDo not translate any css or code, just the text and strings.\n!@>prompt:\n```{original_language}\n{prompt.replace('!@>','')}\n```\n!@>translation:\n```{language}\n"
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template        
+        message_translation_text = f"{start_header_id_template}{system_message_template}{end_header_id_template}Translate the following message to {language}.\nDo not translate any css or code, just the text and strings.{separator_template}{start_header_id_template}prompt:\n```{original_language}\n{prompt.replace(f'{start_header_id_template}','')}\n```{separator_template}{start_header_id_template}translation{end_header_id_template}\n```{language}\n"
         cond_translation = f"```{language}\n"+self.fast_gen(message_translation_text, temperature=0.1, callback=self.sink)
         response = self.extract_code_blocks(cond_translation)
         if len(response)>0 and len(response[0]["content"])>0:
             translated = response[0]["content"]
         else:
             ASCIIColors.print(f"Failed to translate the message. Reverting to english conditionning with a request to use the lanuage {language}")
-            message_translation_text = f"!@>instruction: Translate the following message to {language}.\nDo not translate any css or code, just the text and strings.\n!@>message:\n{prompt.replace('!@>','')}\n!@>translation:\n"
+            message_translation_text = f"{start_header_id_template}{system_message_template}{end_header_id_template}Translate the following message to {language}.\nDo not translate any css or code, just the text and strings.{separator_template}{start_header_id_template}message{end_header_id_template}\n{prompt.replace(f'{start_header_id_template}','')}{separator_template}{start_header_id_template}translation{end_header_id_template}\n"
             translated = self.fast_gen(message_translation_text, temperature=0.1, callback=self.sink)
         return translated
 
@@ -630,6 +645,10 @@ class TasksLibrary:
                             chunk_summary_post_processing=None,
                             summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
                         ):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template        
         if summary_mode==SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL:
             summary = ""
             for i, chunk in enumerate(chunks):
@@ -637,16 +656,16 @@ class TasksLibrary:
                 if summary !="":
                     summary = f"{answer_start}"+ self.fast_gen(
                                 "\n".join([
-                                    f"!@>Document_chunk: {doc_name}:",
+                                    f"{start_header_id_template}Document_chunk: {doc_name}{end_header_id_template}",
                                     f"This is a cumulative summary step. Use the summary of the previous chunks and the current chunk of the document to make a new summary integrating information from both. Make sure not to loose information from previous summaries",
                                     f"Summary of previous chunks",
                                     f"{summary}",
                                     f"current chunk:",
                                     f"{chunk}",
-                                    f"!@>instruction: {summary_instruction}",
+                                    f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                                     f"The summary should extract required information from the current chunk to increment the previous summary.",
                                     f"Answer directly with the cumulative summary with no extra comments.",
-                                    f"!@>summary:",
+                                    f"{start_header_id_template}summary{end_header_id_template}",
                                     f"{answer_start}"
                                     ]),
                                     max_generation_size=max_generation_size,
@@ -654,12 +673,12 @@ class TasksLibrary:
                 else:
                     summary = f"{answer_start}"+ self.fast_gen(
                                 "\n".join([
-                                    f"!@>Document_chunk: {doc_name}:",
+                                    f"{start_header_id_template}Document_chunk: {doc_name}{end_header_id_template}",
                                     f"current chunk:",
                                     f"{chunk}",
-                                    f"!@>instruction: {summary_instruction}",
+                                    f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                                     f"Answer directly with the summary with no extra comments.",
-                                    f"!@>summary:",
+                                    f"{start_header_id_template}summary{end_header_id_template}",
                                     f"{answer_start}"
                                     ]),
                                     max_generation_size=max_generation_size,
@@ -674,11 +693,11 @@ class TasksLibrary:
                 self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
                 summary = f"{answer_start}"+ self.fast_gen(
                             "\n".join([
-                                f"!@>Document_chunk [{doc_name}]:",
+                                f"{start_header_id_template}Document_chunk [{doc_name}]{end_header_id_template}",
                                 f"{chunk}",
-                                f"!@>instruction: {summary_instruction}",
+                                f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                                 f"Answer directly with the summary with no extra comments.",
-                                f"!@>summary:",
+                                f"{start_header_id_template}summary{end_header_id_template}",
                                 f"{answer_start}"
                                 ]),
                                 max_generation_size=max_generation_size,
@@ -699,6 +718,10 @@ class TasksLibrary:
                             callback=None,
                             chunk_summary_post_processing=None
                         ):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template
         summeries = []
         for i, chunk in enumerate(chunks):
             if i<len(chunks)-1:
@@ -710,14 +733,14 @@ class TasksLibrary:
             self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
             summary = f"{answer_start}"+ self.fast_gen(
                         "\n".join([
-                            f"!@>Document_chunk: {doc_name}:",
+                            f"{start_header_id_template}Document_chunk: {doc_name}{end_header_id_template}",
                             f"Block1:",
                             f"{chunk}",
                             f"Block2:",
                             f"{chunk1}",
-                            f"!@>instruction: {summary_instruction}",
+                            f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                             f"Answer directly with the summary with no extra comments.",
-                            f"!@>summary:",
+                            f"{start_header_id_template}summary{end_header_id_template}:",
                             f"{answer_start}"
                             ]),
                             max_generation_size=max_generation_size,
@@ -740,7 +763,11 @@ class TasksLibrary:
         Returns:
             str: The upgraded prompt that includes information about the function calls.
         """
-        function_descriptions = ["!@>information: If you need to call a function to fulfull the user request, use a function markdown tag with the function call as the following json format:",
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template
+        function_descriptions = [f"{start_header_id_template}information{end_header_id_template}If you need to call a function to fulfull the user request, use a function markdown tag with the function call as the following json format:",
                                  "```function",
                                  "{",
                                  '"function_name":the name of the function to be called,',
@@ -750,8 +777,7 @@ class TasksLibrary:
                                  "You can call multiple functions in one generation.",
                                  "Each function call needs to be in a separate function markdown tag.",
                                  "Do not add status of the execution as it will be added automatically by the system.",
-                                 "If you want to get the output of the function before answering the user, then use the keyword @<NEXT>@ at the end of your message.",
-                                 "!@>List of possible functions to be called:\n"]
+                                 f"{start_header_id_template}List of possible functions to be called{end_header_id_template}\n"]
         for function in functions:
             description = f"{function['function_name']}: {function['function_description']}\nparameters:{function['function_parameters']}"
             function_descriptions.append(description)

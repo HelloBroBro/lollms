@@ -156,8 +156,8 @@ class LollmsDiffusers(LollmsTTI):
 
     def paint(
                 self,
-                diffusers_positive_prompt,
-                diffusers_negative_prompt,
+                positive_prompt,
+                negative_prompt,
                 files=[],
                 sampler_name="Euler",
                 seed=-1,
@@ -172,10 +172,10 @@ class LollmsDiffusers(LollmsTTI):
         if output_path is None:
             output_path = self.output_dir
         from diffusers.utils.pil_utils import pt_to_pil
-        image = self.model(diffusers_positive_prompt, negative_prompt=diffusers_negative_prompt, guidance_scale=scale, num_inference_steps=steps,).images[0]
+        image = self.model(positive_prompt, negative_prompt=negative_prompt, guidance_scale=scale, num_inference_steps=steps,).images[0]
         output_path = Path(output_path)
         fn = find_next_available_filename(output_path,"diff_img_")
         # Save the image
         image.save(fn)
-        return fn, {"prompt":diffusers_positive_prompt, "negative_prompt":diffusers_negative_prompt}
+        return fn, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
     

@@ -190,15 +190,17 @@ class LollmsXTTS(LollmsTTS):
     def update_settings(self):
         try:
             settings = {
-                "stream_chunk_size": self.app.config.xtts_stream_chunk_size,
-                "temperature": self.app.config.xtts_temperature,
-                "speed": self.app.config.xtts_speed,
-                "length_penalty": self.app.config.xtts_length_penalty,
-                "repetition_penalty": self.app.config.xtts_repetition_penalty,
-                "top_p": self.app.config.xtts_top_p,
-                "top_k": self.app.config.xtts_top_k,
-                "enable_text_splitting": self.app.config.xtts_enable_text_splitting
-            }             
+                "stream_chunk_size": int(self.app.config.xtts_stream_chunk_size),
+                "temperature": float(self.app.config.xtts_temperature),
+                "speed": float(self.app.config.xtts_speed),
+                "length_penalty": float(self.app.config.xtts_length_penalty),
+                "repetition_penalty": float(self.app.config.xtts_repetition_penalty),
+                "top_p": float(self.app.config.xtts_top_p),
+                "top_k": int(self.app.config.xtts_top_k),
+                "enable_text_splitting": bool(self.app.config.xtts_enable_text_splitting)
+            } 
+            print("set_tts_settings")       
+            print(f"{settings}")       
             response = requests.post(f"{self.xtts_base_url}/set_tts_settings", settings,headers={
                 'accept': 'application/json',
                 'Content-Type': 'application/json'

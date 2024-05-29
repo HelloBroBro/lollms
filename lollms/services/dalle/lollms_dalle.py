@@ -51,6 +51,7 @@ class LollmsDalle(LollmsTTI):
     def paint(
                 self,
                 prompt,
+                negative_prompt,
                 width=512,
                 height=512,
                 images = [],

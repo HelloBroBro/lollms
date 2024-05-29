@@ -120,11 +120,15 @@ class AIPersonality:
         Raises:
         ValueError: If the provided path is not a folder or does not contain a config.yaml file.
         """
+        self.config = config
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         self.bot_says = ""
 
         self.lollms_paths = lollms_paths
         self.model = model
-        self.config = config
         self.callback = callback
         self.app = app
 
@@ -157,10 +161,11 @@ class AIPersonality:
 
         self._languages: List[dict]=[]
 
+
+
         # Conditionning
         self._personality_description: str = "This personality is a helpful and Kind AI ready to help you solve your problems"
         self._personality_conditioning: str = "\n".join([
-            "!@>system:",
             "lollms (Lord of LLMs) is a smart and helpful Assistant built by the computer geek ParisNeo.",
             "It is compatible with many bindings to LLM models such as llama, gpt4all, gptj, autogptq etc.",
             "It can discuss with humans and assist them on many subjects.",
@@ -172,10 +177,9 @@ class AIPersonality:
         ])
         self._welcome_message: str = "Welcome! I am lollms (Lord of LLMs) A free and open assistant built by ParisNeo. What can I do for you today?"
         self._include_welcome_message_in_discussion: bool = True
-        self._user_message_prefix: str = "!@>human: "
+        self._user_message_prefix: str = f"human:"
         self._link_text: str = "\n"
-        self._ai_message_prefix: str = "!@>lollms:"
-        self._anti_prompts:list = [self.config.discussion_prompt_separator]
+        self._ai_message_prefix: str = f"lollms:"
 
         # Extra
         self._dependencies: List[str] = []
@@ -187,7 +191,6 @@ class AIPersonality:
 
         # Default model parameters
         self._model_temperature: float = 0.1 # higher: more creative, lower more deterministic
-        self._model_n_predicts: int = 2048 # higher: generates many words, lower generates
         self._model_top_k: int = 50
         self._model_top_p: float = 0.95
         self._model_repeat_penalty: float = 1.3
@@ -435,25 +438,29 @@ class AIPersonality:
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         choices = "\n".join([f"{i}. {possible_answer}" for i, possible_answer in enumerate(possible_answers)])
         elements = [conditionning] if conditionning!="" else []
         elements += [
-                "!@>instructions:",
+                f"{start_header_id_template}{system_message_template}{end_header_id_template}",
                 "Answer this multi choices question.",
                 "Answer with an id from the possible answers.",
                 "Do not answer with an id outside this possible answers.",
         ]
         if context!="":
             elements+=[
-                       "!@>Context:",
+                       f"{start_header_id_template}context{end_header_id_template}",
                         f"{context}",
                     ]
         elements += [
-                f"!@>question: {question}",
-                "!@>possible answers:",
+                f"{start_header_id_template}question{end_header_id_template}{question}",
+                f"{start_header_id_template}possible answers{end_header_id_template}",
                 f"{choices}",
         ]
-        elements += ["!@>answer:"]
+        elements += [f"{start_header_id_template}answer{end_header_id_template}"]
         prompt = self.build_prompt(elements)
 
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50, callback=self.sink).strip().replace("</s>","").replace("<s>","")
@@ -478,24 +485,28 @@ class AIPersonality:
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         choices = "\n".join([f"{i}. {possible_answer}" for i, possible_answer in enumerate(possible_answers)])
         elements = [conditionning] if conditionning!="" else []
         elements += [
-                "!@>instructions:",
+                f"{start_header_id_template}{system_message_template}{end_header_id_template}",
                 "Answer this multi choices question.",
                 "Answer with an id from the possible answers.",
                 "Do not answer with an id outside this possible answers.",
-                f"!@>question: {question}",
-                "!@>possible answers:",
+                f"{start_header_id_template}{end_header_id_template}{question}",
+                f"{start_header_id_template}possible answers{end_header_id_template}",
                 f"{choices}",
         ]
         if context!="":
             elements+=[
-                       "!@>Context:",
+                       f"{start_header_id_template}context{end_header_id_template}",
                         f"{context}",
                     ]
 
-        elements += ["!@>answer:"]
+        elements += [f"{start_header_id_template}answer{end_header_id_template}"]
         prompt = self.build_prompt(elements)
 
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50).strip().replace("</s>","").replace("<s>","")
@@ -581,8 +592,12 @@ class AIPersonality:
         Returns:
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         prompt = "\n".join([
-            "!@>system: I am an AI assistant that can converse and analyze images. When asked to locate something in an image you send, I will reply with:",
+            f"{start_header_id_template}{system_message_template}{end_header_id_template}I am an AI assistant that can converse and analyze images. When asked to locate something in an image you send, I will reply with:",
             "boundingbox(image_index, label, left, top, width, height)",
             "Where:",
             "image_index: 0-based index of the image",
@@ -822,13 +837,11 @@ class AIPersonality:
         self._user_message_prefix = config.get("user_message_prefix", self._user_message_prefix)
         self._link_text = config.get("link_text", self._link_text)
         self._ai_message_prefix = config.get("ai_message_prefix", self._ai_message_prefix)
-        self._anti_prompts = [self.config.discussion_prompt_separator]+config.get("anti_prompts", self._anti_prompts)
         self._dependencies = config.get("dependencies", self._dependencies)
         self._disclaimer = config.get("disclaimer", self._disclaimer)
         self._help = config.get("help", self._help)
         self._commands = config.get("commands", self._commands)
         self._model_temperature = config.get("model_temperature", self._model_temperature)
-        self._model_n_predicts = config.get("model_n_predicts", self._model_n_predicts)
         self._model_top_k = config.get("model_top_k", self._model_top_k)
         self._model_top_p = config.get("model_top_p", self._model_top_p)
         self._model_repeat_penalty = config.get("model_repeat_penalty", self._model_repeat_penalty)
@@ -889,7 +902,7 @@ class AIPersonality:
                 files = [f for f in self.data_path.iterdir() if f.suffix.lower() in ['.asm', '.bat', '.c', '.cpp', '.cs', '.csproj', '.css',
                     '.csv', '.docx', '.h', '.hh', '.hpp', '.html', '.inc', '.ini', '.java', '.js', '.json', '.log',
                     '.lua', '.map', '.md', '.pas', '.pdf', '.php', '.pptx', '.ps1', '.py', '.rb', '.rtf', '.s', '.se', '.sh', '.sln',
-                    '.snippet', '.snippets', '.sql', '.sym', '.ts', '.txt', '.xlsx', '.xml', '.yaml', '.yml'] ]
+                    '.snippet', '.snippets', '.sql', '.sym', '.ts', '.txt', '.xlsx', '.xml', '.yaml', '.yml', '.msg'] ]
                 if len(files)>0:
                     dl = GenericDataLoader()
                     self.persona_data_vectorizer = TextVectorizer(
@@ -1106,13 +1119,11 @@ class AIPersonality:
             "user_message_prefix": self._user_message_prefix,
             "link_text": self._link_text,
             "ai_message_prefix": self._ai_message_prefix,
-            "anti_prompts": self._anti_prompts,
             "dependencies": self._dependencies,
             "disclaimer": self._disclaimer,
             "help": self._help,
             "commands": self._commands,
             "model_temperature": self._model_temperature,
-            "model_n_predicts": self._model_n_predicts,
             "model_top_k": self._model_top_k,
             "model_top_p": self._model_top_p,
             "model_repeat_penalty": self._model_repeat_penalty,
@@ -1148,13 +1159,11 @@ class AIPersonality:
             "user_message_prefix": self._user_message_prefix,
             "link_text": self._link_text,
             "ai_message_prefix": self._ai_message_prefix,
-            "anti_prompts": self._anti_prompts,
             "dependencies": self._dependencies,
             "disclaimer": self._disclaimer,
             "help": self._help,
             "commands": self._commands,
             "model_temperature": self._model_temperature,
-            "model_n_predicts": self._model_n_predicts,
             "model_top_k": self._model_top_k,
             "model_top_p": self._model_top_p,
             "model_repeat_penalty": self._model_repeat_penalty,
@@ -1417,27 +1426,6 @@ class AIPersonality:
         self._ai_message_prefix = prefix
 
     @property
-    def anti_prompts(self):
-        """
-        Get the anti-prompts list.
-
-        Returns:
-            list: The anti-prompts list.
-        """
-        return self._anti_prompts
-
-    @anti_prompts.setter
-    def anti_prompts(self, prompts):
-        """
-        Set the anti-prompts list.
-
-        Args:
-            prompts (list): The anti-prompts list to set.
-        """
-        self._anti_prompts = prompts
-
-
-    @property
     def dependencies(self) -> List[str]:
         """Getter method for the dependencies attribute.
 
@@ -1525,20 +1513,6 @@ class AIPersonality:
             value (float): The new temperature value.
         """
         self._model_temperature = value
-
-    @property
-    def model_n_predicts(self) -> int:
-        """Get the number of predictions the model generates."""
-        return self._model_n_predicts
-
-    @model_n_predicts.setter
-    def model_n_predicts(self, value: int):
-        """Set the number of predictions the model generates.
-
-        Args:
-            value (int): The new number of predictions value.
-        """
-        self._model_n_predicts = value
 
     @property
     def model_top_k(self) -> int:
@@ -1652,7 +1626,11 @@ class AIPersonality:
         Returns:
             bool: True if any antiprompt is found in the text (ignoring case), False otherwise.
         """
-        for prompt in self.anti_prompts:
+        anti_prompts = [self.app.config.discussion_prompt_separator]
+        if self.app.config.separator_template!="\n":
+            anti_prompts.append(self.app.config.separator_template)
+
+        for prompt in anti_prompts:
             if prompt.lower() in text.lower():
                 return prompt.lower()
         return None
@@ -1897,6 +1875,7 @@ class APScript(StateMachine):
         self.notify                             = personality.app.notify
 
         self.personality                        = personality
+        self.config                             = personality.config
         self.personality_config                 = personality_config
         self.installation_option                = personality.installation_option
         self.configuration_file_path            = self.personality.lollms_paths.personal_configuration_path/"personalities"/self.personality.personality_folder_name/f"config.yaml"
@@ -1932,7 +1911,7 @@ class APScript(StateMachine):
         """
         triggered when a new conversation is created
         """
-        return None
+        return welcome_message
         
     def selected(self):
         """
@@ -2208,16 +2187,20 @@ class APScript(StateMachine):
 
 
     def translate(self, text_chunk, output_language="french", max_generation_size=3000):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         translated = self.fast_gen(
                                 "\n".join([
-                                    f"!@>system:",
+                                    f"{start_header_id_template}{system_message_template}{end_header_id_template}",
                                     f"Translate the following text to {output_language}.",
                                     "Be faithful to the original text and do not add or remove any information.",
                                     "Respond only with the translated text.",
                                     "Do not add comments or explanations.",
-                                    f"!@>text to translate:",
+                                    f"{start_header_id_template}text to translate{end_header_id_template}",
                                     f"{text_chunk}",
-                                    f"!@>translation:",
+                                    f"{start_header_id_template}translation{end_header_id_template}",
                                     ]),
                                     max_generation_size=max_generation_size, callback=self.sink)
         return translated
@@ -2320,18 +2303,22 @@ class APScript(StateMachine):
                             chunk_summary_post_processing=None,
                             summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
                         ):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         if summary_mode==SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL:
             summary = ""
             for i, chunk in enumerate(chunks):
                 self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
                 summary = f"{answer_start}"+ self.fast_gen(
                             "\n".join([
-                                f"!@>Document_chunk: {doc_name}:",
+                                f"{start_header_id_template}Document_chunk{end_header_id_template}{doc_name}:",
                                 f"{summary}",
                                 f"{chunk}",
-                                f"!@>instruction: {summary_instruction}",
+                                f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                                 f"Answer directly with the summary with no extra comments.",
-                                f"!@>summary:",
+                                f"{start_header_id_template}summary{end_header_id_template}",
                                 f"{answer_start}"
                                 ]),
                                 max_generation_size=max_generation_size,
@@ -2346,11 +2333,11 @@ class APScript(StateMachine):
                 self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
                 summary = f"{answer_start}"+ self.fast_gen(
                             "\n".join([
-                                f"!@>Document_chunk [{doc_name}]:",
+                                f"{start_header_id_template}Document_chunk [{doc_name}]{end_header_id_template}",
                                 f"{chunk}",
-                                f"!@>instruction: {summary_instruction}",
+                                f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                                 f"Answer directly with the summary with no extra comments.",
-                                f"!@>summary:",
+                                f"{start_header_id_template}summary{end_header_id_template}",
                                 f"{answer_start}"
                                 ]),
                                 max_generation_size=max_generation_size,
@@ -2371,6 +2358,9 @@ class APScript(StateMachine):
                             callback=None,
                             chunk_summary_post_processing=None
                         ):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
         summeries = []
         for i, chunk in enumerate(chunks):
             if i<len(chunks)-1:
@@ -2382,14 +2372,14 @@ class APScript(StateMachine):
             self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
             summary = f"{answer_start}"+ self.fast_gen(
                         "\n".join([
-                            f"!@>Document_chunk: {doc_name}:",
+                            f"{start_header_id_template}Document_chunk: {doc_name}{end_header_id_template}",
                             f"Block1:",
                             f"{chunk}",
                             f"Block2:",
                             f"{chunk1}",
-                            f"!@>instruction: {summary_instruction}",
+                            f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                             f"Answer directly with the summary with no extra comments.",
-                            f"!@>summary:",
+                            f"{start_header_id_template}summary{end_header_id_template}",
                             f"{answer_start}"
                             ]),
                             max_generation_size=max_generation_size,
@@ -2401,18 +2391,21 @@ class APScript(StateMachine):
         return "\n".join(summeries)
 
     def build_prompt_from_context_details(self, context_details:dict, custom_entries=""):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
         return self.build_prompt([
                     context_details["conditionning"] if context_details["conditionning"] else "",
-                    "!@>documentation:\n"+context_details["documentation"] if context_details["documentation"] else "",
-                    "!@>knowledge:\n"+context_details["knowledge"] if context_details["knowledge"] else "",
+                    f"{start_header_id_template}documentation{end_header_id_template}\n"+context_details["documentation"] if context_details["documentation"] else "",
+                    f"{start_header_id_template}knowledge{end_header_id_template}\n"+context_details["knowledge"] if context_details["knowledge"] else "",
                     context_details["user_description"] if context_details["user_description"] else "",
-                    "!@>positive_boost:\n"+context_details["positive_boost"] if context_details["positive_boost"] else "",
-                    "!@>negative_boost:\n"+context_details["negative_boost"] if context_details["negative_boost"] else "",
-                    "!@>current_language:\n"+context_details["current_language"] if context_details["current_language"] else "",
-                    "!@>fun_mode:\n"+context_details["fun_mode"] if context_details["fun_mode"] else "",
-                    "!@>discussion_window:\n"+context_details["discussion_messages"] if context_details["discussion_messages"] else "",
+                    f"{start_header_id_template}positive_boost{end_header_id_template}\n"+context_details["positive_boost"] if context_details["positive_boost"] else "",
+                    f"{start_header_id_template}negative_boost{end_header_id_template}\n"+context_details["negative_boost"] if context_details["negative_boost"] else "",
+                    f"{start_header_id_template}current_language{end_header_id_template}\n"+context_details["current_language"] if context_details["current_language"] else "",
+                    f"{start_header_id_template}fun_mode{end_header_id_template}\n"+context_details["fun_mode"] if context_details["fun_mode"] else "",
+                    f"{start_header_id_template}discussion_window{end_header_id_template}\n"+context_details["discussion_messages"] if context_details["discussion_messages"] else "",
                     custom_entries,
-                    "!@>"+context_details["ai_prefix"].replace("!@>","").replace(":","")+":"
+                    f"{start_header_id_template}"+context_details["ai_prefix"].replace(f"{start_header_id_template}","").replace(":","")+f"{end_header_id_template}"
                 ], 
                 8)
     def build_prompt(self, prompt_parts:List[str], sacrifice_id:int=-1, context_size:int=None, minimum_spare_context_size:int=None):
@@ -2734,19 +2727,23 @@ class APScript(StateMachine):
         return output.decode("utf8")
 
     def build_python_code(self, prompt, max_title_length=4096):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         if not PackageManager.check_package_installed("autopep8"):
             PackageManager.install_package("autopep8")
         import autopep8
         global_prompt = "\n".join([
             f"{prompt}",
-            "!@>Extra conditions:",
+            f"{start_header_id_template}Extra conditions{end_header_id_template}",
             "- The code must be complete, not just snippets, and should be put inside a single python markdown code.",
             "-Preceive each python codeblock with a line using this syntax:",
             "$$file_name|the file path relative to the root folder of the project$$",
             "```python",
             "# Placeholder. Here you need to put the code for the file",
             "```",
-            "!@>Code Builder:"
+            f"{start_header_id_template}Code Builder{end_header_id_template}"
         ])
         code = self.fast_gen(global_prompt, max_title_length)
         code_blocks = self.extract_code_blocks(code)
@@ -2772,7 +2769,11 @@ class APScript(StateMachine):
         Returns:
             str: The generated title.
         """
-        global_prompt = f"!@>instructions: Based on the provided prompt, suggest a concise and relevant title that captures the main topic or theme of the conversation. Only return the suggested title, without any additional text or explanation.\n!@>prompt: {prompt}\n!@>title:"
+        start_header_id_template    = self.config.start_header_id_template
+        separator_template          = self.config.separator_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        global_prompt = f"{start_header_id_template}{system_message_template}{end_header_id_template}Based on the provided prompt, suggest a concise and relevant title that captures the main topic or theme of the conversation. Only return the suggested title, without any additional text or explanation.{separator_template}{start_header_id_template}prompt{end_header_id_template}{prompt}{separator_template}{start_header_id_template}title{end_header_id_template}"
         title = self.fast_gen(global_prompt,max_title_length)
         return title
 
@@ -2788,12 +2789,16 @@ class APScript(StateMachine):
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
-        template = """!@>instruction:
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
+        template = f"""{start_header_id_template}{system_message_template}{end_header_id_template}
 Act as plan builder, a tool capable of making plans to perform the user requested operation.
 """
         if len(actions_list)>0:
-            template +="""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
-!@>list of action types information:
+            template +=f"""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
+{start_header_id_template}list of action types information{end_header_id_template}
 [
 {{actions_list}}
 ]
@@ -2817,12 +2822,12 @@ The AI should respond in this format using data from actions_list:
 }
 """
         if context!="":
-            template += """!@>Context:
+            template += f"""{start_header_id_template}context{end_header_id_template}
 {{context}}Ok
 """
-        template +="""!@>request: {{request}}
+        template +=f"""{start_header_id_template}request{end_header_id_template}{{request}}
 """
-        template +="""!@>plan: To acheive the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"""
+        template +=f"""{start_header_id_template}plan{end_header_id_template}To acheive the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"""
         pr  = PromptReshaper(template)
         prompt = pr.build({
                 "context":context,
@@ -2851,12 +2856,16 @@ The AI should respond in this format using data from actions_list:
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
-        template = """!@>instruction:
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
+        template = f"""{start_header_id_template}instruction:
 Act as plan builder, a tool capable of making plans to perform the user requested operation.
 """
         if len(actions_list)>0:
-            template +="""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
-!@>list of action types information:
+            template +=f"""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
+{start_header_id_template}list of action types information{end_header_id_template}
 [
 {{actions_list}}
 ]
@@ -2880,12 +2889,12 @@ The AI should respond in this format using data from actions_list:
 }
 """
         if context!="":
-            template += """!@>Context:
+            template += f"""{start_header_id_template}context{end_header_id_template}
 {{context}}Ok
 """
-        template +="""!@>request: {{request}}
+        template +=f"""{start_header_id_template}request{end_header_id_template}{{request}}
 """
-        template +="""!@>plan: To acheive the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"""
+        template +=f"""{start_header_id_template}plan{end_header_id_template}To acheive the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"""
         pr  = PromptReshaper(template)
         prompt = pr.build({
                 "context":context,
@@ -3012,17 +3021,21 @@ The AI should respond in this format using data from actions_list:
 
 
     def build_and_execute_python_code(self,context, instructions, execution_function_signature, extra_imports=""):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         code = "```python\n"+self.fast_gen(
             self.build_prompt([
-            "!@>context!:",
+            f"{start_header_id_template}context{end_header_id_template}",
             context,
-            f"!@>system:",
+            f"{start_header_id_template}{system_message_template}{end_header_id_template}",
             f"{instructions}",
             f"Here is the signature of the function:\n{execution_function_signature}",
             "Don't call the function, just write it",
             "Do not provide usage example.",
             "The code must me without comments",
-            f"!@>coder: Sure, in the following code, I import the necessary libraries, then define the function as you asked.",
+            f"{start_header_id_template}coder{end_header_id_template}Sure, in the following code, I import the necessary libraries, then define the function as you asked.",
             "The function is ready to be used in your code and performs the task as you asked:",
             "```python\n"
             ],2), callback=self.sink)
@@ -3070,15 +3083,19 @@ The AI should respond in this format using data from actions_list:
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         choices = "\n".join([f"{i}. {possible_answer}" for i, possible_answer in enumerate(possible_answers)])
         elements = [conditionning] if conditionning!="" else []
         elements += [
-                "!@>system:",
+                f"{start_header_id_template}{system_message_template}{end_header_id_template}",
                 "Answer this multi choices question.",
         ]
         if context!="":
             elements+=[
-                       "!@>Context:",
+                       f"{start_header_id_template}Context{end_header_id_template}",
                         f"{context}",
                     ]
         elements +=[
@@ -3088,11 +3105,11 @@ The AI should respond in this format using data from actions_list:
                 "the output should be an integer."
         ]
         elements += [
-                f"!@>question: {question}",
-                "!@>possible answers:",
+                f"{start_header_id_template}question{end_header_id_template}{question}",
+                f"{start_header_id_template}possible answers{end_header_id_template}",
                 f"{choices}",
         ]
-        elements += ["!@>answer:"]
+        elements += [f"{start_header_id_template}answer{end_header_id_template}"]
         prompt = self.build_prompt(elements)
 
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50, callback=self.sink).strip().replace("</s>","").replace("<s>","")
@@ -3120,24 +3137,28 @@ The AI should respond in this format using data from actions_list:
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
         choices = "\n".join([f"{i}. {possible_answer}" for i, possible_answer in enumerate(possible_answers)])
         elements = [conditionning] if conditionning!="" else []
         elements += [
-                "!@>instructions:",
+                f"{start_header_id_template}instructions{end_header_id_template}",
                 "Answer this multi choices question.",
                 "Answer with an id from the possible answers.",
                 "Do not answer with an id outside this possible answers.",
-                f"!@>question: {question}",
-                "!@>possible answers:",
+                f"{start_header_id_template}question{end_header_id_template}{question}",
+                f"{start_header_id_template}possible answers{end_header_id_template}",
                 f"{choices}",
         ]
         if context!="":
             elements+=[
-                       "!@>Context:",
+                        f"{start_header_id_template}context{end_header_id_template}",
                         f"{context}",
                     ]
 
-        elements += ["!@>answer:"]
+        elements += [f"{start_header_id_template}answer{end_header_id_template}"]
         prompt = self.build_prompt(elements)
 
         gen = self.generate(prompt, max_answer_length, temperature=0.1, top_k=50, top_p=0.9, repeat_penalty=1.0, repeat_last_n=50).strip().replace("</s>","").replace("<s>","")
@@ -3373,24 +3394,28 @@ The AI should respond in this format using data from actions_list:
         Returns:
             str: The upgraded prompt that includes information about the function calls.
         """
-        function_descriptions = ["!@>information: If you need to call a function to fulfull the user request, use a function markdown tag with the function call as the following json format:",
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
+        function_descriptions = [f"{start_header_id_template}{system_message_template}{end_header_id_template}If you need to call a function to fulfull the user request, use a function markdown tag with the function call as the following json format:",
                                  "```function",
                                  "{",
                                  '"function_name":the name of the function to be called,',
                                  '"function_parameters": a list of  parameter values',
                                  "}",
                                  "```",
+                                 "Only use available functions.",
                                  "You can call multiple functions in one generation.",
                                  "Each function call needs to be in a separate function markdown tag.",
                                  "Do not add status of the execution as it will be added automatically by the system.",
-                                 "If you want to get the output of the function before answering the user, then use the keyword @<NEXT>@ at the end of your message.",
-                                 "!@>List of possible functions to be called:\n"]
+                                 f"{start_header_id_template}Available functions{end_header_id_template}\n"]
         for function in functions:
             description = f"{function['function_name']}: {function['function_description']}\nparameters:{function['function_parameters']}"
             function_descriptions.append(description)
 
         # Combine the function descriptions with the original prompt.
-        function_info = ' '.join(function_descriptions)
+        function_info = '\n'.join(function_descriptions)
         upgraded_prompt = f"{function_info}\n{prompt}"
 
         return upgraded_prompt
@@ -3405,6 +3430,7 @@ The AI should respond in this format using data from actions_list:
         Returns:
             List[Dict[str, Any]]: A list of dictionaries representing the function calls.
         """
+
         # Extract markdown code blocks that contain JSON.
         code_blocks = self.extract_code_blocks(text)
 
@@ -3427,7 +3453,18 @@ The AI should respond in this format using data from actions_list:
         return function_calls
 
 
-    def interact_with_function_call(self, prompt, function_definitions, prompt_after_execution=True, callback = None, hide_function_call=False):
+    def interact_with_function_call(
+                                        self, 
+                                        prompt, 
+                                        function_definitions, 
+                                        prompt_after_execution=True, 
+                                        callback = None, 
+                                        hide_function_call=False,
+                                        separate_output=False):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template
         final_output = ""
         if len(self.personality.image_files)>0:
             out, function_calls = self.generate_with_function_calls_and_images(prompt, self.personality.image_files, function_definitions, callback=callback)
@@ -3437,10 +3474,13 @@ The AI should respond in this format using data from actions_list:
             if hide_function_call:
                 self.full("") #Hide function call
             outputs = self.execute_function_calls(function_calls,function_definitions)
-            final_output = "\n".join([str(o) for o in outputs])
-            out += "\n!@>function calls results:\n" + "\n".join([str(o) for o in outputs])
+            final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
+            out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output
             if prompt_after_execution:
-                prompt += out +"\n"+ "!@>"+self.personality.name+":"
+                if separate_output:
+                    self.full(final_output)
+                    self.new_message("")
+                prompt += out +"\n"+ f"{start_header_id_template}"+self.personality.name+f"{end_header_id_template}"
                 if len(self.personality.image_files)>0:
                     out, function_calls = self.generate_with_function_calls_and_images(prompt, self.personality.image_files, function_definitions, callback=callback)
                 else:
@@ -3448,9 +3488,9 @@ The AI should respond in this format using data from actions_list:
                 final_output += "\n" + out
                 if len(function_calls)>0:
                     outputs = self.execute_function_calls(function_calls,function_definitions)
-                    final_output += "\n" + "\n".join([str(o) for o in outputs]) 
-                    out += "\n!@>function calls results:\n" + "\n".join([str(o) for o in outputs])
-                    prompt += out +"\n"+ "!@>"+self.personality.name+":"
+                    final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
+                    out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output
+                    prompt += out +"\n"+ f"{start_header_id_template}"+self.personality.name+f"{end_header_id_template}"
         else:
             final_output = out
         return final_output

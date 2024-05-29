@@ -48,7 +48,14 @@ class LollmsTTI:
         self.voices = [] # To be filled by the child class
         self.models = [] # To be filled by the child class
 
-    def paint(self, positive_prompt: str, negative_prompt: str = "") -> List[Dict[str, str]]:
+    def paint(self, 
+                positive_prompt: str, 
+                negative_prompt: str = "",
+                width=512,
+                height=512,
+                images = [],
+                generation_engine=None,
+                output_path = None) -> List[Dict[str, str]]:
         """
         Generates images based on the given positive and negative prompts.
 

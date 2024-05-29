@@ -41,6 +41,7 @@ class LoLLMsCom:
     def __init__(self, sio:socketio.AsyncServer=None, verbose:bool=False) -> None:
         self.sio= sio
         self.verbose = verbose
+        self.config = None 
         self.tti = None
         self.tts = None
         self.stt = None
