@@ -1626,7 +1626,11 @@ class AIPersonality:
         Returns:
             bool: True if any antiprompt is found in the text (ignoring case), False otherwise.
         """
-        anti_prompts = [self.app.config.discussion_prompt_separator]
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        separator_template          = self.config.separator_template
+
+        anti_prompts = [start_header_id_template, self.app.config.discussion_prompt_separator]
         if self.app.config.separator_template!="\n":
             anti_prompts.append(self.app.config.separator_template)
 

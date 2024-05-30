@@ -182,7 +182,6 @@ class LollmsApplication(LoLLMsCom):
             return False
         
     def add_discussion_to_skills_library(self, client: Client):
-        discussion_prompt_separator = self.config.discussion_prompt_separator
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
         separator_template          = self.config.separator_template
@@ -770,7 +769,6 @@ class LollmsApplication(LoLLMsCom):
         Returns:
             Tuple[str, str, List[str]]: The prepared query, original message content, and tokenized query.
         """
-        discussion_prompt_separator = self.config.discussion_prompt_separator
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
         separator_template          = self.config.separator_template
@@ -1071,14 +1069,14 @@ class LollmsApplication(LoLLMsCom):
                     # Tokenize the message content
                     if self.config.use_model_name_in_discussions:
                         if message.model:
-                            msg = "\n" + self.config.discussion_prompt_separator + message.sender + f"({message.model}): " + message.content.strip()
+                            msg = f"{separator_template}{start_header_id_template}{message.sender}({message.model}){end_header_id_template}" + message.content.strip()
                         else:
-                            msg = "\n" + self.config.discussion_prompt_separator + message.sender + ": " + message.content.strip()
+                            msg = f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
                         message_tokenized = self.model.tokenize(msg)
                     else:
                         message_tokenized = self.model.tokenize(
-                            "\n" + self.config.discussion_prompt_separator + message.sender + ": " + message.content.strip())
-
+                            f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                        )
                     # Check if adding the message will exceed the available space
                     if tokens_accumulated + len(message_tokenized) > available_space-n_tokens:
                         # Update the cumulative number of tokens
@@ -1099,9 +1097,16 @@ class LollmsApplication(LoLLMsCom):
             if message.content != '' and (
                     message.message_type <= MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_USER.value and message.message_type != MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_AI.value):
 
-                # Tokenize the message content
-                message_tokenized = self.model.tokenize(
-                    "\n" + self.config.discussion_prompt_separator + message.sender + ": " + message.content.strip())
+                if self.config.use_model_name_in_discussions:
+                    if message.model:
+                        msg = f"{separator_template}{start_header_id_template}{message.sender}({message.model}){end_header_id_template}" + message.content.strip()
+                    else:
+                        msg = f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                    message_tokenized = self.model.tokenize(msg)
+                else:
+                    message_tokenized = self.model.tokenize(
+                        f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                    )
 
                 # Add the tokenized message to the full_message_list
                 full_message_list.insert(0, message_tokenized)

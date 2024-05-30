@@ -738,6 +738,10 @@ async def ollama_generate(request: CompletionGenerationRequest):
     :param request: The HTTP request object.
     :return: A JSON response with the status of the operation.
     """
+    start_header_id_template    = elf_server.config.start_header_id_template
+    end_header_id_template      = elf_server.config.end_header_id_template
+    separator_template          = elf_server.config.separator_template
+
     try:
         start_time = time.perf_counter_ns()
         ASCIIColors.cyan("> Ollama Server emulator: Received request")
@@ -767,7 +771,7 @@ async def ollama_generate(request: CompletionGenerationRequest):
                     def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
                         # Yield each chunk of data
                         output["text"] += chunk
-                        antiprompt = detect_antiprompt(output["text"])
+                        antiprompt = detect_antiprompt(output["text"], [start_header_id_template, end_header_id_template])
                         if antiprompt:
                             ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
                             output["text"] = remove_text_from_string(output["text"],antiprompt)
