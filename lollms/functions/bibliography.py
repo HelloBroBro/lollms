@@ -206,3 +206,153 @@ if __name__ == "__main__":
 
     # Print the HTML output
     print(html_output)
+
+
+
+# Core function to search for PDFs on arXiv and download them to a specified directory
+def search_and_rank(llm, search_subject:str, score_threshold:float, query: str, max_results: Optional[int] = 5, sort_by: Optional[str] = 'relevance', start_date: Optional[str] = None, end_date: Optional[str] = None, author: Optional[str] = None, client: Optional[Any] = None) -> (str, Dict[str, Any]):
+    try:
+
+        if client is None:
+            download_to = Path("./pdf_search")
+        else:
+            download_to = client.discussion.discussion_folder / "pdf_search"
+        
+        # Construct the search URL with additional parameters
+        url = f'http://export.arxiv.org/api/query?search_query={query}&start=0&max_results={max_results}&sortBy={sort_by}'
+        if start_date:
+            url += f'&startDate={start_date}'
+        if end_date:
+            url += f'&endDate={end_date}'
+        if author:
+            url += f'&author={author}'
+        
+        response = requests.get(url)
+        response.raise_for_status()
+
+        # Parse the response
+        soup = BeautifulSoup(response.content, 'xml')
+        entries = soup.find_all('entry')
+
+        # Create the directory if it doesn't exist
+        download_to.mkdir(parents=True, exist_ok=True)
+
+        # Extract PDF URLs and additional information
+        html_output = "<html><body>"
+        report_content = ""
+        pdf_info = {}
+        for entry in entries:
+            pdf_url = entry.id.text.replace('abs', 'pdf') + '.pdf'
+            pdf_name = pdf_url.split('/')[-1]
+            pdf_path = download_to / pdf_name
+
+            if client is None:
+                local_url = f'/discussions/pdf_search/{pdf_name}'
+            else:
+                local_url = discussion_path_to_url(pdf_path)
+
+            # Extract additional information
+            title = entry.title.text
+            authors = ', '.join(author.find('name').text for author in entry.find_all('author'))
+            affiliations = ', '.join(affiliation.text for affiliation in entry.find_all('affiliation'))
+            abstract = entry.summary.text
+            published_date = entry.published.text
+            journal_ref = entry.find('journal_ref').text if entry.find('journal_ref') else 'N/A'
+
+            # Use the LLM to rate the relevance of the text example compared to the search prompt
+            relevance_score = llm.fast_gen(f"Rate the relevance of the following text compared to the prompt on a scale of 0 to 1. Only respond with a number between 0 and 1:\nPrompt: {search_subject}\nText: {abstract}\nRelevance score:")
+
+            # Extract the relevance score from the generated text
+            try:
+                score = float(relevance_score.strip())
+            except ValueError:
+                score = 0.0  # Default score in case of parsing issues
+
+            if score<score_threshold: # drop irrelevant scores
+                continue
+
+            # Create the output tuple
+            result = (f"Relevance Score: {score}", {"score": score})
+
+            # Write abstract and additional information to text file
+            abstract_path = download_to / f"{pdf_name}_abstract.txt"
+            with abstract_path.open('w', encoding='utf-8') as abstract_file:
+                abstract_file.write(f"Title: {title}\n")
+                abstract_file.write(f"Authors: {authors}\n")
+                abstract_file.write(f"Affiliations: {affiliations}\n")
+                abstract_file.write(f"Abstract: {abstract}\n")
+                abstract_file.write(f"Published Date: {published_date}\n")
+                abstract_file.write(f"Journal/Conference: {journal_ref}\n")
+                abstract_file.write(f"Relevance score: {score}\n")
+
+            # Download PDF
+            pdf_response = requests.get(pdf_url)
+            with pdf_path.open('wb') as pdf_file:
+                pdf_file.write(pdf_response.content)
+
+            # Append to HTML output
+            html_output += f"""
+<div>
+<h2>{title}</h2>
+<p><strong>Authors:</strong> {authors}</p>
+<p><strong>Affiliations:</strong> {affiliations}</p>
+<p><strong>Abstract:</strong> {abstract}</p>
+<p><strong>Published Date:</strong> {published_date}</p>
+<p><strong>Journal/Conference:</strong> {journal_ref}</p>
+<p><strong>Relevance score:</strong> {score}</p>
+<p><a href="{pdf_url}" target="_blank">PDF Link</a></p>
+<p><a href="{local_url}" target="_blank">Local PDF</a></p>
+</div>
+            """
+            # Append to report content
+            report_content += f"""
+Title: {title}
+Authors: {authors}
+Affiliations: {affiliations}
+Abstract: {abstract}
+Published Date: {published_date}
+Journal/Conference: {journal_ref}
+Relevance score: {score}
+PDF Link: {pdf_url}
+Local PDF: {local_url}
+------------------------
+            """
+            # Append to pdf_info dict
+            pdf_info[pdf_name] = {
+                "title": title,
+                "authors": authors,
+                "affiliations": affiliations,
+                "abstract": abstract,
+                "published_date": published_date,
+                "journal_ref": journal_ref,
+                "pdf_url": pdf_url,
+                "local_url": local_url
+            }
+        
+        # Save the report to a text file
+        report_path = download_to / "pdf_search_report.txt"
+        with report_path.open('w', encoding='utf-8') as report_file:
+            report_file.write(report_content)
+        
+        html_output += "</body></html>"
+        return html_output, pdf_info
+
+    except Exception as e:
+        return trace_exception(e), {}
+
+# Metadata function
+def search_and_rank_function(llm, score_threshold:float, client: Optional[Any] = None):
+    return {
+        "function_name": "search_and_rank",  # The function name in string
+        "function": partial(search_and_rank, llm=llm, client=client, score_threshold= score_threshold),  # The function to be called with partial to preset client
+        "function_description": "Searches for PDFs on arXiv based on a query, downloads them to a specified directory, rates them, sort them by rating and returns a HTML string containing article details and links, along with a dictionary containing detailed information about each PDF.",  # Description of the function
+        "function_parameters": [  # The set of parameters
+            {"name": "search_subject", "type": "str", "description": "The search subject."},
+            {"name": "query", "type": "str", "description": "The search query for arXiv."},
+            {"name": "max_results", "type": "int", "description": "The maximum number of results to return. (Optional)", "optional": True, "default": 5},
+            {"name": "sort_by", "type": "str", "description": "The sorting criteria for the search results (e.g., relevance, lastUpdatedDate). (Optional)", "optional": True, "default": "relevance"},
+            {"name": "start_date", "type": "str", "description": "The start date for the search results in the format YYYY-MM-DD. (Optional)", "optional": True},
+            {"name": "end_date", "type": "str", "description": "The end date for the search results in the format YYYY-MM-DD. (Optional)", "optional": True},
+            {"name": "author", "type": "str", "description": "The author name for the search results. (Optional)", "optional": True},
+        ]
+    }

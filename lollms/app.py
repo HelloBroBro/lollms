@@ -419,29 +419,29 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load Motion control")
 
-            if self.config.active_tti_service == "diffusers":
+            if self.config.active_tti_service == "diffusers" and type(self.tti)!=LollmsDiffusers:
                 from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
-            elif self.config.active_tti_service == "autosd":
+            elif self.config.active_tti_service == "autosd" and type(self.tti)!=LollmsSD:
                 from lollms.services.sd.lollms_sd import LollmsSD
                 self.tti = LollmsSD(self)
-            elif self.config.active_tti_service == "dall-e":
+            elif self.config.active_tti_service == "dall-e" and type(self.tti)!=LollmsDalle:
                 from lollms.services.dalle.lollms_dalle import LollmsDalle
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
-            elif self.config.active_tti_service == "midjourney":
+            elif self.config.active_tti_service == "midjourney" and type(self.tti)!=LollmsMidjourney:
                 from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
                 self.tti = LollmsMidjourney(self, self.config.midjourney_key)
 
-            if self.config.active_tts_service == "openai_tts":
+            if self.config.active_tts_service == "openai_tts" and type(self.tts)!=LollmsOpenAITTS:
                 from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
-            if self.config.active_stt_service == "openai_whisper":
+            if self.config.active_stt_service == "openai_whisper" and type(self.stt)!=LollmsOpenAIWhisper:
                 from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
                 self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
-            elif self.config.active_stt_service == "whisper":
+            elif self.config.active_stt_service == "whisper" and type(self.stt)!=LollmsWhisper :
                 from lollms.services.whisper.lollms_whisper import LollmsWhisper
                 self.stt = LollmsWhisper(self, self.config.whisper_model)
 
@@ -771,10 +771,18 @@ class LollmsApplication(LoLLMsCom):
         """
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
+
         separator_template          = self.config.separator_template
+
+        start_user_header_id_template   = self.config.start_user_header_id_template
+        end_user_header_id_template     = self.config.end_user_header_id_template
+        end_user_message_id_template    = self.config.end_user_message_id_template
+
+        start_ai_header_id_template     = self.config.start_ai_header_id_template
+        end_ai_header_id_template       = self.config.end_ai_header_id_template
+        end_ai_message_id_template      = self.config.end_ai_message_id_template
+
         system_message_template     = self.config.system_message_template
-
-
 
         if self.personality.callback is None:
             self.personality.callback = partial(self.process_chunk, client_id=client_id)
@@ -1069,13 +1077,13 @@ class LollmsApplication(LoLLMsCom):
                     # Tokenize the message content
                     if self.config.use_model_name_in_discussions:
                         if message.model:
-                            msg = f"{separator_template}{start_header_id_template}{message.sender}({message.model}){end_header_id_template}" + message.content.strip()
+                            msg = f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}({message.model}){end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                         else:
-                            msg = f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                            msg = f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                         message_tokenized = self.model.tokenize(msg)
                     else:
                         message_tokenized = self.model.tokenize(
-                            f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                            f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                         )
                     # Check if adding the message will exceed the available space
                     if tokens_accumulated + len(message_tokenized) > available_space-n_tokens:
@@ -1099,13 +1107,13 @@ class LollmsApplication(LoLLMsCom):
 
                 if self.config.use_model_name_in_discussions:
                     if message.model:
-                        msg = f"{separator_template}{start_header_id_template}{message.sender}({message.model}){end_header_id_template}" + message.content.strip()
+                        msg = f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}({message.model}){end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                     else:
-                        msg = f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                        msg = f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                     message_tokenized = self.model.tokenize(msg)
                 else:
                     message_tokenized = self.model.tokenize(
-                        f"{separator_template}{start_header_id_template}{message.sender}{end_header_id_template}" + message.content.strip()
+                        f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                     )
 
                 # Add the tokenized message to the full_message_list

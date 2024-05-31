@@ -3313,11 +3313,15 @@ The AI should respond in this format using data from actions_list:
         Returns:
             List[Dict[str, Any]]: A list of dictionaries with the function names and parameters to execute.
         """
+
         # Upgrade the prompt with information about the function calls.
         upgraded_prompt = self._upgrade_prompt_with_function_info(prompt, functions)
 
         # Generate the initial text based on the upgraded prompt.
         generated_text = self.fast_gen(upgraded_prompt, max_answer_length, callback=callback)
+
+        if self.config.debug:
+            self.print_prompt("Generrated", generated_text)
 
         # Extract the function calls from the generated text.
         function_calls = self.extract_function_calls_as_json(generated_text)
@@ -3401,8 +3405,9 @@ The AI should respond in this format using data from actions_list:
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
         system_message_template     = self.config.system_message_template
+        separator_template          = self.config.separator_template
 
-        function_descriptions = [f"{start_header_id_template}{system_message_template}{end_header_id_template}If you need to call a function to fulfull the user request, use a function markdown tag with the function call as the following json format:",
+        function_descriptions = [f"{start_header_id_template}{system_message_template}{end_header_id_template}If you need to call a function to fulfill the user request, use a function markdown tag with the function call as the following json format:",
                                  "```function",
                                  "{",
                                  '"function_name":the name of the function to be called,',
@@ -3410,10 +3415,11 @@ The AI should respond in this format using data from actions_list:
                                  "}",
                                  "```",
                                  "Only use available functions.",
-                                 "You can call multiple functions in one generation.",
-                                 "Each function call needs to be in a separate function markdown tag.",
-                                 "Do not add status of the execution as it will be added automatically by the system.",
+                                 "If you choose to use a function call, do not write anything else. Just the function call.",
+                                 f"Do not add status of the execution as it will be added automatically by the system.",
+                                 f"A function call must not be followed by any text{separator_template}"
                                  f"{start_header_id_template}Available functions{end_header_id_template}\n"]
+
         for function in functions:
             description = f"{function['function_name']}: {function['function_description']}\nparameters:{function['function_parameters']}"
             function_descriptions.append(description)

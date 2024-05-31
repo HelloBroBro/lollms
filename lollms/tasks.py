@@ -767,7 +767,7 @@ class TasksLibrary:
         end_header_id_template      = self.config.end_header_id_template
         system_message_template     = self.config.system_message_template
         separator_template          = self.config.separator_template
-        function_descriptions = [f"{start_header_id_template}information{end_header_id_template}If you need to call a function to fulfull the user request, use a function markdown tag with the function call as the following json format:",
+        function_descriptions = [f"{start_header_id_template}information{end_header_id_template}If you need to call a function to fulfill the user request, use a function markdown tag with the function call as the following json format:",
                                  "```function",
                                  "{",
                                  '"function_name":the name of the function to be called,',
