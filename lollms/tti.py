@@ -25,7 +25,8 @@ class LollmsTTI:
     """
     
     def __init__(
-                    self, 
+                    self,
+                    name:str,
                     app: LollmsApplication, 
                     model="",
                     api_key="",
@@ -41,6 +42,7 @@ class LollmsTTI:
             output_path (Path or str, optional): Path where the output image files will be saved. Defaults to None.
         """
         self.ready = False
+        self.name = name
         self.app = app
         self.model = model
         self.api_key = api_key

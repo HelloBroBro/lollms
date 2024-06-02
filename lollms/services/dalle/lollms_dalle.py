@@ -43,7 +43,7 @@ class LollmsDalle(LollmsTTI):
                     generation_engine="dall-e-3",# other possibility "dall-e-2"
                     output_path=None
                     ):
-        super().__init__(app)
+        super().__init__(generation_engine,app)
         self.key = key 
         self.generation_engine = generation_engine
         self.output_path = output_path

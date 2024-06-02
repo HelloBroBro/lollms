@@ -93,7 +93,7 @@ class LollmsDiffusers(LollmsTTI):
                     app:LollmsApplication, 
                     wm = "Artbot", 
                     ):
-        super().__init__(app)
+        super().__init__("diffusers",app)
         self.ready = False
         # Get the current directory
         lollms_paths = app.lollms_paths

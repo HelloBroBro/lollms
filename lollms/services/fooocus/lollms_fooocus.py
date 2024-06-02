@@ -92,7 +92,7 @@ class LollmsFooocus(LollmsTTI):
                     wm = "Artbot",
                     base_url="localhost:1024"
                     ):
-        super().__init__(app)
+        super().__init__("fooocus",app)
         self.ready = False
         self.base_url = base_url
         # Get the current directory

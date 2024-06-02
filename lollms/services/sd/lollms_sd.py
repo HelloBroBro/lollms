@@ -256,7 +256,7 @@ class LollmsSD(LollmsTTI):
                     share=False,
                     wait_for_service=True
                     ):
-        super().__init__(app)
+        super().__init__("stable_diffusion",app)
         if auto_sd_base_url=="" or auto_sd_base_url=="http://127.0.0.1:7860":
             auto_sd_base_url = None
         self.ready = False

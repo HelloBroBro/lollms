@@ -2568,23 +2568,6 @@ class APScript(StateMachine):
         if callback:
             callback(warning, MSG_TYPE.MSG_TYPE_EXCEPTION)
 
-    def info(self, info:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
-        """This sends exception to the client
-
-        Args:
-            inf (str): The information to be sent
-            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
-            The callback has these fields:
-            - chunk
-            - Message Type : the type of message
-            - Parameters (optional) : a dictionary of parameters
-            - Metadata (optional) : a list of metadata
-        """
-        if not callback and self.callback:
-            callback = self.callback
-
-        if callback:
-            callback(info, MSG_TYPE.MSG_TYPE_INFO)
 
     def json(self, title:str, json_infos:dict, callback: Callable[[str, int, dict, list], bool]=None, indent=4):
         """This sends json data to front end
@@ -3198,6 +3181,15 @@ The AI should respond in this format using data from actions_list:
         )
 
 
+    def InfoMessage(self, content, client_id=None, verbose:bool=None):
+        self.personality.app.notify(
+                content, 
+                notification_type=NotificationType.NOTIF_SUCCESS, 
+                duration=0, 
+                client_id=client_id, 
+                display_type=NotificationDisplayType.MESSAGE_BOX,
+                verbose=verbose
+            )
 
     def info(self, info_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
         """This sends info text to front end
