@@ -367,11 +367,30 @@ class LollmsXTTS(LollmsTTS):
             thread_uid =  str(uuid.uuid4())       
             thread = threading.Thread(target=tts2_audio_th, args=(thread_uid,))
             self.generation_threads[thread_uid]=thread
+            self.thread = thread
             thread.start()
             ASCIIColors.green("Generation started")
             return thread
         else:
             return tts2_audio_th()
+    
+    def stop(self):
+        url = f"{self.xtts_base_url}/stop_streaming"
+
+        # Define the request body
+        payload = {
+        }
+        headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+
+        # Send the POST request
+        response =  requests.post(url, headers=headers, data=json.dumps(payload))
+
+        if response.status_code == 200:
+            print("Request successful")
+
         
     def get_voices(self):
         ASCIIColors.yellow("Listing voices")

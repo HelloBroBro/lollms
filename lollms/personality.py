@@ -3311,7 +3311,7 @@ The AI should respond in this format using data from actions_list:
         generated_text = self.fast_gen(upgraded_prompt, max_answer_length, callback=callback)
 
         if self.config.debug:
-            self.print_prompt("Generrated", generated_text)
+            self.print_prompt("Generated", generated_text)
 
         # Extract the function calls from the generated text.
         function_calls = self.extract_function_calls_as_json(generated_text)

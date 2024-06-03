@@ -37,8 +37,11 @@ def add_events(sio:socketio):
         #kill thread
         ASCIIColors.error(f'Client {sid} requested cancelling generation')
         terminate_thread(client.generation_thread)
-        ASCIIColors.error(f'Client {sid} canceled generation')
         lollmsElfServer.busy=False
+        if lollmsElfServer.tts:
+            lollmsElfServer.tts.stop()
+        
+        ASCIIColors.error(f'Client {sid} canceled generation')
     
     
     @sio.on('cancel_text_generation')

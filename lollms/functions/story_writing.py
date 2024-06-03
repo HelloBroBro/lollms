@@ -20,7 +20,7 @@ import json
 # Import  markdown2latex
 from lollms.functions.markdown2latex import markdown_to_latex
 from lollms.functions.file_manipulation import change_file_extension
-from lollms.functions.generate_image import build_image
+from lollms.functions.generate_image import build_image, build_negative_prompt
 from lollms.client_session import Client
 
 import copy
@@ -62,11 +62,26 @@ def build_section_illustration(llm, prompt_ideas, current_section, content, clie
     image_generation_prompt = llm.fast_gen(prompt, callback=llm.sink)
     code_blocks = llm.extract_code_blocks(image_generation_prompt)
     if len(code_blocks)>0:
-        code = json.loads(code_blocks[0]["content"])        
-        return build_image(image_generation_prompt, "",width=code["width"],height=code["height"], processor=llm, client=client)    
+        code = json.loads(code_blocks[0]["content"]) 
+        if llm.config.use_negative_prompt:
+            if llm.config.use_ai_generated_negative_prompt:
+                prompt=build_negative_prompt(image_generation_prompt,llm)
+                nevative_prompt=llm.fast_gen(prompt)
+            else:
+                nevative_prompt = llm.config.default_negative_prompt
+        else:
+            nevative_prompt = ""
+        return build_image(image_generation_prompt, nevative_prompt,width=code["width"],height=code["height"], processor=llm, client=client)    
 
 # Define the core functions
-def start_writing_story(prompt_ideas: str, llm: Any, story_file_path: str, build_latex:bool=False, client:Client = None) -> str:
+def start_writing_story(
+                        prompt_ideas: str, 
+                        llm: Any, 
+                        story_file_path: str, 
+                        build_latex:bool=False, 
+                        include_summary_between_chapters:bool=False,
+                        allow_illustrations:bool=False,
+                        client:Client = None) -> str:
     discussion_prompt_separator = llm.config.discussion_prompt_separator
     start_header_id_template    = llm.config.start_header_id_template
     end_header_id_template      = llm.config.end_header_id_template
@@ -119,16 +134,28 @@ def start_writing_story(prompt_ideas: str, llm: Any, story_file_path: str, build
             llm.step_start(f'Building section: {section["section_name"]}')
 
             section_name = section["section_name"]
-            
-            new_section = write_story_section(
-                llm=llm,
-                story_file_path=story_file_path,
-                story_plan=story_plan,
-                current_section=section_name,
-                prompt_ideas=prompt_ideas,
-                add_illustration=needs_illustration(section_name, story_plan),
-                client=client
-            )
+            if allow_illustrations:
+                new_section = write_story_section(
+                    llm=llm,
+                    story_file_path=story_file_path,
+                    story_plan=story_plan,
+                    current_section=section_name,
+                    prompt_ideas=prompt_ideas,
+                    add_illustration=needs_illustration(section_name, story_plan),
+                    include_summary_between_chapters=include_summary_between_chapters,
+                    client=client
+                )
+            else:
+                new_section = write_story_section(
+                    llm=llm,
+                    story_file_path=story_file_path,
+                    story_plan=story_plan,
+                    current_section=section_name,
+                    prompt_ideas=prompt_ideas,
+                    add_illustration=False,
+                    include_summary_between_chapters=include_summary_between_chapters,
+                    client=client
+                )
             section_full["content"]=new_section
             final_story_content += f"\n## {section_name}\n\n{new_section}\n"
             llm.step_end(f'Building section: {section["section_name"]}')
@@ -164,19 +191,18 @@ def start_writing_story(prompt_ideas: str, llm: Any, story_file_path: str, build
         return trace_exception(e)
 
 # Define the metadata functions
-def start_writing_story_function(llm, story_file_path, build_latex:bool=False, client:Client=None):
+def start_writing_story_function(llm, story_file_path, build_latex:bool=False, include_summary_between_chapters:bool=False, allow_illustrations:bool=False,  client:Client=None):
     return {
         "function_name": "start_writing_story",
-        "function": partial(start_writing_story, llm=llm, story_file_path=story_file_path, build_latex=build_latex, client=client),
+        "function": partial(start_writing_story, llm=llm, story_file_path=story_file_path, build_latex=build_latex, include_summary_between_chapters=include_summary_between_chapters, allow_illustrations=allow_illustrations, client=client),
         "function_description": "Starts writing a story based on the provided prompt ideas, generating a plan in JSON format, and writing the story section by section.",
         "function_parameters": [
             {"name": "prompt_ideas", "type": "str"}
         ]
     }
 
-
 # Define the core function
-def write_story_section(prompt_ideas: str, llm: Any, story_file_path: str, story_plan: dict, current_section: str, add_illustration:bool=False, client:Client=None) -> str:
+def write_story_section(prompt_ideas: str, llm: Any, story_file_path: str, story_plan: dict, current_section: str, add_illustration:bool=False, include_summary_between_chapters:bool=False,  client:Client=None) -> str:
     discussion_prompt_separator = llm.config.discussion_prompt_separator
     start_header_id_template    = llm.config.start_header_id_template
     end_header_id_template      = llm.config.end_header_id_template
@@ -224,24 +250,42 @@ def write_story_section(prompt_ideas: str, llm: Any, story_file_path: str, story
         story_content = story_path.read_text()
 
         # Summarize the current content of the story
-        story_summary = llm.summerize_text(story_content, callback=llm.sink)
+        if include_summary_between_chapters:
+            story_summary = llm.summerize_text(story_content, callback=llm.sink)
 
-        # Generate the current section using the LLM's fast_gen function
-        prompt = "\n".join([
-            f"{start_header_id_template}{system_message_template}{end_header_id_template}",
-            f"You are story section writer. Your task is to build the content of a single section of a story from informations about the story.",
-            "Your output must strictly contain only the section content with no comments or suggestions.",
-            f"{start_header_id_template}General idea{end_header_id_template}",
-            f"{prompt_ideas}\n\n"
-            f"{start_header_id_template}Story plan{end_header_id_template}",
-            f"{story_plan}",
-            f"{start_header_id_template}Section to be written{end_header_id_template}",
-            f"{current_section}",
-            f"{start_header_id_template}Story summary up to the current section{end_header_id_template}",
-            f"{story_summary}",
-            f"{start_header_id_template}story_section_writer{end_header_id_template}"
-            ]
-        )
+            # Generate the current section using the LLM's fast_gen function
+            prompt = "\n".join([
+                f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+                f"You are story section writer. Your task is to build the content of a single section of a story from informations about the story.",
+                "Your output must strictly contain only the section content with no comments or suggestions.",
+                f"{start_header_id_template}General idea{end_header_id_template}",
+                f"{prompt_ideas}\n\n"
+                f"{start_header_id_template}Story plan{end_header_id_template}",
+                f"{story_plan}",
+                f"{start_header_id_template}Section to be written{end_header_id_template}",
+                f"{current_section}",
+                f"{start_header_id_template}Story summary up to the current section{end_header_id_template}",
+                f"{story_summary}",
+                f"{start_header_id_template}story_section_writer{end_header_id_template}"
+                ]
+            )
+        else:
+
+            # Generate the current section using the LLM's fast_gen function
+            prompt = "\n".join([
+                f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+                f"You are story section writer. Your task is to build the content of a single section of a story from informations about the story.",
+                "Your output must strictly contain only the section content with no comments or suggestions.",
+                f"{start_header_id_template}General idea{end_header_id_template}",
+                f"{prompt_ideas}\n\n"
+                f"{start_header_id_template}Story plan{end_header_id_template}",
+                f"{story_plan}",
+                f"{start_header_id_template}Section to be written{end_header_id_template}",
+                f"{current_section}",
+                f"{start_header_id_template}story_section_writer{end_header_id_template}"
+                ]
+            )
+
         new_section = f"## {current_section}\n\n"
         content = llm.fast_gen(prompt, callback=llm.sink).strip()
         new_section += content
@@ -258,10 +302,10 @@ def write_story_section(prompt_ideas: str, llm: Any, story_file_path: str, story
         return trace_exception(e)
 
 # Define the metadata function
-def write_story_section_function(llm, story_file_path, story_plan, current_section):
+def write_story_section_function(llm, story_file_path, story_plan, current_section, allow_illustrations:bool=False):
     return {
         "function_name": "write_story_section", # The function name in string
-        "function": partial(write_story_section, llm=llm, story_file_path=story_file_path, story_plan=story_plan, current_section=current_section), # The function to be called
+        "function": partial(write_story_section, llm=llm, story_file_path=story_file_path, story_plan=story_plan, current_section=current_section, allow_illustrations=allow_illustrations), # The function to be called
         "function_description": "Writes a new section of a story based on the provided plan and current content of the story file. If the story file does not exist, it creates a new story with a generated title based on user ideas.", # Change this with the description
         "function_parameters": [
             {"name": "prompt_ideas", "type": "str", "description": "Ideas for the story to be written"}

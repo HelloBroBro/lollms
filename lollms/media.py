@@ -158,7 +158,7 @@ class RTCom:
         self.summoned = False
         self.sample_mfccs = None
         if self.use_keyword_audio and self.keyword_audio_path:
-            self.sample_features = self.load_and_extract_features()
+            self.sample_features = self.load_and_extract_features(self.keyword_audio_path)
 
 
 
@@ -203,12 +203,29 @@ class RTCom:
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
         return np.mean(mfccs.T, axis=0)
 
-    def extract_features(self, buffer):
+    def extract_features(self, frames):
         if not PackageManager.check_package_installed("librosa"):
             PackageManager.install_package("librosa")
+        
+        filename = f"recording_{self.file_index}.wav"
+        self.file_index += 1
+
+        amplified_frames = self._apply_gain(frames)
+        trimmed_frames = self._trim_silence([amplified_frames])
+        logs_file = Path(self.logs_folder)/filename
+        logs_file.parent.mkdir(exist_ok=True, parents=True)
+
+        wf = wave.open(str(logs_file), 'wb')
+        wf.setnchannels(self.channels)
+        wf.setsampwidth(2)
+        wf.setframerate(self.rate)
+        wf.writeframes(trimmed_frames)
+        wf.close()
+
         import librosa
-        y, sr = librosa.load(buffer, sr=self.rate)
+        y, sr = librosa.load(logs_file, sr=self.rate)
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
+
         return np.mean(mfccs.T, axis=0)
     
     def compare_voices(self, sample_features, realtime_features, th = 20):
@@ -437,7 +454,7 @@ class RTCom:
                         ASCIIColors.red(" -------------------------------------------------")
                         self.lc.info("Talking")
                         ASCIIColors.green("<<TALKING>>")
-                        self.lc.tts.tts_audio(lollms_text, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wav")
+                        self.lc.tts.tts_audio(lollms_text, file_name_or_path=str(Path(self.logs_folder)/filename)+"_answer.wav", use_threading=True)
             except Exception as ex:
                 trace_exception(ex)
             self.block_listening = False

@@ -12,7 +12,20 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 import sys
 from functools import partial
 
-def build_image(prompt, antiprompt, width, height, processor:APScript, client:Client):
+def build_negative_prompt(image_generation_prompt, llm):
+    start_header_id_template    = llm.config.start_header_id_template
+    end_header_id_template      = llm.config.end_header_id_template
+    system_message_template     = llm.config.system_message_template        
+
+    return "\n".join([
+                    f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+                    f"{llm.config.negative_prompt_generation_prompt}",
+                    f"{start_header_id_template}image_generation_prompt{end_header_id_template}",
+                    f"{image_generation_prompt}",
+                    f"{start_header_id_template}negative_prompt{end_header_id_template}",
+                ])    
+
+def build_image(prompt, negative_prompt, width, height, processor:APScript, client:Client):
     try:
         if processor.personality.config.active_tti_service=="diffusers":
             if not processor.personality.app.tti:
@@ -23,7 +36,7 @@ def build_image(prompt, antiprompt, width, height, processor:APScript, client:Cl
                 processor.step_end("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
             file, infos = processor.personality.app.tti.paint(
                             prompt, 
-                            antiprompt,
+                            negative_prompt,
                             processor.personality.image_files,
                             width = width,
                             height = height,
@@ -38,7 +51,7 @@ def build_image(prompt, antiprompt, width, height, processor:APScript, client:Cl
                 processor.step_end("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
             file, infos = processor.personality.app.tti.paint(
                             prompt, 
-                            antiprompt,
+                            negative_prompt,
                             processor.personality.image_files,
                             width = width,
                             height = height,
@@ -69,9 +82,28 @@ def build_image(prompt, antiprompt, width, height, processor:APScript, client:Cl
 
 
 def build_image_function(processor, client):
-    return {
-            "function_name": "build_image",
-            "function": partial(build_image, processor=processor, client=client),
-            "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
-            "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "antiprompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
-        }
+    if processor.config.use_negative_prompt:
+        if processor.config.use_ai_generated_negative_prompt:
+            return {
+                    "function_name": "build_image",
+                    "function": partial(build_image, processor=processor, client=client),
+                    "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
+                    "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "negative_prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
+                }
+        else:
+            return {
+                    "function_name": "build_image",
+                    "function": partial(build_image, processor=processor, client=client, negative_prompt=processor.config.default_negative_prompt),
+                    "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
+                    "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
+                }
+    else:
+        return {
+                "function_name": "build_image",
+                "function": partial(build_image, processor=processor, client=client, negative_prompt=""),
+                "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
+                "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
+            }
+
+
+

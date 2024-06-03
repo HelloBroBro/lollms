@@ -1048,6 +1048,48 @@ class PackageManager:
             print(f"{package} is not installed. Time to add it to your collection!")
             return PackageManager.install_package(package)
 
+    @staticmethod
+    def uninstall_package(package):
+        """
+        Uninstall a Python package.
+
+        Args:
+            package (str): The name of the package to uninstall.
+
+        Returns:
+            bool: True if the package was uninstalled successfully, False otherwise.
+        """
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", package], check=True)
+            print(f"Successfully uninstalled {package}. Goodbye, old friend!")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error uninstalling {package}: {e}. Uninstallation wizard failed!")
+            return False
+
+    @staticmethod
+    def reinstall(package):
+        """
+        Reinstall a Python package.
+
+        Args:
+            package (str): The name of the package to reinstall.
+
+        Returns:
+            bool: True if the package was reinstalled successfully, False otherwise.
+        """
+        if PackageManager.check_package_installed(package):
+            print(f"{package} is already installed. Let's give it a fresh start!")
+            if PackageManager.uninstall_package(package):
+                print(f"{package} uninstalled successfully. Now, let's reinstall it.")
+                return PackageManager.install_package(package)
+            else:
+                print(f"Failed to uninstall {package}. Reinstallation aborted.")
+                return False
+        else:
+            print(f"{package} is not installed. Installing it now.")
+            return PackageManager.install_package(package)
+
 class GitManager:
     @staticmethod
     def git_pull(folder_path):

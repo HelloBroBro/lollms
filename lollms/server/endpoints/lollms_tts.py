@@ -134,7 +134,7 @@ async def text2Audio(request: LollmsText2AudioRequest):
         if lollmsElfServer.tts is None:
             return {"url": None, "error":f"No TTS service is on"}
         if lollmsElfServer.tts.ready:
-            response = lollmsElfServer.tts.tts_audio(request.text, request.voice, file_name_or_path=request.fn)
+            response = lollmsElfServer.tts.tts_audio(request.text, request.voice, file_name_or_path=request.fn, use_threading=True)
             return response
         else:
             return {"url": None, "error":f"TTS service is not ready yet"}
