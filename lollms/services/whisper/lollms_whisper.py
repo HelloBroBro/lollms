@@ -40,7 +40,7 @@ class LollmsWhisper(LollmsSTT):
                     model="small",
                     output_path=None
                     ):
-        super().__init__(app, model, output_path)
+        super().__init__("whisper",app, model, output_path)
         self.whisper = whisper.load_model(model)
         self.ready = True
 

@@ -43,7 +43,7 @@ class LollmsOpenAIWhisper(LollmsSTT):
                     api_key="",
                     output_path=None
                     ):
-        super().__init__(app, model, output_path)
+        super().__init__("openai_whisper",app, model, output_path)
         self.client = OpenAI(api_key=api_key)
         self.ready = True
 

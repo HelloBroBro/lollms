@@ -38,7 +38,8 @@ class LollmsSTT:
     """
     
     def __init__(
-                    self, 
+                    self,
+                    name:str,
                     app: LollmsApplication, 
                     model="",
                     output_path=None,
@@ -52,6 +53,7 @@ class LollmsSTT:
             model (str, optional): The STT model to be used for transcription. Defaults to an empty string.
             output_path (Path or str, optional): Path where the output transcription files will be saved. Defaults to None.
         """
+        self.name = name
         self.ready = False
         self.app = app
         self.output_path = output_path

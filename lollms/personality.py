@@ -2405,9 +2405,9 @@ class APScript(StateMachine):
                     f"{start_header_id_template}negative_boost{end_header_id_template}\n"+context_details["negative_boost"] if context_details["negative_boost"] else "",
                     f"{start_header_id_template}current_language{end_header_id_template}\n"+context_details["current_language"] if context_details["current_language"] else "",
                     f"{start_header_id_template}fun_mode{end_header_id_template}\n"+context_details["fun_mode"] if context_details["fun_mode"] else "",
-                    f"{start_header_id_template}discussion_window{end_header_id_template}\n"+context_details["discussion_messages"] if context_details["discussion_messages"] else "",
+                    f"{start_header_id_template}discussion_window{end_header_id_template}\n"+context_details["discussion_messages"] if context_details["discussion_messages"].strip()!="" else "",
                     custom_entries,
-                    f"{start_header_id_template}"+context_details["ai_prefix"].replace(f"{start_header_id_template}","").replace(":","")+f"{end_header_id_template}"
+                    f'{start_header_id_template}{context_details["ai_prefix"]}{end_header_id_template}'
                 ], 
                 8)
     def build_prompt(self, prompt_parts:List[str], sacrifice_id:int=-1, context_size:int=None, minimum_spare_context_size:int=None):
@@ -2433,11 +2433,13 @@ class APScript(StateMachine):
         else:
             part_tokens=[]
             nb_tokens=0
-            for i,part in enumerate(prompt_parts):
-                tk = self.personality.model.tokenize(part)
+            for i, part in enumerate(prompt_parts):
+                part_s=part.strip()
+                tk = self.personality.model.tokenize(part_s)
                 part_tokens.append(tk)
                 if i != sacrifice_id:
                     nb_tokens += len(tk)
+                    
             if len(part_tokens[sacrifice_id])>0:
                 sacrifice_tk = part_tokens[sacrifice_id]
                 sacrifice_tk= sacrifice_tk[-(context_size-nb_tokens-minimum_spare_context_size):]
@@ -3291,12 +3293,12 @@ The AI should respond in this format using data from actions_list:
 
 
 
-    def generate_with_function_calls(self, prompt: str, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
+    def generate_with_function_calls(self, context_details: dict, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
         """
         Performs text generation with function calls.
 
         Args:
-            prompt (str): The full prompt (including conditioning, user discussion, extra data, and the user prompt).
+            context_details (dict): The full prompt (including conditioning, user discussion, extra data, and the user prompt).
             functions (List[Dict[str, Any]]): A list of dictionaries describing functions that can be called.
             max_answer_length (int, optional): Maximum string length allowed for the generated text.
 
@@ -3304,8 +3306,9 @@ The AI should respond in this format using data from actions_list:
             List[Dict[str, Any]]: A list of dictionaries with the function names and parameters to execute.
         """
 
+
         # Upgrade the prompt with information about the function calls.
-        upgraded_prompt = self._upgrade_prompt_with_function_info(prompt, functions)
+        upgraded_prompt = self._upgrade_prompt_with_function_info(context_details, functions)
 
         # Generate the initial text based on the upgraded prompt.
         generated_text = self.fast_gen(upgraded_prompt, max_answer_length, callback=callback)
@@ -3319,7 +3322,7 @@ The AI should respond in this format using data from actions_list:
         return generated_text, function_calls
 
 
-    def generate_with_function_calls_and_images(self, prompt: str, images:list, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
+    def generate_with_function_calls_and_images(self, context_details: dict, images:list, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
         """
         Performs text generation with function calls.
 
@@ -3332,7 +3335,7 @@ The AI should respond in this format using data from actions_list:
             List[Dict[str, Any]]: A list of dictionaries with the function names and parameters to execute.
         """
         # Upgrade the prompt with information about the function calls.
-        upgraded_prompt = self._upgrade_prompt_with_function_info(prompt, functions)
+        upgraded_prompt = self._upgrade_prompt_with_function_info(context_details, functions)
 
         # Generate the initial text based on the upgraded prompt.
         generated_text = self.fast_gen_with_images(upgraded_prompt, images, max_answer_length, callback=callback)
@@ -3380,13 +3383,55 @@ The AI should respond in this format using data from actions_list:
 
         return results
 
+    def transform_functions_to_text(self, functions):
+        function_texts = []
 
-    def _upgrade_prompt_with_function_info(self, prompt: str, functions: List[Dict[str, Any]]) -> str:
+        for func in functions:
+            function_text = f'Function: {func["function_name"]}\nDescription: {func["function_description"]}\nParameters:\n'
+            
+            for param in func["function_parameters"]:
+                param_type = "string" if param["type"] == "str" else param["type"]
+                param_description = param.get("description", "")
+                function_text += f'  - {param["name"]} ({param_type}): {param_description}\n'
+            
+            function_texts.append(function_text.strip())
+        
+        return "\n\n".join(function_texts)
+    
+    def transform_functions(self, functions):
+        tools = []
+
+        for func in functions:
+            function_dict = {
+                "type": "function",
+                "function": {
+                    "name": func["function_name"],
+                    "description": func["function_description"],
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                    },
+                },
+            }
+            
+            for param in func["function_parameters"]:
+                function_dict["function"]["parameters"]["properties"][param["name"]] = {
+                    "type": "string" if param["type"] == "str" else param["type"],
+                    "description": param.get("description", ""),
+                }
+                function_dict["function"]["parameters"]["required"].append(param["name"])
+            
+            tools.append(function_dict)
+
+        return tools
+
+    def _upgrade_prompt_with_function_info(self, context_details: dict, functions: List[Dict[str, Any]]) -> str:
         """
         Upgrades the prompt with information about function calls.
 
         Args:
-            prompt (str): The original prompt.
+            context_details (dict): The original prompt.
             functions (List[Dict[str, Any]]): A list of dictionaries describing functions that can be called.
 
         Returns:
@@ -3397,27 +3442,31 @@ The AI should respond in this format using data from actions_list:
         system_message_template     = self.config.system_message_template
         separator_template          = self.config.separator_template
 
-        function_descriptions = [f"{start_header_id_template}{system_message_template}{end_header_id_template}If you need to call a function to fulfill the user request, use a function markdown tag with the function call as the following json format:",
+
+        tools = self.transform_functions_to_text(functions)
+        import copy
+        cd = copy.deepcopy(context_details)
+        function_descriptions = [
+                                 f"{start_header_id_template}Available functions{end_header_id_template}\n",
+                                 tools,
+                                 cd["conditionning"],
+                                 "Your objective is interact with the user and if you need to call a function, then use the available functions above and call them using the following json format inside a markdown tag:"
                                  "```function",
                                  "{",
                                  '"function_name":the name of the function to be called,',
                                  '"function_parameters": a list of  parameter values',
                                  "}",
                                  "```",
-                                 "Only use available functions.",
-                                 "If you choose to use a function call, do not write anything else. Just the function call.",
-                                 f"Do not add status of the execution as it will be added automatically by the system.",
-                                 f"A function call must not be followed by any text{separator_template}"
-                                 f"{start_header_id_template}Available functions{end_header_id_template}\n"]
+                                 ]
 
-        for function in functions:
-            description = f"{function['function_name']}: {function['function_description']}\nparameters:{function['function_parameters']}"
-            function_descriptions.append(description)
 
         # Combine the function descriptions with the original prompt.
         function_info = '\n'.join(function_descriptions)
-        upgraded_prompt = f"{function_info}\n{prompt}"
 
+        cd["conditionning"]=function_info
+        upgraded_prompt = self.build_prompt_from_context_details(cd)
+
+        
         return upgraded_prompt
 
     def extract_function_calls_as_json(self, text: str) -> List[Dict[str, Any]]:
@@ -3437,7 +3486,7 @@ The AI should respond in this format using data from actions_list:
         # Filter out and parse JSON entries.
         function_calls = []
         for block in code_blocks:
-            if block["type"]=="function":
+            if block["type"]=="function" or block["type"]=="json":
                 content = block.get("content", "")
                 try:
                     # Attempt to parse the JSON content of the code block.
@@ -3455,21 +3504,25 @@ The AI should respond in this format using data from actions_list:
 
     def interact_with_function_call(
                                         self, 
-                                        prompt, 
+                                        context_details, 
                                         function_definitions, 
                                         prompt_after_execution=True, 
                                         callback = None, 
                                         hide_function_call=False,
                                         separate_output=False):
+        
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
         system_message_template     = self.config.system_message_template
         separator_template          = self.config.separator_template
+
+
+
         final_output = ""
         if len(self.personality.image_files)>0:
-            out, function_calls = self.generate_with_function_calls_and_images(prompt, self.personality.image_files, function_definitions, callback=callback)
+            out, function_calls = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
         else:
-            out, function_calls = self.generate_with_function_calls(prompt, function_definitions, callback=callback)
+            out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
         if len(function_calls)>0:
             if hide_function_call:
                 self.full("") #Hide function call
@@ -3480,17 +3533,17 @@ The AI should respond in this format using data from actions_list:
                 if separate_output:
                     self.full(final_output)
                     self.new_message("")
-                prompt += out +"\n"+ f"{start_header_id_template}"+self.personality.name+f"{end_header_id_template}"
+                context_details["discussion_messages"] +=out
                 if len(self.personality.image_files)>0:
-                    out, function_calls = self.generate_with_function_calls_and_images(prompt, self.personality.image_files, function_definitions, callback=callback)
+                    out, function_calls = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
                 else:
-                    out, function_calls = self.generate_with_function_calls(prompt, function_definitions, callback=callback)
+                    out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
                 final_output += "\n" + out
                 if len(function_calls)>0:
                     outputs = self.execute_function_calls(function_calls,function_definitions)
                     final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
                     out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output
-                    prompt += out +"\n"+ f"{start_header_id_template}"+self.personality.name+f"{end_header_id_template}"
+                    context_details["discussion_messages"] +=out
         else:
             final_output = out
         return final_output

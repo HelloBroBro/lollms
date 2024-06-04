@@ -55,7 +55,7 @@ class LollmsOpenAITTS(LollmsTTS):
                     api_key="",
                     output_path=None
                     ):
-        super().__init__(app, model, voice, api_key, output_path)
+        super().__init__("openai_tts", app, model, voice, api_key, output_path)
         self.client = OpenAI(api_key=api_key)
         self.voices = [
          "alloy",

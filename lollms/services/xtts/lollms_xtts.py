@@ -52,7 +52,7 @@ class LollmsXTTS(LollmsTTS):
                     use_deep_speed=False,
                     use_streaming_mode = True
                 ):
-        super().__init__(app)
+        super().__init__("xtts",app)
         self.generation_threads = {}
         self.voices_folder = voices_folder
         self.ready = False
@@ -172,6 +172,10 @@ class LollmsXTTS(LollmsTTS):
             return LollmsXTTS
 
     def run_xtts_api_server(self):
+        root_dir = self.app.lollms_paths.personal_path
+        shared_folder = root_dir/"shared"
+        xtts_path = shared_folder / "xtts"
+        
         # Get the path to the current Python interpreter
         ASCIIColors.yellow("Loading XTTS ")
         options= ""
@@ -179,7 +183,7 @@ class LollmsXTTS(LollmsTTS):
             options += " --deepspeed"
         if self.use_streaming_mode:
             options += " --streaming-mode --streaming-mode-improve --stream-play-sync"
-        process = run_python_script_in_env("xtts", f"-m xtts_api_server {options} -o {self.output_folder} -sf {self.voice_samples_path} -p {self.xtts_base_url.split(':')[-1].replace('/','')}", wait= False)
+        process = run_python_script_in_env("xtts", f"-m xtts_api_server {options} -o {self.output_folder} -sf {self.voice_samples_path} -p {self.xtts_base_url.split(':')[-1].replace('/','')}", cwd=xtts_path, wait= False)
         return process
 
     def wait_for_service_in_another_thread(self, max_retries=150, show_warning=True):

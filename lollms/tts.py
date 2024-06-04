@@ -38,6 +38,7 @@ class LollmsTTS:
     
     def __init__(
                     self, 
+                    name:str,
                     app: LollmsApplication, 
                     model="",
                     voice="",
@@ -54,6 +55,7 @@ class LollmsTTS:
             api_key (str, optional): API key for accessing external TTS services. Defaults to an empty string.
             output_path (Path or str, optional): Path where the output audio files will be saved. Defaults to None.
         """
+        self.name = name
         self.ready = False
         self.app = app
         self.model = model

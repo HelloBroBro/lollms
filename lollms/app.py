@@ -419,29 +419,29 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load Motion control")
 
-            if self.config.active_tti_service == "diffusers" and type(self.tti)!=LollmsDiffusers:
+            if self.config.active_tti_service == "diffusers" and (self.tti is None or type(self.tti.name)!="diffusers"):
                 from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
-            elif self.config.active_tti_service == "autosd" and type(self.tti)!=LollmsSD:
+            elif self.config.active_tti_service == "autosd" and (self.tti is None or type(self.tti.name)!="stable_diffusion"):
                 from lollms.services.sd.lollms_sd import LollmsSD
                 self.tti = LollmsSD(self)
-            elif self.config.active_tti_service == "dall-e" and type(self.tti)!=LollmsDalle:
+            elif self.config.active_tti_service == "dall-e" and (self.tti is None or type(self.tti.name)!="dall-e-2" or type(self.tti.name)!="dall-e-3"):
                 from lollms.services.dalle.lollms_dalle import LollmsDalle
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
-            elif self.config.active_tti_service == "midjourney" and type(self.tti)!=LollmsMidjourney:
+            elif self.config.active_tti_service == "midjourney" and (self.tti is None or type(self.tti.name)!="midjourney"):
                 from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
                 self.tti = LollmsMidjourney(self, self.config.midjourney_key)
 
-            if self.config.active_tts_service == "openai_tts" and type(self.tts)!=LollmsOpenAITTS:
+            if self.config.active_tts_service == "openai_tts" and (self.tts is None or type(self.tts.name)!="openai_tts"):
                 from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
-            if self.config.active_stt_service == "openai_whisper" and type(self.stt)!=LollmsOpenAIWhisper:
+            if self.config.active_stt_service == "openai_whisper" and (self.tts is None or type(self.tts.name)!="openai_whisper"):
                 from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
                 self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
-            elif self.config.active_stt_service == "whisper" and type(self.stt)!=LollmsWhisper :
+            elif self.config.active_stt_service == "whisper" and (self.tts is None or  type(self.tts.name)!="whisper") :
                 from lollms.services.whisper.lollms_whisper import LollmsWhisper
                 self.stt = LollmsWhisper(self, self.config.whisper_model)
 
@@ -1058,7 +1058,7 @@ class LollmsApplication(LoLLMsCom):
         # If this is not a continue request, we add the AI prompt
         if not is_continue:
             message_tokenized = self.model.tokenize(
-                "\n" +self.personality.ai_message_prefix.strip()
+                self.personality.ai_message_prefix.strip()
             )
             full_message_list.append(message_tokenized)
             # Update the cumulative number of tokens
@@ -1172,7 +1172,8 @@ class LollmsApplication(LoLLMsCom):
             "negative_boost":negative_boost,
             "current_language":self.config.current_language,
             "fun_mode":fun_mode,
-            "ai_prefix":ai_prefix
+            "ai_prefix":ai_prefix,
+            "extra":""
         }    
 
         # Return the prepared query, original message content, and tokenized query
