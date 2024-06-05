@@ -28,6 +28,8 @@ import winsound
 # here is the core of the function to be built
 def set_timer_with_alert(duration: int, message: str) -> str:
     def timer_callback():
+        if type(duration)==str and len(duration)>0:
+            duration = float(duration.split()[0])
         time.sleep(duration)
         winsound.Beep(1000, 1000)  # Make noise when time is up
 

@@ -419,29 +419,29 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load Motion control")
 
-            if self.config.active_tti_service == "diffusers" and (self.tti is None or type(self.tti.name)!="diffusers"):
+            if self.config.active_tti_service == "diffusers" and (self.tti is None or self.tti.name!="diffusers"):
                 from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
-            elif self.config.active_tti_service == "autosd" and (self.tti is None or type(self.tti.name)!="stable_diffusion"):
+            elif self.config.active_tti_service == "autosd" and (self.tti is None or self.tti.name!="stable_diffusion"):
                 from lollms.services.sd.lollms_sd import LollmsSD
                 self.tti = LollmsSD(self)
-            elif self.config.active_tti_service == "dall-e" and (self.tti is None or type(self.tti.name)!="dall-e-2" or type(self.tti.name)!="dall-e-3"):
+            elif self.config.active_tti_service == "dall-e" and (self.tti is None or self.tti.name!="dall-e-2" or type(self.tti.name)!="dall-e-3"):
                 from lollms.services.dalle.lollms_dalle import LollmsDalle
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
-            elif self.config.active_tti_service == "midjourney" and (self.tti is None or type(self.tti.name)!="midjourney"):
+            elif self.config.active_tti_service == "midjourney" and (self.tti is None or self.tti.name!="midjourney"):
                 from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
                 self.tti = LollmsMidjourney(self, self.config.midjourney_key)
 
-            if self.config.active_tts_service == "openai_tts" and (self.tts is None or type(self.tts.name)!="openai_tts"):
+            if self.config.active_tts_service == "openai_tts" and (self.tts is None or self.tts.name!="openai_tts"):
                 from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
-            if self.config.active_stt_service == "openai_whisper" and (self.tts is None or type(self.tts.name)!="openai_whisper"):
+            if self.config.active_stt_service == "openai_whisper" and (self.tts is None or self.tts.name!="openai_whisper"):
                 from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
                 self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
-            elif self.config.active_stt_service == "whisper" and (self.tts is None or  type(self.tts.name)!="whisper") :
+            elif self.config.active_stt_service == "whisper" and (self.tts is None or  self.tts.name!="whisper") :
                 from lollms.services.whisper.lollms_whisper import LollmsWhisper
                 self.stt = LollmsWhisper(self, self.config.whisper_model)
 
@@ -1082,14 +1082,15 @@ class LollmsApplication(LoLLMsCom):
                             msg = f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                         message_tokenized = self.model.tokenize(msg)
                     else:
+                        msg_value= f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
                         message_tokenized = self.model.tokenize(
-                            f"{separator_template}{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else end_user_header_id_template}" + message.content.strip()
+                            msg_value
                         )
                     # Check if adding the message will exceed the available space
-                    if tokens_accumulated + len(message_tokenized) > available_space-n_tokens:
+                    if tokens_accumulated + len(message_tokenized) > available_space:
                         # Update the cumulative number of tokens
-                        msg = message_tokenized[-(available_space-tokens_accumulated-n_tokens):]
-                        tokens_accumulated += available_space-tokens_accumulated-n_tokens
+                        msg = message_tokenized[-(available_space-tokens_accumulated):]
+                        tokens_accumulated += available_space-tokens_accumulated
                         full_message_list.insert(0, msg)
                         break
 
@@ -1129,11 +1130,11 @@ class LollmsApplication(LoLLMsCom):
             discussion_messages += self.model.detokenize(message_tokens)
         
         if len(full_message_list)>0:
-            ai_prefix = self.model.detokenize(full_message_list[-1])
+            ai_prefix = self.personality.ai_message_prefix
         else:
             ai_prefix = ""
         # Build the final prompt by concatenating the conditionning and discussion messages
-        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + ai_prefix
+        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + start_ai_header_id_template + ai_prefix + end_ai_header_id_template
 
         # Tokenize the prompt data
         tokens = self.model.tokenize(prompt_data)

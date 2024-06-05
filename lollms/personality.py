@@ -2407,6 +2407,7 @@ class APScript(StateMachine):
                     f"{start_header_id_template}fun_mode{end_header_id_template}\n"+context_details["fun_mode"] if context_details["fun_mode"] else "",
                     f"{start_header_id_template}discussion_window{end_header_id_template}\n"+context_details["discussion_messages"] if context_details["discussion_messages"].strip()!="" else "",
                     custom_entries,
+                    context_details["extra"],
                     f'{start_header_id_template}{context_details["ai_prefix"]}{end_header_id_template}'
                 ], 
                 8)
@@ -2985,6 +2986,8 @@ The AI should respond in this format using data from actions_list:
                     except:
                         find_return = int(1e10)
                     next_index = min(find_return, find_space)
+                    if '{' in sub_text[:next_index]:
+                        next_index =0
                     start_pos = next_index
                     if code_delimiter_position+3<len(text) and text[code_delimiter_position+3] in ["\n"," ","\t"] :
                         # No
@@ -3360,18 +3363,19 @@ The AI should respond in this format using data from actions_list:
         """
         results = []
         # Convert function_definitions to a dict for easier lookup
-        functions_dict = {func['function_name']: func['function'] for func in function_definitions}
+        functions_dict = {func['function_name']: func for func in function_definitions}
 
         for call in function_calls:
-            function_name = call.get("function_name")
+            function_name = call.get("function_name", None) or call.get("function", None)
             parameters = call.get("function_parameters", [])
-            function = functions_dict.get(function_name)
-
-            if function:
+            fn =  functions_dict.get(function_name)
+            if fn:
+                function = fn['function']
                 try:
                     # Assuming parameters is a dictionary that maps directly to the function's arguments.
                     if type(parameters)==list:
-                        result = function(*parameters)
+                        f_parameters ={k:v for k,v in zip([p['name'] for p in fn['function_parameters']],parameters)}
+                        result = function(**f_parameters)
                     elif type(parameters)==dict:
                         result = function(**parameters)
                     results.append(result)
@@ -3449,6 +3453,7 @@ The AI should respond in this format using data from actions_list:
         function_descriptions = [
                                  f"{start_header_id_template}Available functions{end_header_id_template}\n",
                                  tools,
+                                 "",
                                  cd["conditionning"],
                                  "Your objective is interact with the user and if you need to call a function, then use the available functions above and call them using the following json format inside a markdown tag:"
                                  "```function",
@@ -3486,7 +3491,7 @@ The AI should respond in this format using data from actions_list:
         # Filter out and parse JSON entries.
         function_calls = []
         for block in code_blocks:
-            if block["type"]=="function" or block["type"]=="json":
+            if block["type"]=="function" or block["type"]=="json" or block["type"]=="":
                 content = block.get("content", "")
                 try:
                     # Attempt to parse the JSON content of the code block.
@@ -3525,7 +3530,11 @@ The AI should respond in this format using data from actions_list:
             out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
         if len(function_calls)>0:
             if hide_function_call:
-                self.full("") #Hide function call
+                self.full("") #Hide function 
+            
+            if self.config.debug:
+                self.print_prompt("Function calls", json.dumps(function_calls, indent=4))
+
             outputs = self.execute_function_calls(function_calls,function_definitions)
             final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
             out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output
