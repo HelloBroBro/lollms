@@ -25,14 +25,21 @@ from dataclasses import dataclass
 from PIL import Image, PngImagePlugin
 from enum import Enum
 from typing import List, Dict, Any
-
+import uuid
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
-from lollms.utilities import git_pull, show_yes_no_dialog, run_script_in_env, create_conda_env, run_python_script_in_env
+from lollms.utilities import git_pull, show_yes_no_dialog, run_script_in_env, create_conda_env, run_python_script_in_env, PackageManager
+from lollms.tti import LollmsTTI
 import subprocess
 import shutil
 from tqdm import tqdm
 
+if not PackageManager.check_package_installed("websocket"):
+    PackageManager.install_or_update("websocket-client")
+import websocket
+if not PackageManager.check_package_installed("urllib"):
+    PackageManager.install_or_update("urllib")
+from urllib import request, parse
 
 def verify_comfyui(lollms_paths:LollmsPaths):
     # Clone repository
@@ -144,18 +151,13 @@ def get_comfyui(lollms_paths:LollmsPaths):
         ASCIIColors.success("ok")
         return LollmsComfyUI
 
-class LollmsComfyUI:
+class LollmsComfyUI(LollmsTTI):
     has_controlnet = False
     def __init__(
                     self, 
                     app:LollmsApplication, 
                     wm = "Artbot", 
                     max_retries=50,
-                    sampler="Euler a",
-                    steps=20,               
-                    use_https=False,
-                    username=None,
-                    password=None,
                     comfyui_base_url=None,
                     share=False,
                     wait_for_service=True
@@ -250,3 +252,183 @@ class LollmsComfyUI:
             if self.app is not None:
                 self.app.error("Comfyui Service did not become available within the given time.")
         return False
+            
+    def paint(
+                self,
+                positive_prompt,
+                negative_prompt,
+                sampler_name="",
+                seed=-1,
+                scale=7.5,
+                steps=20,
+                img2img_denoising_strength=0.9,
+                width=512,
+                height=512,
+                restore_faces=True,
+                output_path=None
+                ):
+        client_id = str(uuid.uuid4())
+
+        def queue_prompt(prompt):
+            p = {"prompt": prompt, "client_id": client_id}
+            data = json.dumps(p).encode('utf-8')
+            req =  request.Request("http://{}/prompt".format(self.comfyui_base_url), data=data)
+            return json.loads(request.urlopen(req).read())
+
+        def get_image(filename, subfolder, folder_type):
+            data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+            url_values = parse.urlencode(data)
+            with request.urlopen("http://{}/view?{}".format(self.comfyui_base_url, url_values)) as response:
+                return response.read()
+
+        def get_history(prompt_id):
+            with request.urlopen("http://{}/history/{}".format(self.comfyui_base_url, prompt_id)) as response:
+                return json.loads(response.read())
+
+        def get_images(ws, prompt):
+            prompt_id = queue_prompt(prompt)['prompt_id']
+            output_images = {}
+            while True:
+                out = ws.recv()
+                if isinstance(out, str):
+                    message = json.loads(out)
+                    if message['type'] == 'executing':
+                        data = message['data']
+                        if data['node'] is None and data['prompt_id'] == prompt_id:
+                            break #Execution is done
+                else:
+                    continue #previews are binary data
+
+            history = get_history(prompt_id)[prompt_id]
+            for o in history['outputs']:
+                for node_id in history['outputs']:
+                    node_output = history['outputs'][node_id]
+                    if 'images' in node_output:
+                        images_output = []
+                        for image in node_output['images']:
+                            image_data = get_image(image['filename'], image['subfolder'], image['type'])
+                            images_output.append(image_data)
+                    output_images[node_id] = images_output
+
+            return output_images
+
+        prompt_text = """
+        {
+            "3": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "cfg": 8,
+                    "denoise": 1,
+                    "latent_image": [
+                        "5",
+                        0
+                    ],
+                    "model": [
+                        "4",
+                        0
+                    ],
+                    "negative": [
+                        "7",
+                        0
+                    ],
+                    "positive": [
+                        "6",
+                        0
+                    ],
+                    "sampler_name": "euler",
+                    "scheduler": "normal",
+                    "seed": 8566257,
+                    "steps": 20
+                }
+            },
+            "4": {
+                "class_type": "CheckpointLoaderSimple",
+                "inputs": {
+                    """+f"""
+                    "ckpt_name": "{self.app.config.comfyui_model}"
+                    """+"""
+                }
+            },
+            "5": {
+                "class_type": "EmptyLatentImage",
+                "inputs": {
+                    "batch_size": 1,
+                    "height": 512,
+                    "width": 512
+                }
+            },
+            "6": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "clip": [
+                        "4",
+                        1
+                    ],"""+f"""
+                    "text": "{positive_prompt}"
+                    """+"""
+                }
+            },
+            "7": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "clip": [
+                        "4",
+                        1
+                    ],"""+f"""
+                    "text": "{negative_prompt}"
+                    """+"""
+                }
+            },
+            "8": {
+                "class_type": "VAEDecode",
+                "inputs": {
+                    "samples": [
+                        "3",
+                        0
+                    ],
+                    "vae": [
+                        "4",
+                        2
+                    ]
+                }
+            },
+            "9": {
+                "class_type": "SaveImage",
+                "inputs": {
+                    "filename_prefix": "ComfyUI",
+                    "images": [
+                        "8",
+                        0
+                    ]
+                }
+            }
+        }
+        """
+
+        prompt = json.loads(prompt_text)
+        #set the text prompt for our positive CLIPTextEncode
+        prompt["6"]["inputs"]["text"] = "masterpiece best quality man"
+
+        #set the seed for our KSampler node
+        prompt["3"]["inputs"]["seed"] = 5
+
+        ws = websocket.WebSocket()
+        ws.connect("ws://{}/ws?clientId={}".format(self.comfyui_base_url, client_id))
+        images = get_images(ws, prompt)
+        return None
+    
+    def paint_from_images(self, positive_prompt: str, 
+                            images: List[str], 
+                            negative_prompt: str = "",
+                            sampler_name="",
+                            seed=-1,
+                            scale=7.5,
+                            steps=20,
+                            img2img_denoising_strength=0.9,
+                            width=512,
+                            height=512,
+                            restore_faces=True,
+                            output_path=None
+                            ) -> List[Dict[str, str]]:
+        return None
+    

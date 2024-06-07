@@ -37,7 +37,6 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
             file, infos = processor.personality.app.tti.paint(
                             prompt, 
                             negative_prompt,
-                            processor.personality.image_files,
                             width = width,
                             height = height,
                             output_path=client.discussion.discussion_folder
@@ -52,7 +51,6 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
             file, infos = processor.personality.app.tti.paint(
                             prompt, 
                             negative_prompt,
-                            processor.personality.image_files,
                             width = width,
                             height = height,
                             output_path=client.discussion.discussion_folder

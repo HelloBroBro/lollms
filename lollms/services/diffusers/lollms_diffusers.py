@@ -121,11 +121,15 @@ class LollmsDiffusers(LollmsTTI):
         ASCIIColors.red("                             |______|                                      ")
 
         import torch 
-        from diffusers import PixArtSigmaPipeline
-        self.model = PixArtSigmaPipeline.from_pretrained(
+        from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image#PixArtSigmaPipeline
+        self.model = AutoPipelineForText2Image.from_pretrained(
             app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.models_dir,
             use_safetensors=True,
         )
+        # self.model = StableDiffusionPipeline.from_pretrained(
+        #     "CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16, cache_dir=self.models_dir,
+        #     use_safetensors=True,
+        # ) # app.config.diffusers_model
         # Enable memory optimizations.
         if app.config.diffusers_offloading_mode=="sequential_cpu_offload":
             self.model.enable_sequential_cpu_offload()
@@ -155,13 +159,31 @@ class LollmsDiffusers(LollmsTTI):
             ASCIIColors.success("ok")
             return LollmsDiffusers
 
-
+    def get_scheduler_by_name(self, scheduler_name="LMS"):
+        if scheduler_name == "LMS":
+            from diffusers import LMSDiscreteScheduler
+            return LMSDiscreteScheduler(
+                beta_start=0.00085, 
+                beta_end=0.012, 
+                beta_schedule="scaled_linear"
+            )
+        elif scheduler_name == "Euler":
+            from diffusers import EulerDiscreteScheduler
+            return LMSDiscreteScheduler()
+        elif scheduler_name == "DDPMS":
+            from diffusers import DDPMScheduler
+            return DDPMScheduler()
+        elif scheduler_name == "DDIMS":
+            from diffusers import DDIMScheduler
+            return DDIMScheduler()
+        
+        
+            
     def paint(
                 self,
                 positive_prompt,
                 negative_prompt,
-                files=[],
-                sampler_name="Euler",
+                sampler_name="",
                 seed=-1,
                 scale=7.5,
                 steps=20,
@@ -171,10 +193,51 @@ class LollmsDiffusers(LollmsTTI):
                 restore_faces=True,
                 output_path=None
                 ):
+        import torch
+        if sampler_name!="":
+            sc = self.get_scheduler_by_name(sampler_name)
+            if sc:
+                self.model.scheduler = sc
+
         if output_path is None:
             output_path = self.output_dir
-        from diffusers.utils.pil_utils import pt_to_pil
-        image = self.model(positive_prompt, negative_prompt=negative_prompt, guidance_scale=scale, num_inference_steps=steps,).images[0]
+        if seed!=-1:
+            generator = torch.Generator("cuda").manual_seed(seed)
+            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
+        else:
+            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
+        output_path = Path(output_path)
+        fn = find_next_available_filename(output_path,"diff_img_")
+        # Save the image
+        image.save(fn)
+        return fn, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
+    
+    def paint_from_images(self, positive_prompt: str, 
+                            images: List[str], 
+                            negative_prompt: str = "",
+                            sampler_name="",
+                            seed=-1,
+                            scale=7.5,
+                            steps=20,
+                            img2img_denoising_strength=0.9,
+                            width=512,
+                            height=512,
+                            restore_faces=True,
+                            output_path=None
+                            ) -> List[Dict[str, str]]:
+        import torch
+        if sampler_name!="":
+            sc = self.get_scheduler_by_name(sampler_name)
+            if sc:
+                self.model.scheduler = sc
+
+        if output_path is None:
+            output_path = self.output_dir
+        if seed!=-1:
+            generator = torch.Generator("cuda").manual_seed(seed)
+            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
+        else:
+            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
         output_path = Path(output_path)
         fn = find_next_available_filename(output_path,"diff_img_")
         # Save the image
