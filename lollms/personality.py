@@ -3366,8 +3366,15 @@ The AI should respond in this format using data from actions_list:
         functions_dict = {func['function_name']: func for func in function_definitions}
 
         for call in function_calls:
-            function_name = call.get("function_name", None) or call.get("function", None)
-            parameters = call.get("function_parameters", [])
+            keys = [k for k in call.keys()]
+            if not ("function_name" in keys):
+                key = keys[0] if len(keys)>0 else None
+                d = call[key] if key else None
+                function_name = key
+                parameters = d
+            else:
+                function_name = call.get("function_name", None) or call.get("function", None)
+                parameters = call.get("function_parameters", None)
             fn =  functions_dict.get(function_name)
             if fn:
                 function = fn['function']
@@ -3376,9 +3383,10 @@ The AI should respond in this format using data from actions_list:
                     if type(parameters)==list:
                         f_parameters ={k:v for k,v in zip([p['name'] for p in fn['function_parameters']],parameters)}
                         result = function(**f_parameters)
+                        results.append(result)
                     elif type(parameters)==dict:
                         result = function(**parameters)
-                    results.append(result)
+                        results.append(result)
                 except TypeError as e:
                     # Handle cases where the function call fails due to incorrect parameters, etc.
                     results.append(f"Error calling {function_name}: {e}")
