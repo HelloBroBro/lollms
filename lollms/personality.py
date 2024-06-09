@@ -1876,6 +1876,7 @@ class APScript(StateMachine):
                     callback            = None
                 ) -> None:
         super().__init__(states_list)
+        self.function_definitions               = [] # New! useful for 3rd gen personalities 
         self.notify                             = personality.app.notify
 
         self.personality                        = personality
@@ -3348,6 +3349,9 @@ The AI should respond in this format using data from actions_list:
 
         return generated_text, function_calls
 
+    def execute_function(self, code, function_definitions = None):
+        function_call = json.loads(code)
+        self.execute_function_calls([function_call], function_definitions=function_definitions )
 
     def execute_function_calls(self, function_calls: List[Dict[str, Any]], function_definitions: List[Dict[str, Any]]) -> List[Any]:
         """
@@ -3361,6 +3365,8 @@ The AI should respond in this format using data from actions_list:
         Returns:
             List[Any]: A list of results from executing the function calls.
         """
+        if function_definitions is None:
+            function_definitions = self.function_definitions
         results = []
         # Convert function_definitions to a dict for easier lookup
         functions_dict = {func['function_name']: func for func in function_definitions}
