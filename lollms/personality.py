@@ -107,6 +107,7 @@ class AIPersonality:
                     app:LoLLMsCom=None,
                     run_scripts=True,
                     selected_language=None,
+                    ignore_discussion_documents_rag=False,
                     is_relative_path=True,
                     installation_option:InstallOption=InstallOption.INSTALL_IF_NECESSARY,
                     callback: Callable[[str, MSG_TYPE, dict, list], bool]=None
@@ -158,6 +159,7 @@ class AIPersonality:
         self._language: str = "english"
         self._supported_languages: str = []
         self._selected_language: str = selected_language
+        self._ignore_discussion_documents_rag:bool = ignore_discussion_documents_rag
 
         self._languages: List[dict]=[]
 
@@ -828,6 +830,8 @@ class AIPersonality:
         self._category_desc = config.get("category", self._category)
         self._language = config.get("language", self._language)
 
+        self._ignore_discussion_documents_rag = config.get("ignore_discussion_documents_rag", self._ignore_discussion_documents_rag)
+
 
         self._personality_description = config.get("personality_description", self._personality_description)
         self._personality_conditioning = config.get("personality_conditioning", self._personality_conditioning)
@@ -1112,6 +1116,7 @@ class AIPersonality:
             "language": self._language,
             "supported_languages": self._supported_languages,
             "selected_language": self._selected_language,
+            "ignore_discussion_documents_rag": self._ignore_discussion_documents_rag,
             "personality_description": self._personality_description,
             "personality_conditioning": self._personality_conditioning,
             "welcome_message": self._welcome_message,
@@ -1152,6 +1157,7 @@ class AIPersonality:
             "language": self._language,
             "supported_languages": self._supported_languages,
             "selected_language": self._selected_language,
+            "ignore_discussion_documents_rag": self._ignore_discussion_documents_rag,
             "personality_description": self._personality_description,
             "personality_conditioning": self._personality_conditioning,
             "welcome_message": self._welcome_message,
@@ -1284,6 +1290,17 @@ class AIPersonality:
     def selected_language(self, value: str):
         """Set the selected_language."""
         self._selected_language = value
+
+    @property
+    def ignore_discussion_documents_rag(self) -> str:
+        """Get the ignore_discussion_documents_rag."""
+        return self._ignore_discussion_documents_rag
+
+    @ignore_discussion_documents_rag.setter
+    def ignore_discussion_documents_rag(self, value: str):
+        """Set the ignore_discussion_documents_rag."""
+        self._ignore_discussion_documents_rag = value
+
 
     @property
     def personality_description(self) -> str:
@@ -3394,6 +3411,7 @@ The AI should respond in this format using data from actions_list:
                         result = function(**parameters)
                         results.append(result)
                 except TypeError as e:
+                    trace_exception(e)
                     # Handle cases where the function call fails due to incorrect parameters, etc.
                     results.append(f"Error calling {function_name}: {e}")
             else:
@@ -3521,6 +3539,20 @@ The AI should respond in this format using data from actions_list:
         return function_calls
 
 
+    def interact(
+                    self, 
+                    context_details, 
+                    callback = None
+                    ):
+        upgraded_prompt = self.build_prompt_from_context_details(context_details)
+        if len(self.personality.image_files)>0:
+            # Generate the initial text based on the upgraded prompt.
+            generated_text = self.fast_gen_with_images(upgraded_prompt, self.personality.image_files, callback=callback)
+        else:    
+            generated_text = self.fast_gen(upgraded_prompt, callback=callback)
+
+        return generated_text
+
     def interact_with_function_call(
                                         self, 
                                         context_details, 
@@ -3528,24 +3560,26 @@ The AI should respond in this format using data from actions_list:
                                         prompt_after_execution=True, 
                                         callback = None, 
                                         hide_function_call=False,
-                                        separate_output=False):
+                                        separate_output=False,
+                                        max_nested_function_calls=10):
         
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
         system_message_template     = self.config.system_message_template
         separator_template          = self.config.separator_template
 
-
-
         final_output = ""
         if len(self.personality.image_files)>0:
             out, function_calls = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
         else:
             out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
-        if len(function_calls)>0:
+        nested_function_calls = 0
+        while len(function_calls)>0 and nested_function_calls<max_nested_function_calls:
+            nested_function_calls += 1
+            self.chunk("\n") 
             if hide_function_call:
                 self.full("") #Hide function 
-            
+
             if self.config.debug:
                 self.print_prompt("Function calls", json.dumps(function_calls, indent=4))
 
@@ -3562,11 +3596,6 @@ The AI should respond in this format using data from actions_list:
                 else:
                     out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
                 final_output += "\n" + out
-                if len(function_calls)>0:
-                    outputs = self.execute_function_calls(function_calls,function_definitions)
-                    final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
-                    out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output
-                    context_details["discussion_messages"] +=out
         else:
             final_output = out
         return final_output

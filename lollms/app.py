@@ -917,7 +917,7 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning("Couldn't add documentation to the context. Please verify the vector database")
             
-            if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
+            if not self.personality.ignore_discussion_documents_rag and (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
                 if discussion is None:
                     discussion = self.recover_discussion(client_id)
 
