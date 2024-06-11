@@ -150,7 +150,6 @@ class LollmsFooocus(LollmsTTI):
                 self,
                 positive_prompt,
                 negative_prompt,
-                files=[],
                 sampler_name="Euler",
                 seed=-1,
                 scale=7.5,

@@ -52,11 +52,16 @@ class LollmsDalle(LollmsTTI):
                 self,
                 positive_prompt,
                 negative_prompt,
+                sampler_name="Euler",
+                seed=-1,
+                scale=7.5,
+                steps=20,
+                img2img_denoising_strength=0.9,
                 width=512,
                 height=512,
-                images = [],
-                generation_engine=None,
-                output_path = None
+                restore_faces=True,
+                output_path=None,
+                generation_engine=None
                 ):
         if output_path is None:
             output_path = self.output_path
@@ -126,33 +131,18 @@ class LollmsDalle(LollmsTTI):
     def paint_from_images(self, positive_prompt: str, images: List[str], negative_prompt: str = "") -> List[Dict[str, str]]:
         if output_path is None:
             output_path = self.output_path
-        if generation_engine is None:
-            generation_engine = self.generation_engine
         if not PackageManager.check_package_installed("openai"):
             PackageManager.install_package("openai")
         import openai
         openai.api_key = self.key
-        if generation_engine=="dall-e-2":
-            supported_resolutions = [
-                [512, 512],
-                [1024, 1024],
-            ]
-            # Find the closest resolution
-            closest_resolution = min(supported_resolutions, key=lambda res: abs(res[0] - width) + abs(res[1] - height))
-            
-        else:
-            supported_resolutions = [
-                [1024, 1024],
-                [1024, 1792],
-                [1792, 1024]
-            ]
-            # Find the closest resolution
-            if width>height:
-                closest_resolution = [1792, 1024]
-            elif width<height: 
-                closest_resolution = [1024, 1792]
-            else:
-                closest_resolution = [1024, 1024]
+        generation_engine="dall-e-2"
+        supported_resolutions = [
+            [512, 512],
+            [1024, 1024],
+        ]
+        # Find the closest resolution
+        closest_resolution = min(supported_resolutions, key=lambda res: abs(res[0] - width) + abs(res[1] - height))
+
 
 
         # Update the width and height

@@ -1010,8 +1010,7 @@ class AIPersonality:
             self.audio_files.append(path)
             if process:
                 self.new_message("")
-                self.info(f"Transcribing ... ")
-                self.step_start("Transcribing ... ")
+                self.ShowBlockingMessage(f"Transcribing ... ")
                 if self.app.stt is None:
                     self.InfoMessage("No STT service is up.\nPlease configure your default STT service in the settings page.")
                     return
@@ -1022,7 +1021,6 @@ class AIPersonality:
 
                 self.info(f"File saved to {transcription_fn}")
                 self.full(text)
-                self.step_end("Transcribing ... ")
         elif path.suffix in [".png",".jpg",".jpeg",".gif",".bmp",".svg",".webp"]:
             self.image_files.append(path)
             if process:
@@ -2333,10 +2331,14 @@ class APScript(StateMachine):
                 self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
                 summary = f"{answer_start}"+ self.fast_gen(
                             "\n".join([
-                                f"{start_header_id_template}Document_chunk{end_header_id_template}{doc_name}:",
+                                f"{start_header_id_template}Previous_chunks_summary{end_header_id_template}",
                                 f"{summary}",
+                                f"{start_header_id_template}Current_chunk{end_header_id_template}",
                                 f"{chunk}",
                                 f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
+                                f"Summerize the current chunk and fuse it with previous chunk summary ion order to keep the required informations.",
+                                f"The summary needs to keep all relevant information.",
+                                f"Be precise and do not invent information that does not exist in the previous summary or the current chunk.",
                                 f"Answer directly with the summary with no extra comments.",
                                 f"{start_header_id_template}summary{end_header_id_template}",
                                 f"{answer_start}"

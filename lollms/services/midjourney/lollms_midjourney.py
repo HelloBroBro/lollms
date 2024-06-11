@@ -50,11 +50,15 @@ class LollmsMidjourney(LollmsTTI):
                 self,
                 positive_prompt,
                 negative_prompt,
+                sampler_name="Euler",
+                seed=-1,
+                scale=7.5,
+                steps=20,
+                img2img_denoising_strength=0.9,
                 width=512,
                 height=512,
-                images = [],
-                generation_engine=None,
-                output_path = None
+                restore_faces=True,
+                output_path=None
                 ):
         if output_path is None:
             output_path = self.output_path
