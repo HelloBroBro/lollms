@@ -1125,7 +1125,7 @@ class LollmsApplication(LoLLMsCom):
 
         # Build the final discussion messages by detokenizing the full_message_list
         discussion_messages = ""
-        for i in range(len(full_message_list)-1):
+        for i in range(len(full_message_list)-1 if not is_continue else len(full_message_list)):
             message_tokens = full_message_list[i]
             discussion_messages += self.model.detokenize(message_tokens)
         
@@ -1134,7 +1134,7 @@ class LollmsApplication(LoLLMsCom):
         else:
             ai_prefix = ""
         # Build the final prompt by concatenating the conditionning and discussion messages
-        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + start_ai_header_id_template + ai_prefix + end_ai_header_id_template
+        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + (start_ai_header_id_template + ai_prefix + end_ai_header_id_template if not is_continue else '')
 
         # Tokenize the prompt data
         tokens = self.model.tokenize(prompt_data)

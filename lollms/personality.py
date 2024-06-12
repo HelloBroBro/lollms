@@ -3587,7 +3587,7 @@ The AI should respond in this format using data from actions_list:
 
             outputs = self.execute_function_calls(function_calls,function_definitions)
             final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
-            out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output
+            out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output + "\n"
             if prompt_after_execution:
                 if separate_output:
                     self.full(final_output)

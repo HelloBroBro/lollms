@@ -126,7 +126,7 @@ class LollmsDalle(LollmsTTI):
         else:
             ASCIIColors.red("Failed to download the image")
 
-        return file_name
+        return file_name, {"positive_prompt":positive_prompt}
     
     def paint_from_images(self, positive_prompt: str, images: List[str], negative_prompt: str = "") -> List[Dict[str, str]]:
         if output_path is None:
