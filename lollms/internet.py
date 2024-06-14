@@ -157,7 +157,10 @@ def get_relevant_text_block(
     vectorizer,
     title=None,
     brief=None,
-    wait_step_delay=0.5
+    wait_step_delay=0.5,
+    query="",
+    asses_using_llm=True,
+    yes_no=None
 ):
     from bs4 import BeautifulSoup
     import time
@@ -193,7 +196,11 @@ def get_relevant_text_block(
             document_id["title"] = title
             document_id["brief"] = brief
             text_block=text_block.strip()
-            vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
+            if asses_using_llm and yes_no is not None:
+                if yes_no(f"Is this content relevant to the query: {query}", text_block):
+                    vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
+            else:
+                vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
             return True
         else:
             body = soup.body
@@ -205,6 +212,7 @@ def get_relevant_text_block(
                 document_id["title"] = title
                 document_id["brief"] = brief
                 text_block=text_block.strip()
+
                 vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
                 return True
             else:
@@ -314,7 +322,7 @@ def internet_search(query, internet_nb_search_pages, chromedriver_path=None, qui
 
     return search_results
 
-def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorize=True):
+def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorize=True, asses_using_llm=True, yes_no=None):
     """
     """
 
@@ -343,7 +351,7 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
         if quick_search:
             vectorizer.add_document({'url':href, 'title':title, 'brief': brief}, brief)
         else:
-            get_relevant_text_block(href, driver, internet_vectorization_chunk_size, internet_vectorization_overlap_size, vectorizer, title, brief)
+            get_relevant_text_block(href, driver, internet_vectorization_chunk_size, internet_vectorization_overlap_size, vectorizer, title, brief, query=query, asses_using_llm=asses_using_llm, yes_no=yes_no)
         nb_non_empty += 1
         if nb_non_empty>=internet_nb_search_pages:
             break

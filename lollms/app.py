@@ -863,14 +863,29 @@ class LollmsApplication(LoLLMsCom):
                     discussion = self.recover_discussion(client_id)
                 if self.config.internet_activate_search_decision:
                     self.personality.step_start(f"Requesting if {self.personality.name} needs to search internet to answer the user")
-                    need = not self.personality.yes_no(f"{start_header_id_template}{system_message_template}{end_header_id_template}Answer the question with yes or no. Don't add any extra explanation.{separator_template}{start_header_id_template}user: Do you have enough information to give a satisfactory answer to {self.config.user_name}'s request without internet search? (If you do not know or you can't answer 0 (no)", discussion)
+                    q = f"{separator_template}".join([
+                        f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+                        f"Answer the question with yes or no. Don't add any extra explanation.",
+                        f"{start_user_header_id_template}user{end_user_header_id_template}",
+                        f"Do you have enough information to give a satisfactory answer to {self.config.user_name}'s request without internet search?",
+                        "(If you do not know or you can't answer the question, return 0 (no)"
+                    ])
+                    need = not self.personality.yes_no(q, discussion)
                     self.personality.step_end(f"Requesting if {self.personality.name} needs to search internet to answer the user")
                     self.personality.step("Yes" if need else "No")
                 else:
                     need=True
                 if need:
                     self.personality.step_start("Crafting internet search query")
-                    query = self.personality.fast_gen(f"{start_header_id_template}discussion{end_header_id_template}\n{discussion[-2048:]}{separator_template}{start_header_id_template}system: Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}current date: {datetime.now()}{separator_template}{start_header_id_template}websearch query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                    q = f"{separator_template}".join([
+                        f"{start_header_id_template}discussion{end_header_id_template}",
+                        f"{discussion[-2048:]}{start_header_id_template}system{end_header_id_template}",
+                        f"Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.",
+                        f"Do not answer the prompt. Do not add explanations.",
+                        f"{start_header_id_template}current date{end_header_id_template}{datetime.now()}",
+                        f"{start_header_id_template}websearch query{end_header_id_template}"
+                    ])
+                    query = self.personality.fast_gen(q, max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     self.personality.step_end("Crafting internet search query")
                     self.personality.step(f"web search query: {query}")
 
@@ -879,9 +894,9 @@ class LollmsApplication(LoLLMsCom):
                     else:
                         self.personality.step_start("Performing Internet search (advanced mode: slower but more advanced)")
 
-                    internet_search_results=f"{start_header_id_template}instructions{end_header_id_template}Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.{separator_template}{start_header_id_template}Web search results:\n"
+                    internet_search_results=f"{start_header_id_template}{system_message_template}{end_header_id_template}Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.{separator_template}{start_header_id_template}Web search results{end_header_id_template}\n"
 
-                    docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search)
+                    docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search, asses_using_llm=self.config.activate_internet_pages_judgement)
                     
                     if len(docs)>0:
                         for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):

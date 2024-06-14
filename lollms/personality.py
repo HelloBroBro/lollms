@@ -396,19 +396,21 @@ class AIPersonality:
         f' </details>\n'
         ])
 
-    def internet_search_with_vectorization(self, query, quick_search:bool=False):
+    def internet_search_with_vectorization(self, query, quick_search:bool=False, asses_using_llm=True):
         """
         Do internet search and return the result
         """
         from lollms.internet import internet_search_with_vectorization
         return internet_search_with_vectorization(
                                                     query,
-                                                    internet_nb_search_pages=self.config.internet_nb_search_pages,
-                                                    internet_vectorization_chunk_size=self.config.internet_vectorization_chunk_size,
-                                                    internet_vectorization_overlap_size=self.config.internet_vectorization_overlap_size,
-                                                    internet_vectorization_nb_chunks=self.config.internet_vectorization_nb_chunks,
+                                                    internet_nb_search_pages=int(self.config.internet_nb_search_pages),
+                                                    internet_vectorization_chunk_size=int(self.config.internet_vectorization_chunk_size),
+                                                    internet_vectorization_overlap_size=int(self.config.internet_vectorization_overlap_size),
+                                                    internet_vectorization_nb_chunks=int(self.config.internet_vectorization_nb_chunks),
                                                     model = self.model,
-                                                    quick_search=quick_search
+                                                    quick_search=quick_search,
+                                                    asses_using_llm=asses_using_llm,
+                                                    yes_no = self.yes_no
                                                     )
 
     def sink(self, s=None,i=None,d=None):

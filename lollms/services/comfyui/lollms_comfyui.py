@@ -33,6 +33,7 @@ from lollms.tti import LollmsTTI
 import subprocess
 import shutil
 from tqdm import tqdm
+import threading
 
 if not PackageManager.check_package_installed("websocket"):
     PackageManager.install_or_update("websocket-client")
@@ -224,10 +225,14 @@ class LollmsComfyUI(LollmsTTI):
 
         # Wait until the service is available at http://127.0.0.1:8188//
         if wait_for_service:
-            self.wait_for_service(max_retries=max_retries)
+            self.wait_for_service()
         else:
-            ASCIIColors.warning("We are not waiting for the SD service to be up.\nThis means that you may need to wait a bit before you can use it.")
+            self.wait_for_service_in_another_thread(max_retries=max_retries)
 
+    def wait_for_service_in_another_thread(self, max_retries=150, show_warning=True):
+        thread = threading.Thread(target=self.wait_for_service, args=(max_retries, show_warning))
+        thread.start()
+        return thread
 
     def wait_for_service(self, max_retries = 50, show_warning=True):
         url = f"{self.comfyui_base_url}"

@@ -96,21 +96,21 @@ def build_image_function(processor, client):
             return {
                     "function_name": "build_image",
                     "function": partial(build_image, processor=processor, client=client),
-                    "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
+                    "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024. Width and height have to be divisible by 8.",
                     "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "negative_prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
                 }
         else:
             return {
                     "function_name": "build_image",
                     "function": partial(build_image, processor=processor, client=client, negative_prompt=processor.config.default_negative_prompt),
-                    "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
+                    "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024. Width and height have to be divisible by 8.",
                     "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
                 }
     else:
         return {
                 "function_name": "build_image",
                 "function": partial(build_image, processor=processor, client=client, negative_prompt=""),
-                "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024.",
+                "function_description": "Builds and shows an image from a prompt and width and height parameters. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024. Width and height have to be divisible by 8.",
                 "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}]                
             }
 

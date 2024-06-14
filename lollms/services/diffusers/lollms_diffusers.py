@@ -126,22 +126,33 @@ class LollmsDiffusers(LollmsTTI):
             PackageManager.install_or_update("diffusers")
             PackageManager.install_or_update("sentencepiece")
             PackageManager.install_or_update("accelerate")
-             
-        from diffusers import AutoPipelineForText2Image, AutoPipelineForImage2Image#PixArtSigmaPipeline
-        self.model = AutoPipelineForText2Image.from_pretrained(
-            app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.models_dir,
-            use_safetensors=True,
-        )
-        # self.model = StableDiffusionPipeline.from_pretrained(
-        #     "CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16, cache_dir=self.models_dir,
-        #     use_safetensors=True,
-        # ) # app.config.diffusers_model
-        # Enable memory optimizations.
-        if app.config.diffusers_offloading_mode=="sequential_cpu_offload":
-            self.model.enable_sequential_cpu_offload()
-        elif app.coinfig.diffusers_offloading_mode=="model_cpu_offload":
-            self.model.enable_model_cpu_offload()
-
+        try:
+            if "stable-diffusion-3" in app.config.diffusers_model:
+                from diffusers import StableDiffusion3Pipeline # AutoPipelineForImage2Image#PixArtSigmaPipeline
+                self.model = StableDiffusion3Pipeline.from_pretrained(
+                    app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.models_dir,
+                    use_safetensors=True,
+                )
+            else:
+                from diffusers import AutoPipelineForText2Image # AutoPipelineForImage2Image#PixArtSigmaPipeline
+                self.model = AutoPipelineForText2Image.from_pretrained(
+                    app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.models_dir,
+                    use_safetensors=True,
+                )
+            
+            # AutoPipelineForText2Image
+            # self.model = StableDiffusionPipeline.from_pretrained(
+            #     "CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16, cache_dir=self.models_dir,
+            #     use_safetensors=True,
+            # ) # app.config.diffusers_model
+            # Enable memory optimizations.
+            if app.config.diffusers_offloading_mode=="sequential_cpu_offload":
+                self.model.enable_sequential_cpu_offload()
+            elif app.coinfig.diffusers_offloading_mode=="model_cpu_offload":
+                self.model.enable_model_cpu_offload()
+        except Exception as ex:
+            self.model= None
+            trace_exception(ex)
     @staticmethod
     def verify(app:LollmsApplication):
         # Clone repository
