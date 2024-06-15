@@ -43,7 +43,6 @@ def arxiv_pdf_search(query: str, max_results: Optional[int] = 5, sort_by: Option
         if author:
             url += f'&author={author}'
         
-        ASCIIColors.multicolor(["URL:",url],[ASCIIColors.red, ASCIIColors.yellow])
         response = requests.get(url)
         response.raise_for_status()
 
