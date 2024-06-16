@@ -163,6 +163,7 @@ class LollmsComfyUI(LollmsTTI):
                     share=False,
                     wait_for_service=True
                     ):
+        super().__init__("comfyui", app)
         if comfyui_base_url=="" or comfyui_base_url=="http://127.0.0.1:8188/":
             comfyui_base_url = None
         # Get the current directory
@@ -272,22 +273,28 @@ class LollmsComfyUI(LollmsTTI):
                 restore_faces=True,
                 output_path=None
                 ):
+        if output_path is None:
+            output_path = self.output_dir
         client_id = str(uuid.uuid4())
+        url = self.comfyui_base_url[7:-1]
 
         def queue_prompt(prompt):
             p = {"prompt": prompt, "client_id": client_id}
             data = json.dumps(p).encode('utf-8')
-            req =  request.Request("http://{}/prompt".format(self.comfyui_base_url), data=data)
+            full_url = "http://{}/prompt".format(url)
+            req =  request.Request(full_url, data=data)
             return json.loads(request.urlopen(req).read())
 
-        def get_image(filename, subfolder, folder_type):
-            data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
+        def get_image(filename, subfolder):
+            data = {"filename": filename, "subfolder": subfolder}
             url_values = parse.urlencode(data)
-            with request.urlopen("http://{}/view?{}".format(self.comfyui_base_url, url_values)) as response:
+            full_url = "http://{}/view?{}".format(url, url_values)
+            with request.urlopen(full_url) as response:
                 return response.read()
 
         def get_history(prompt_id):
-            with request.urlopen("http://{}/history/{}".format(self.comfyui_base_url, prompt_id)) as response:
+            url_values = "http://{}/history/{}".format(url, prompt_id)
+            with request.urlopen(url_values) as response:
                 return json.loads(response.read())
 
         def get_images(ws, prompt):
@@ -311,116 +318,110 @@ class LollmsComfyUI(LollmsTTI):
                     if 'images' in node_output:
                         images_output = []
                         for image in node_output['images']:
-                            image_data = get_image(image['filename'], image['subfolder'], image['type'])
-                            images_output.append(image_data)
-                    output_images[node_id] = images_output
+                            if image["type"]=="output":
+                                image_data = get_image(image['filename'], image['subfolder'])
+                                images_output.append(image_data)
 
-            return output_images
-
+            return images_output
+        
+        def save_images(images:dict, folder_path:str|Path):
+            # Create the folder if it doesn't exist
+            folder = Path(folder_path)
+            folder.mkdir(parents=True, exist_ok=True)
+            
+            # Save each image to the folder
+            for i, img_data in enumerate(images):
+                img_path = folder / f'image_{i+1}.png'
+                with open(img_path, 'wb') as img_file:
+                    img_file.write(img_data)
+        
+            # Return the path to the first image
+            return str(folder / 'image_1.png')
         prompt_text = """
         {
-            "3": {
-                "class_type": "KSampler",
-                "inputs": {
-                    "cfg": 8,
-                    "denoise": 1,
-                    "latent_image": [
-                        "5",
-                        0
-                    ],
-                    "model": [
-                        "4",
-                        0
-                    ],
-                    "negative": [
-                        "7",
-                        0
-                    ],
-                    "positive": [
-                        "6",
-                        0
-                    ],
-                    "sampler_name": "euler",
-                    "scheduler": "normal",
-                    "seed": 8566257,
-                    "steps": 20
-                }
+        "1": {
+            "inputs": {
+            "base_ckpt_name": "juggernaut.safetensors",
+            "base_clip_skip": -2,
+            "refiner_ckpt_name": "None",
+            "refiner_clip_skip": -2,
+            "positive_ascore": 6,
+            "negative_ascore": 2,
+            "vae_name": "Baked VAE",
+            "positive": "smart robot icon, slick, flat design, high res, W in the center, black background",
+            "negative": "ugly, deformed, badly rendered, fuzzy",
+            "token_normalization": "none",
+            "weight_interpretation": "comfy",
+            "empty_latent_width": 1024,
+            "empty_latent_height": 1024,
+            "batch_size": 1
             },
-            "4": {
-                "class_type": "CheckpointLoaderSimple",
-                "inputs": {
-                    """+f"""
-                    "ckpt_name": "{self.app.config.comfyui_model}"
-                    """+"""
-                }
+            "class_type": "Eff. Loader SDXL",
+            "_meta": {
+            "title": "Eff. Loader SDXL"
+            }
+        },
+        "2": {
+            "inputs": {
+            "noise_seed": 74738751167752,
+            "steps": 20,
+            "cfg": 7,
+            "sampler_name": "euler",
+            "scheduler": "normal",
+            "start_at_step": 0,
+            "refine_at_step": -1,
+            "preview_method": "auto",
+            "vae_decode": "true",
+            "sdxl_tuple": [
+                "1",
+                0
+            ],
+            "latent_image": [
+                "1",
+                1
+            ],
+            "optional_vae": [
+                "1",
+                2
+            ]
             },
-            "5": {
-                "class_type": "EmptyLatentImage",
-                "inputs": {
-                    "batch_size": 1,
-                    "height": 512,
-                    "width": 512
-                }
+            "class_type": "KSampler SDXL (Eff.)",
+            "_meta": {
+            "title": "KSampler SDXL (Eff.)"
+            }
+        },
+        "3": {
+            "inputs": {
+            "filename_prefix": "ComfyUI",
+            "images": [
+                "2",
+                3
+            ]
             },
-            "6": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "clip": [
-                        "4",
-                        1
-                    ],"""+f"""
-                    "text": "{positive_prompt}"
-                    """+"""
-                }
-            },
-            "7": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "clip": [
-                        "4",
-                        1
-                    ],"""+f"""
-                    "text": "{negative_prompt}"
-                    """+"""
-                }
-            },
-            "8": {
-                "class_type": "VAEDecode",
-                "inputs": {
-                    "samples": [
-                        "3",
-                        0
-                    ],
-                    "vae": [
-                        "4",
-                        2
-                    ]
-                }
-            },
-            "9": {
-                "class_type": "SaveImage",
-                "inputs": {
-                    "filename_prefix": "ComfyUI",
-                    "images": [
-                        "8",
-                        0
-                    ]
-                }
+            "class_type": "SaveImage",
+            "_meta": {
+            "title": "Save Image"
             }
         }
+        }
         """
+            
 
         prompt = json.loads(prompt_text)
         #set the text prompt for our positive CLIPTextEncode
-        prompt["6"]["inputs"]["text"] = "masterpiece best quality man"
-
-        #set the seed for our KSampler node
-        prompt["3"]["inputs"]["seed"] = 5
-
+        prompt["1"]["inputs"]["positive"] = prompt_text
+        prompt["1"]["inputs"]["negative"] = negative_prompt
+        prompt["1"]["inputs"]["empty_latent_width"] = width
+        prompt["1"]["inputs"]["empty_latent_height"] = height
+        
+        prompt["1"]["inputs"]["base_ckpt_name"] = self.app.config.comfyui_model
+        
         ws = websocket.WebSocket()
-        ws.connect("ws://{}/ws?clientId={}".format(self.comfyui_base_url, client_id))
+        ws.connect("ws://{}/ws?clientId={}".format(url, client_id))
         images = get_images(ws, prompt)
-        return None
+        
+        return save_images(images, output_path), {"prompt":prompt,"negative_prompt":negative_prompt}
+        
     
     def paint_from_images(self, positive_prompt: str, 
                             images: List[str], 

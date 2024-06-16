@@ -69,13 +69,17 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
         elif processor.personality.config.active_tti_service=="comfyui":
             if not processor.personality.app.tti:
                 from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
-                processor.step_start("Loading dalle service")
-                processor.personality.app.tti = LollmsComfyUI(processor.personality.app, comfyui_base_url=processor.personality)
+                processor.step_start("Loading comfyui service")
+                processor.personality.app.tti = LollmsComfyUI(
+                                                                    processor.personality.app,
+                                                                    comfyui_base_url=processor.config.comfyui_base_url
+                                                            )
                 processor.personality.app.dalle = processor.personality.app.tti
-                processor.step_end("Loading dalle service")
+                processor.step_end("Loading comfyui service")
             processor.step_start("Painting")
             file = processor.personality.app.tti.paint(
-                            prompt, 
+                            prompt,
+                            negative_prompt,
                             width = width,
                             height = height,
                             output_path=client.discussion.discussion_folder
@@ -87,7 +91,7 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
         return f'\n![]({escaped_url})'
     except Exception as ex:
         trace_exception(ex)
-        return "Couldn't generate image. Make sure Auto1111's stable diffusion service is installed"
+        return f"Couldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"
 
 
 def build_image_function(processor, client):

@@ -409,7 +409,7 @@ class LollmsApplication(LoLLMsCom):
                     from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
                     self.comfyui = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
                 except:
-                    self.warning(f"Couldn't load SD")
+                    self.warning(f"Couldn't load Comfyui")
 
             if self.config.enable_motion_ctrl_service and self.motion_ctrl is None:
                 try:
@@ -921,7 +921,7 @@ class LollmsApplication(LoLLMsCom):
                 else:
                     query = current_message.content
                 try:
-                    docs, sorted_similarities, document_ids = self.personality.persona_data_vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
+                    docs, sorted_similarities, document_ids = self.personality.persona_data_vectorizer.recover_text(query, top_k=int(self.config.data_vectorization_nb_chunks))
                     for doc, infos, doc_id in zip(docs, sorted_similarities, document_ids):
                         if self.config.data_vectorization_put_chunk_informations_into_context:
                             documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk_infos:{infos}\ncontent:{doc}\n"
@@ -959,7 +959,7 @@ class LollmsApplication(LoLLMsCom):
                         else:
                             documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{content}\n"
 
-                    docs, sorted_similarities, document_ids = client.discussion.vectorizer.recover_text(query, top_k=self.config.data_vectorization_nb_chunks)
+                    docs, sorted_similarities, document_ids = client.discussion.vectorizer.recover_text(query, top_k=int(self.config.data_vectorization_nb_chunks))
                     for doc, infos in zip(docs, sorted_similarities):
                         if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0 and infos[0]==doc_id:
                             continue
