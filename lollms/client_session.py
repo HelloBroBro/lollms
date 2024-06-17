@@ -16,6 +16,7 @@ class Client:
         self.db_name = db
         self.rooms = set()
 
+        self.rag_databases = []
         self.generated_text = ""
         self.cancel_generation = False
         self.generation_thread:Thread = None

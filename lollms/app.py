@@ -73,17 +73,19 @@ class LollmsApplication(LoLLMsCom):
         
 
         # services
-        self.ollama = None
-        self.vllm = None
-        self.whisper = None
-        self.xtts = None
-        self.sd = None
-        self.comfyui = None
-        self.motion_ctrl = None
+        self.ollama         = None
+        self.vllm           = None
+        self.whisper        = None
+        self.xtts           = None
+        self.sd             = None
+        self.comfyui        = None
+        self.motion_ctrl    = None
 
         self.tti = None
         self.tts = None
         self.stt = None
+        self.ttm = None
+        self.ttv = None
 
         self.rt_com = None
         if not free_mode:
@@ -251,7 +253,7 @@ class LollmsApplication(LoLLMsCom):
 
         ASCIIColors.yellow("* - * - * - Starting services - * - * - *")
 
-
+        ASCIIColors.blue("Loading TTT services")
         if self.config.enable_ollama_service:
             try:
                 from lollms.services.ollama.lollms_ollama import Service
@@ -275,6 +277,7 @@ class LollmsApplication(LoLLMsCom):
             except Exception as ex:
                 trace_exception(ex)
 
+        ASCIIColors.blue("Loading TTS services")
         ASCIIColors.yellow(f" -> self.config.xtts_enable: {self.config.xtts_enable}")
         ASCIIColors.yellow(f" -> self.config.active_stt_service: {self.config.active_stt_service}")
         if self.config.xtts_enable or self.config.active_tts_service == "xtts":
@@ -299,6 +302,7 @@ class LollmsApplication(LoLLMsCom):
             except:
                 self.warning(f"Couldn't load XTTS")
 
+        ASCIIColors.blue("Loading TTI services")
         if self.config.enable_sd_service:
             try:
                 from lollms.services.sd.lollms_sd import LollmsSD
@@ -335,12 +339,15 @@ class LollmsApplication(LoLLMsCom):
             from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
             self.tti = LollmsMidjourney(self, self.config.midjourney_key)
 
+        ASCIIColors.blue("Loading TTS services")
+
         if self.config.active_tts_service == "openai_tts":
             from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
             self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
         elif self.config.active_tts_service == "xtts" and self.xtts:
             self.tts = self.xtts
 
+        ASCIIColors.blue("Loading STT services")
         if self.config.active_stt_service == "openai_whisper":
             from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
             self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
