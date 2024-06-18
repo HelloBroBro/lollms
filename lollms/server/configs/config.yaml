@@ -1,5 +1,5 @@
 # =================== Lord Of Large Language Multimodal Systems Configuration file =========================== 
-version: 106
+version: 114
 binding_name: null
 model_name: null
 model_variant: null
@@ -31,7 +31,17 @@ app_custom_logo: ""
 discussion_prompt_separator: "!@>"
 start_header_id_template: "!@>"
 end_header_id_template: ": "
+
 separator_template: "\n"
+
+start_user_header_id_template: "!@>"
+end_user_header_id_template: ": "
+end_user_message_id_template: ""
+
+start_ai_header_id_template: "!@>"
+end_ai_header_id_template: ": "
+end_ai_message_id_template: ""
+
 system_message_template: "system"
 
 seed: -1
@@ -152,9 +162,18 @@ openai_tts_voice: "alloy"
 
 # ***************** TTI *****************
 
+use_negative_prompt: true
+use_ai_generated_negative_prompt: false
+negative_prompt_generation_prompt: Generate negative prompt for the following prompt. negative prompt is a set of words that describe things we do not want to have in the generated image.
+default_negative_prompt: (((text))), (((ugly))), (((duplicate))), ((morbid)), ((mutilated)), out of frame, extra fingers, mutated hands, ((poorly drawn hands)), ((poorly drawn face)), (((mutation))), (((deformed))), blurry, ((bad anatomy)), (((bad proportions))), ((extra limbs)), cloned face, (((disfigured))), ((extra arms)), (((extra legs))), mutated hands, (fused fingers), (too many fingers), (((long neck))), ((watermark)), ((robot eyes))
+
 # Image generation service
 enable_sd_service: false
 sd_base_url: http://localhost:7860
+
+# Image generation service
+enable_fooocus_service: false
+fooocus_base_url: http://localhost:7860
 
 # diffuser
 diffusers_offloading_mode: sequential_cpu_offload # sequential_cpu_offload
@@ -170,6 +189,7 @@ midjourney_key: ""
 # Image generation service comfyui
 enable_comfyui_service: false
 comfyui_base_url: http://127.0.0.1:8188/
+comfyui_model: v1-5-pruned-emaonly.ckpt
 
 # Motion control service
 enable_motion_ctrl_service: false
@@ -219,6 +239,8 @@ audio_auto_send_input: true
 audio_silenceTimer: 5000
 
 # Data vectorization
+rag_databases: [] # This is the list of paths to database sources. Each database is a folder containing data
+
 activate_skills_lib: false # Activate vectorizing previous conversations
 skills_lib_database_name: "default" # Default skills database
 
@@ -240,10 +262,11 @@ data_vectorization_make_persistance: false # If true, the data will be persistan
 
 # Activate internet search
 activate_internet_search: false
+activate_internet_pages_judgement: true
 internet_vectorization_chunk_size: 512 # chunk size
-internet_vectorization_overlap_size: 128 # overlap between chunks size
-internet_vectorization_nb_chunks: 2 # number of chunks to use
-internet_nb_search_pages: 3 # number of pages to select
+internet_vectorization_overlap_size: 0 # overlap between chunks size
+internet_vectorization_nb_chunks: 4 # number of chunks to use
+internet_nb_search_pages: 8 # number of pages to select
 internet_quick_search: false # If active the search engine will not load and read the webpages
 internet_activate_search_decision: false # If active the ai decides by itself if it needs to do search
 # Helpers

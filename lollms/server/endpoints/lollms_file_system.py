@@ -161,6 +161,23 @@ def select_rag_database() -> Optional[Dict[str, Path]]:
     except Exception as e:
         print(f"An error occurred: {e}")
         return None
+
+def find_rag_database_by_name(entries: List[str], name: str) -> Optional[str]:
+    """
+    Finds an entry in the list by its name.
+
+    Args:
+        entries (List[str]): The list of entries in the form 'name::path'.
+        name (str): The name to search for.
+
+    Returns:
+        Optional[str]: The entry if found, otherwise None.
+    """
+    for i, entry in enumerate(entries):
+        entry_name, entry_path = entry.split('::')
+        if entry_name == name:
+            return i, entry_path
+    return None
 # ----------------------------------- Personal files -----------------------------------------
 class SelectDatabase(BaseModel):
     client_id: str
@@ -209,6 +226,17 @@ def mount_rag_database(database_infos: MountDatabase):
     Selects and names a database 
     """ 
     client = check_access(lollmsElfServer, database_infos.client_id)
-    client.rag_databases.append(database_infos.database_name)
-    return select_rag_database()
+    index, path = find_rag_database_by_name(lollmsElfServer.config.rag_databases,database_infos.database_name)
+    if not lollmsElfServer.config.rag_databases[index].split("::")[-1]=="mounted":
+        lollmsElfServer.config.rag_databases[index] = lollmsElfServer.config.rag_databases[index] + "::mounted"
+        if not PackageManager.check_package_installed("lollmsvectordb"):
+            PackageManager.install_package("lollmsvectordb")
+        
+        from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+        from lollmsvectordb import VectorDatabase
+        from lollmsvectordb.text_document_loader import TextDocumentsLoader
+        v = BERTVectorizer()
+        vdb = VectorDatabase(Path(path)/"db_name.sqlite", v)       
+        vdb.build_index() 
+        lollmsElfServer.active_rag_dbs.append({"name":database_infos.database_name,"path":path,"vectorizer":vdb})
 

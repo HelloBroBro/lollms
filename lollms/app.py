@@ -27,6 +27,8 @@ import platform
 import gc
 import yaml
 import time
+from lollms.utilities import PackageManager
+
 class LollmsApplication(LoLLMsCom):
     def __init__(
                     self, 
@@ -86,6 +88,25 @@ class LollmsApplication(LoLLMsCom):
         self.stt = None
         self.ttm = None
         self.ttv = None
+
+        try:
+            self.load_rag_dbs()
+        except Exception as ex:
+            trace_exception(ex)
+
+        for entry in self.config.rag_databases:
+            if "mounted" in entry:
+                parts = entry.split("::")
+                if not PackageManager.check_package_installed("lollmsvectordb"):
+                    PackageManager.install_package("lollmsvectordb")
+                
+                from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                from lollmsvectordb import VectorDatabase
+                from lollmsvectordb.text_document_loader import TextDocumentsLoader
+                v = BERTVectorizer()
+                vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v)
+                vdb.build_index()                 
+                self.active_rag_dbs.append({"name":parts[0],"path":parts[1],"vectorizer":vdb})
 
         self.rt_com = None
         if not free_mode:
@@ -248,12 +269,29 @@ class LollmsApplication(LoLLMsCom):
 
     def get_uploads_path(self, client_id):
         return self.lollms_paths.personal_uploads_path
+    
+    def load_rag_dbs(self):
+        self.active_rag_dbs = []
+        for rag_db in self.config.rag_databases:
+            parts = rag_db.split("::")
+            if parts[-1]=="mounted":
+                if not PackageManager.check_package_installed("lollmsvectordb"):
+                    PackageManager.install_package("lollmsvectordb")
+                
+                from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                from lollmsvectordb import VectorDatabase
+                from lollmsvectordb.text_document_loader import TextDocumentsLoader
+                v = BERTVectorizer()
+                vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v)       
+                vdb.build_index() 
+                self.active_rag_dbs.append({"name":parts[0],"path":parts[1],"vectorizer":vdb})
+
 
     def start_servers(self):
 
         ASCIIColors.yellow("* - * - * - Starting services - * - * - *")
 
-        ASCIIColors.blue("Loading TTT services")
+        ASCIIColors.blue("Loading local TTT services")
         if self.config.enable_ollama_service:
             try:
                 from lollms.services.ollama.lollms_ollama import Service
@@ -270,6 +308,7 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
                 self.warning(f"Couldn't load vllm")
 
+        ASCIIColors.blue("Loading loacal STT services")
         if self.config.whisper_activate or self.config.active_stt_service == "whisper":
             try:
                 from lollms.services.whisper.lollms_whisper import LollmsWhisper
@@ -277,9 +316,7 @@ class LollmsApplication(LoLLMsCom):
             except Exception as ex:
                 trace_exception(ex)
 
-        ASCIIColors.blue("Loading TTS services")
-        ASCIIColors.yellow(f" -> self.config.xtts_enable: {self.config.xtts_enable}")
-        ASCIIColors.yellow(f" -> self.config.active_stt_service: {self.config.active_stt_service}")
+        ASCIIColors.blue("Loading local TTS services")
         if self.config.xtts_enable or self.config.active_tts_service == "xtts":
             ASCIIColors.yellow("Loading XTTS")
             try:
@@ -302,7 +339,7 @@ class LollmsApplication(LoLLMsCom):
             except:
                 self.warning(f"Couldn't load XTTS")
 
-        ASCIIColors.blue("Loading TTI services")
+        ASCIIColors.blue("Loading local TTI services")
         if self.config.enable_sd_service:
             try:
                 from lollms.services.sd.lollms_sd import LollmsSD
@@ -325,21 +362,30 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
                 self.warning(f"Couldn't load Motion control")
 
-        
+        ASCIIColors.blue("Activating TTI service")
         if self.config.active_tti_service == "diffusers":
             from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
             self.tti = LollmsDiffusers(self)
         elif self.config.active_tti_service == "autosd":
-            from lollms.services.sd.lollms_sd import LollmsSD
-            self.tti = LollmsSD(self)
+            if self.sd:
+                self.tti = self.sd
+            else:
+                from lollms.services.sd.lollms_sd import LollmsSD
+                self.tti = LollmsSD(self)
         elif self.config.active_tti_service == "dall-e":
             from lollms.services.dalle.lollms_dalle import LollmsDalle
             self.tti = LollmsDalle(self, self.config.dall_e_key)
         elif self.config.active_tti_service == "midjourney":
             from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
             self.tti = LollmsMidjourney(self, self.config.midjourney_key)
+        elif self.config.active_tti_service == "comfyui" and (self.tti is None or self.tti.name!="comfyui"):
+            if self.comfyui:
+                self.tti = self.comfyui
+            else:
+                from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+                self.tti = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
 
-        ASCIIColors.blue("Loading TTS services")
+        ASCIIColors.blue("Activating TTS services")
 
         if self.config.active_tts_service == "openai_tts":
             from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
@@ -360,6 +406,8 @@ class LollmsApplication(LoLLMsCom):
         ASCIIColors.yellow("* - * - * - Verifying services - * - * - *")
 
         try:
+            ASCIIColors.blue("Loading active local TTT services")
+            
             if self.config.enable_ollama_service and self.ollama is None:
                 try:
                     from lollms.services.ollama.lollms_ollama import Service
@@ -376,12 +424,16 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load vllm")
 
+            ASCIIColors.blue("Loading local STT services")
+
             if self.config.whisper_activate and self.whisper is None:
                 try:
                     from lollms.services.whisper.lollms_whisper import LollmsWhisper
                     self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
                 except Exception as ex:
                     trace_exception(ex)
+                    
+            ASCIIColors.blue("Loading loacal TTS services")
             if (self.config.xtts_enable or self.config.active_tts_service == "xtts") and self.xtts is None:
                 ASCIIColors.yellow("Loading XTTS")
                 try:
@@ -404,6 +456,7 @@ class LollmsApplication(LoLLMsCom):
                 except:
                     self.warning(f"Couldn't load XTTS")
 
+            ASCIIColors.blue("Loading local TTI services")
             if self.config.enable_sd_service and self.sd is None:
                 try:
                     from lollms.services.sd.lollms_sd import LollmsSD
@@ -426,25 +479,38 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     self.warning(f"Couldn't load Motion control")
 
+
+            ASCIIColors.blue("Activating TTI service")
             if self.config.active_tti_service == "diffusers" and (self.tti is None or self.tti.name!="diffusers"):
                 from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
             elif self.config.active_tti_service == "autosd" and (self.tti is None or self.tti.name!="stable_diffusion"):
-                from lollms.services.sd.lollms_sd import LollmsSD
-                self.tti = LollmsSD(self)
+                if self.sd:
+                    self.tti = self.sd
+                else:
+                    from lollms.services.sd.lollms_sd import LollmsSD
+                    self.tti = LollmsSD(self)
             elif self.config.active_tti_service == "dall-e" and (self.tti is None or self.tti.name!="dall-e-2" or type(self.tti.name)!="dall-e-3"):
                 from lollms.services.dalle.lollms_dalle import LollmsDalle
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
             elif self.config.active_tti_service == "midjourney" and (self.tti is None or self.tti.name!="midjourney"):
                 from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
                 self.tti = LollmsMidjourney(self, self.config.midjourney_key)
+            elif self.config.active_tti_service == "comfyui" and (self.tti is None or self.tti.name!="comfyui"):
+                if self.comfyui:
+                    self.tti = self.comfyui
+                else:
+                    from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+                    self.tti = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
 
+            ASCIIColors.blue("Activating TTS service")
             if self.config.active_tts_service == "openai_tts" and (self.tts is None or self.tts.name!="openai_tts"):
                 from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
+            ASCIIColors.blue("Activating STT service")
             if self.config.active_stt_service == "openai_whisper" and (self.tts is None or self.tts.name!="openai_whisper"):
                 from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
                 self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
@@ -762,6 +828,14 @@ class LollmsApplication(LoLLMsCom):
                 self.config.save_config()
         return True
 
+    def recover_discussion(self,client_id, message_index=-1):
+        messages = self.session.get_client(client_id).discussion.get_messages()
+        discussion=""
+        for msg in messages:
+            if message_index!=-1 and msg>message_index:
+                break
+            discussion += "\n" + self.config.discussion_prompt_separator + msg.sender + ": " + msg.content.strip()
+        return discussion
     # -------------------------------------- Prompt preparing
     def prepare_query(self, client_id: str, message_id: int = -1, is_continue: bool = False, n_tokens: int = 0, generation_type = None, force_using_internet=False) -> Tuple[str, str, List[str]]:
         """
@@ -938,74 +1012,99 @@ class LollmsApplication(LoLLMsCom):
                 except Exception as ex:
                     trace_exception(ex)
                     self.warning("Couldn't add documentation to the context. Please verify the vector database")
-            
-            if not self.personality.ignore_discussion_documents_rag and (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
-                if discussion is None:
-                    discussion = self.recover_discussion(client_id)
-
-                if documentation=="":
-                    documentation=f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.{separator_template}{start_header_id_template}Documentation:\n"
-
-                if self.config.data_vectorization_build_keys_words:
-                    self.personality.step_start("Building vector store query")
-                    query = self.personality.fast_gen(f"{separator_template}{start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
-                    self.personality.step_end("Building vector store query")
-                    ASCIIColors.cyan(f"Query: {query}")
-                else:
-                    query = current_message.content
-
-                try:
-                    if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0:
-                        doc_index = list(client.discussion.vectorizer.chunks.keys())[0]
-
-                        doc_id = client.discussion.vectorizer.chunks[doc_index]['document_id']
-                        content = client.discussion.vectorizer.chunks[doc_index]['chunk_text']
-                        
-                        if self.config.data_vectorization_put_chunk_informations_into_context:
-                            documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk_infos:{doc_id}\ncontent:{content}\n"
-                        else:
-                            documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{content}\n"
-
-                    docs, sorted_similarities, document_ids = client.discussion.vectorizer.recover_text(query, top_k=int(self.config.data_vectorization_nb_chunks))
-                    for doc, infos in zip(docs, sorted_similarities):
-                        if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0 and infos[0]==doc_id:
-                            continue
-                        if self.config.data_vectorization_put_chunk_informations_into_context:
-                            documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
-                        else:
-                            documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{doc}\n"
-
-                    documentation += f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
-                except Exception as ex:
-                    trace_exception(ex)
-                    self.warning("Couldn't add documentation to the context. Please verify the vector database")
-            # Check if there is discussion knowledge to add to the prompt
-            if self.config.activate_skills_lib:
-                try:
-                    self.personality.step_start("Querying skills library")
+            if not self.personality.ignore_discussion_documents_rag:
+                query = None
+                if len(self.active_rag_dbs) > 0 :
                     if discussion is None:
                         discussion = self.recover_discussion(client_id)
-                    self.personality.step_start("Building query")
-                    query = self.personality.fast_gen(f"{start_header_id_template}{system_message_template}{end_header_id_template}Your task is to carefully read the provided discussion and reformulate {self.config.user_name}'s request concisely. Return only the reformulated request without any additional explanations, commentary, or output.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}search query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
-                    self.personality.step_end("Building query")
-                    # skills = self.skills_library.query_entry(query)
-                    self.personality.step_start("Adding skills")
-                    if self.config.debug:
-                        ASCIIColors.info(f"Query : {query}")
-                    skill_titles, skills = self.skills_library.query_vector_db(query, top_k=3, max_dist=1000)#query_entry_fts(query)
-                    knowledge_infos={"titles":skill_titles,"contents":skills}
-                    if len(skills)>0:
-                        if knowledge=="":
-                            knowledge=f"{start_header_id_template}knowledge{end_header_id_template}\n"
-                        for i,(title, content) in enumerate(zip(skill_titles,skills)):
-                            knowledge += f"{start_header_id_template}knowledge {i}{end_header_id_template}\ntitle:\n{title}\ncontent:\n{content}\n"
-                    self.personality.step_end("Adding skills")
-                    self.personality.step_end("Querying skills library")
-                except Exception as ex:
-                    ASCIIColors.error(ex)
-                    self.warning("Couldn't add long term memory information to the context. Please verify the vector database")        # Add information about the user
-                    self.personality.step_end("Adding skills")
-                    self.personality.step_end("Querying skills library",False)
+
+                    if self.config.data_vectorization_build_keys_words:
+                        self.personality.step_start("Building vector store query")
+                        query = self.personality.fast_gen(f"{separator_template}{start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                        self.personality.step_end("Building vector store query")
+                        ASCIIColors.cyan(f"Query: {query}")
+                    else:
+                        query = current_message.content
+                    if documentation=="":
+                        documentation=f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.{separator_template}{start_header_id_template}Documentation:\n"
+                    results = []
+                    for db in self.active_rag_dbs:
+                        v = db["vectorizer"]
+                        r=v.search(query)
+                        results+=r
+                    n_neighbors = self.active_rag_dbs[0]["vectorizer"].n_neighbors
+                    sorted_results = sorted(results, key=lambda x: x[3])[:n_neighbors]
+                    for vector, text, title, distance in sorted_results:
+                        documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nsource_document_title:{title}\ncontent:{text}\n"
+
+                if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
+                    if discussion is None:
+                        discussion = self.recover_discussion(client_id)
+
+                    if documentation=="":
+                        documentation=f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.{separator_template}{start_header_id_template}Documentation:\n"
+
+                    if query is None:
+                        if self.config.data_vectorization_build_keys_words:
+                            self.personality.step_start("Building vector store query")
+                            query = self.personality.fast_gen(f"{separator_template}{start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                            self.personality.step_end("Building vector store query")
+                            ASCIIColors.cyan(f"Query: {query}")
+                        else:
+                            query = current_message.content
+
+                    try:
+                        if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0:
+                            doc_index = list(client.discussion.vectorizer.chunks.keys())[0]
+
+                            doc_id = client.discussion.vectorizer.chunks[doc_index]['document_id']
+                            content = client.discussion.vectorizer.chunks[doc_index]['chunk_text']
+                            
+                            if self.config.data_vectorization_put_chunk_informations_into_context:
+                                documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk_infos:{doc_id}\ncontent:{content}\n"
+                            else:
+                                documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{content}\n"
+
+                        docs, sorted_similarities, document_ids = client.discussion.vectorizer.recover_text(query, top_k=int(self.config.data_vectorization_nb_chunks))
+                        for doc, infos in zip(docs, sorted_similarities):
+                            if self.config.data_vectorization_force_first_chunk and len(client.discussion.vectorizer.chunks)>0 and infos[0]==doc_id:
+                                continue
+                            if self.config.data_vectorization_put_chunk_informations_into_context:
+                                documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nchunk path: {infos[0]}\nchunk content:\n{doc}\n"
+                            else:
+                                documentation += f"{start_header_id_template}chunk{end_header_id_template}\n{doc}\n"
+
+                        documentation += f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
+                    except Exception as ex:
+                        trace_exception(ex)
+                        self.warning("Couldn't add documentation to the context. Please verify the vector database")
+                # Check if there is discussion knowledge to add to the prompt
+                if self.config.activate_skills_lib:
+                    try:
+                        self.personality.step_start("Querying skills library")
+                        if discussion is None:
+                            discussion = self.recover_discussion(client_id)
+                        self.personality.step_start("Building query")
+                        query = self.personality.fast_gen(f"{start_header_id_template}{system_message_template}{end_header_id_template}Your task is to carefully read the provided discussion and reformulate {self.config.user_name}'s request concisely. Return only the reformulated request without any additional explanations, commentary, or output.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}search query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                        self.personality.step_end("Building query")
+                        # skills = self.skills_library.query_entry(query)
+                        self.personality.step_start("Adding skills")
+                        if self.config.debug:
+                            ASCIIColors.info(f"Query : {query}")
+                        skill_titles, skills = self.skills_library.query_vector_db(query, top_k=3, max_dist=1000)#query_entry_fts(query)
+                        knowledge_infos={"titles":skill_titles,"contents":skills}
+                        if len(skills)>0:
+                            if knowledge=="":
+                                knowledge=f"{start_header_id_template}knowledge{end_header_id_template}\n"
+                            for i,(title, content) in enumerate(zip(skill_titles,skills)):
+                                knowledge += f"{start_header_id_template}knowledge {i}{end_header_id_template}\ntitle:\n{title}\ncontent:\n{content}\n"
+                        self.personality.step_end("Adding skills")
+                        self.personality.step_end("Querying skills library")
+                    except Exception as ex:
+                        ASCIIColors.error(ex)
+                        self.warning("Couldn't add long term memory information to the context. Please verify the vector database")        # Add information about the user
+                        self.personality.step_end("Adding skills")
+                        self.personality.step_end("Querying skills library",False)
         user_description=""
         if self.config.use_user_informations_in_discussion:
             user_description=f"{start_header_id_template}User description{end_header_id_template}\n"+self.config.user_description+"\n"

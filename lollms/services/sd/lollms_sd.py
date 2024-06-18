@@ -372,62 +372,33 @@ class LollmsSD(LollmsTTI):
             output_path = self.output_dir
         infos = {}
         img_paths = []
-        if len(files)>0:
-            try:
-                generated = self.img2img(
-                            positive_prompt,
-                            negative_prompt, 
-                            [self.loadImage(files[-1])],
-                            sampler_name=sampler_name,
-                            seed=seed,
-                            cfg_scale=scale,
-                            steps=steps,
-                            width=int(width),
-                            height=int(height),
-                            denoising_strength=img2img_denoising_strength,
-                            tiling=False,
-                            restore_faces=restore_faces,
-                            styles=None, 
-                            script_name="",
-                            )
-                """
-                    images: list
-                    parameters: dict
-                    info: dict
-                """
-                for img in generated.images:
-                    img_paths.append(self.saveImage(img, output_path))
-                infos = generated.info
-            except Exception as ex:
-                ASCIIColors.error("Couldn't generate the image")
-                trace_exception(ex)  
-        else:
-            try:
-                generated = self.txt2img(
-                            positive_prompt,
-                            negative_prompt=negative_prompt, 
-                            sampler_name=sampler_name,
-                            seed=seed,
-                            cfg_scale=scale,
-                            steps=steps,
-                            width=width,
-                            height=height,
-                            tiling=False,
-                            restore_faces=restore_faces,
-                            styles=None, 
-                            script_name="",
-                            )
-                """
-                    images: list
-                    parameters: dict
-                    info: dict
-                """
-                for img in generated.images:
-                    img_paths.append(self.saveImage(img, output_path))
-                infos = generated.info
-            except Exception as ex:
-                ASCIIColors.error("Couldn't generate the image")
-                trace_exception(ex)  
+
+        try:
+            generated = self.txt2img(
+                        positive_prompt,
+                        negative_prompt=negative_prompt, 
+                        sampler_name=sampler_name,
+                        seed=seed,
+                        cfg_scale=scale,
+                        steps=steps,
+                        width=width,
+                        height=height,
+                        tiling=False,
+                        restore_faces=restore_faces,
+                        styles=None, 
+                        script_name="",
+                        )
+            """
+                images: list
+                parameters: dict
+                info: dict
+            """
+            for img in generated.images:
+                img_paths.append(self.saveImage(img, output_path))
+            infos = generated.info
+        except Exception as ex:
+            ASCIIColors.error("Couldn't generate the image")
+            trace_exception(ex)  
 
 
         return img_paths[0] if len(img_paths)>0 else None, infos
