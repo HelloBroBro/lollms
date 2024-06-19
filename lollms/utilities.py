@@ -17,7 +17,7 @@ import subprocess
 import gc
 import shutil
 
-from typing import List
+from typing import List, Optional
 
 from PIL import Image
 import requests
@@ -986,7 +986,25 @@ class PackageManager:
             trace_exception(ex)
             ASCIIColors.error("Something is wrong with your library.\nIt looks installed, but I am not able to call it.\nTry to reinstall it.")
             return False
-        
+    @staticmethod
+    def check_package_installed_with_version(package_name: str, min_version: Optional[str] = None) -> bool:
+        try:
+            import pkg_resources
+            # Summon the library from the depths of the Python abyss
+            package = importlib.import_module(package_name)
+            if min_version:
+                # Check if the library is at least at the specified version
+                installed_version = pkg_resources.get_distribution(package_name).version
+                if pkg_resources.parse_version(installed_version) < pkg_resources.parse_version(min_version):
+                    raise ImportError(f"Version {installed_version} is less than the required {min_version}.")
+            return True
+        except ImportError as ex:
+            print(f"Oopsie daisy! The library '{package_name}' is playing hide and seek. Error: {ex}")
+            return False
+        except Exception as ex:
+            print(f"Yikes! Something went bananas with your library. Error: {ex}")
+            return False
+           
     @staticmethod
     def safe_import(module_name, library_name=None):
         if not PackageManager.check_package_installed(module_name):

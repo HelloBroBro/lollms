@@ -2803,41 +2803,47 @@ class APScript(StateMachine):
         end_header_id_template      = self.config.end_header_id_template
         system_message_template     = self.config.system_message_template
 
-        template = f"""{start_header_id_template}{system_message_template}{end_header_id_template}
-Act as plan builder, a tool capable of making plans to perform the user requested operation.
-"""
+        template = "\n".join([
+            f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+            "Act as plan builder, a tool capable of making plans to perform the user requested operation."
+        ])
+
         if len(actions_list)>0:
-            template +=f"""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
-{start_header_id_template}list of action types information{end_header_id_template}
-[
-{{actions_list}}
-]
-The AI should respond in this format using data from actions_list:
-{
-    "actions": [
-    {
-        "name": name of the action 1,
-        "parameters":[
-            parameter name: parameter value
-        ]
-    },
-    {
-        "name": name of the action 2,
-        "parameters":[
-            parameter name: parameter value
-        ]
-    }
-    ...
-    ]
-}
-"""
-        if context!="":
-            template += f"""{start_header_id_template}context{end_header_id_template}
-{{context}}Ok
-"""
-        template +=f"""{start_header_id_template}request{end_header_id_template}{{request}}
-"""
-        template +=f"""{start_header_id_template}plan{end_header_id_template}To acheive the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"""
+            template += "\n".join([
+                "The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.",
+                f"{start_header_id_template}list of action types information{end_header_id_template}",
+                "[",
+                "{actions_list}",
+                "]",
+                "The AI should respond in this format using data from actions_list:",
+                "{",
+                '    "actions": [',
+                '    {',
+                '        "name": name of the action 1,',
+                '        "parameters":[',
+                '            parameter name: parameter value',
+                '        ]',
+                '    },',
+                '    {',
+                '        "name": name of the action 2,',
+                '        "parameters":[',
+                '            parameter name: parameter value',
+                '        ]',
+                '    }',
+                '    ...',
+                '    ]',
+                "}"
+            ])
+        if context != "":
+            template += "\n".join([
+                f"{start_header_id_template}context{end_header_id_template}",
+                "{context}Ok"
+            ])
+
+        template += "\n".join([
+            f"{start_header_id_template}request{end_header_id_template}{{request}}",
+            f"{start_header_id_template}plan{end_header_id_template}To achieve the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"
+        ])
         pr  = PromptReshaper(template)
         prompt = pr.build({
                 "context":context,
@@ -2870,41 +2876,48 @@ The AI should respond in this format using data from actions_list:
         end_header_id_template      = self.config.end_header_id_template
         system_message_template     = self.config.system_message_template
 
-        template = f"""{start_header_id_template}instruction:
-Act as plan builder, a tool capable of making plans to perform the user requested operation.
-"""
-        if len(actions_list)>0:
-            template +=f"""The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.
-{start_header_id_template}list of action types information{end_header_id_template}
-[
-{{actions_list}}
-]
-The AI should respond in this format using data from actions_list:
-{
-    "actions": [
-    {
-        "name": name of the action 1,
-        "parameters":[
-            parameter name: parameter value
-        ]
-    },
-    {
-        "name": name of the action 2,
-        "parameters":[
-            parameter name: parameter value
-        ]
-    }
-    ...
-    ]
-}
-"""
-        if context!="":
-            template += f"""{start_header_id_template}context{end_header_id_template}
-{{context}}Ok
-"""
-        template +=f"""{start_header_id_template}request{end_header_id_template}{{request}}
-"""
-        template +=f"""{start_header_id_template}plan{end_header_id_template}To acheive the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"""
+        template = "\n".join([
+            f"{start_header_id_template}instruction:",
+            "Act as plan builder, a tool capable of making plans to perform the user requested operation."
+        ])
+
+        if len(actions_list) > 0:
+            template += "\n".join([
+                "The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.",
+                f"{start_header_id_template}list of action types information{end_header_id_template}",
+                "[",
+                "{actions_list}",
+                "]",
+                "The AI should respond in this format using data from actions_list:",
+                "{",
+                '    "actions": [',
+                '    {',
+                '        "name": name of the action 1,',
+                '        "parameters":[',
+                '            parameter name: parameter value',
+                '        ]',
+                '    },',
+                '    {',
+                '        "name": name of the action 2,',
+                '        "parameters":[',
+                '            parameter name: parameter value',
+                '        ]',
+                '    }',
+                '    ...',
+                '    ]',
+                "}"
+            ])
+
+        if context != "":
+            template += "\n".join([
+                f"{start_header_id_template}context{end_header_id_template}",
+                "{context}Ok"
+            ])
+
+        template += "\n".join([
+            f"{start_header_id_template}request{end_header_id_template}{{request}}",
+            f"{start_header_id_template}plan{end_header_id_template}To achieve the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"
+        ])
         pr  = PromptReshaper(template)
         prompt = pr.build({
                 "context":context,
@@ -3691,6 +3704,76 @@ fetch('/open_file', {
     def select_model(self, binding_name, model_name):
         self.personality.app.select_model(binding_name, model_name)
 
+    # Properties ===============================================
+    @property
+    def start_header_id_template(self) -> str:
+        """Get the start_header_id_template."""
+        return self.config.start_header_id_template
+
+    @property
+    def end_header_id_template(self) -> str:
+        """Get the end_header_id_template."""
+        return self.config.end_header_id_template
+    
+    @property
+    def system_message_template(self) -> str:
+        """Get the system_message_template."""
+        return self.config.system_message_template
+
+
+    @property
+    def separator_template(self) -> str:
+        """Get the separator template."""
+        return self.config.separator_template
+
+
+    @property
+    def start_user_header_id_template(self) -> str:
+        """Get the start_user_header_id_template."""
+        return self.config.start_user_header_id_template
+    @property
+    def end_user_header_id_template(self) -> str:
+        """Get the end_user_header_id_template."""
+        return self.config.end_user_header_id_template
+    @property
+    def end_user_message_id_template(self) -> str:
+        """Get the end_user_message_id_template."""
+        return self.config.end_user_message_id_template
+
+
+
+
+    @property
+    def start_ai_header_id_template(self) -> str:
+        """Get the start_ai_header_id_template."""
+        return self.config.start_ai_header_id_template
+    @property
+    def end_ai_header_id_template(self) -> str:
+        """Get the end_ai_header_id_template."""
+        return self.config.end_ai_header_id_template
+    @property
+    def end_ai_message_id_template(self) -> str:
+        """Get the end_ai_message_id_template."""
+        return self.config.end_ai_message_id_template
+    @property
+    def system_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_header_id_template}{self.system_message_template}{self.end_header_id_template}"
+    @property
+    def user_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{self.config.user_name}{self.end_user_header_id_template}"
+    @property
+    def ai_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{self.personality.name}{self.end_user_header_id_template}"
+
+
+    def ai_custom_header(self, ai_name) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{ai_name}{self.end_user_header_id_template}"
+
+
 class AIPersonalityInstaller:
     def __init__(self, personality:AIPersonality) -> None:
         self.personality = personality
@@ -3782,3 +3865,5 @@ class PersonalityBuilder:
 
         else:
             return None, None, 0
+
+

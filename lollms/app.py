@@ -93,21 +93,33 @@ class LollmsApplication(LoLLMsCom):
             self.load_rag_dbs()
         except Exception as ex:
             trace_exception(ex)
-
         for entry in self.config.rag_databases:
-            if "mounted" in entry:
-                parts = entry.split("::")
-                if not PackageManager.check_package_installed("lollmsvectordb"):
-                    PackageManager.install_package("lollmsvectordb")
-                
-                from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
-                from lollmsvectordb import VectorDatabase
-                from lollmsvectordb.text_document_loader import TextDocumentsLoader
-                v = BERTVectorizer()
-                vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v)
-                vdb.build_index()                 
-                self.active_rag_dbs.append({"name":parts[0],"path":parts[1],"vectorizer":vdb})
+            try:
+                if "mounted" in entry:
+                    parts = entry.split("::")
+                    database_name = parts[0]
+                    database_path = parts[1]            
 
+                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.3.0"):
+                        PackageManager.install_or_update("lollmsvectordb")
+                    
+                    from lollmsvectordb import VectorDatabase
+                    from lollmsvectordb.text_document_loader import TextDocumentsLoader
+                    from lollmsvectordb.tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+
+                    if self.config.rag_vectorizer == "bert":
+                        from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                        v = BERTVectorizer()
+                    elif self.config.rag_vectorizer == "tfidf":
+                        from lollmsvectordb.vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                        v = TFIDFVectorizer()
+
+                    vdb = VectorDatabase(Path(database_path)/"db_name.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
+                    vdb.build_index() 
+                    self.active_rag_dbs.append({"name":database_name,"path":database_path,"vectorizer":vdb})
+                    self.config.save_config()
+            except Exception as ex:
+                trace_exception(ex)
         self.rt_com = None
         if not free_mode:
             try:
@@ -281,8 +293,15 @@ class LollmsApplication(LoLLMsCom):
                 from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
                 from lollmsvectordb import VectorDatabase
                 from lollmsvectordb.text_document_loader import TextDocumentsLoader
-                v = BERTVectorizer()
-                vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v)       
+                from lollmsvectordb.tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+                if self.config.rag_vectorizer == "bert":
+                    from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                    v = BERTVectorizer()
+                elif self.config.rag_vectorizer == "tfidf":
+                    from lollmsvectordb.vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                    v = TFIDFVectorizer()
+
+                vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
                 vdb.build_index() 
                 self.active_rag_dbs.append({"name":parts[0],"path":parts[1],"vectorizer":vdb})
 
