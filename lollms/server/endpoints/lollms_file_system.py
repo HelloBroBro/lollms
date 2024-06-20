@@ -155,11 +155,13 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
                             text = TextDocumentsLoader.read_file(fn)
                             title = fn.stem  # Use the file name without extension as the title
                             vdb.add_document(title, text, fn)
+                            lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nAdding {title}")
                             print(f"Added document: {title}")
                         except Exception as e:
                             print(f"Failed to add document {fn}: {e}")
                     if vdb.new_data: #New files are added, need reindexing
                         ASCIIColors.blue("Indexing database ...", end="", flush=True)
+                        lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nIndexing database")
                         vdb.build_index()
                         ASCIIColors.success("OK")
                     lollmsElfServer.HideBlockingMessage()
