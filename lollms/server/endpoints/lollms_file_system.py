@@ -125,26 +125,29 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
             if db_name:
                 try:
                     lollmsElfServer.ShowBlockingMessage("Adding a new database.\nVectorizing the database")
-                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.3.0"):
+                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.5.1"):
                         PackageManager.install_or_update("lollmsvectordb")
                     
-                    from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
                     from lollmsvectordb import VectorDatabase
                     from lollmsvectordb.text_document_loader import TextDocumentsLoader
-                    from lollmsvectordb.tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+                    from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
 
                     if lollmsElfServer.config.rag_vectorizer == "bert":
-                        from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                        lollmsElfServer.backup_trust_store()
+                        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
                         v = BERTVectorizer()
+                        lollmsElfServer.restore_trust_store()
+                        
                     elif lollmsElfServer.config.rag_vectorizer == "tfidf":
-                        from lollmsvectordb.vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                        from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                         v = TFIDFVectorizer()
 
                     vdb = VectorDatabase(Path(folder_path)/"db_name.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer())
                     # Get all files in the folder
                     folder = Path(folder_path)
-                    file_types = [f"*{f}" for f in TextDocumentsLoader.get_supported_file_types()]
+                    file_types = [f"**/*{f}" for f in TextDocumentsLoader.get_supported_file_types()]
                     files = []
                     for file_type in file_types:
                         files.extend(folder.glob(file_type))
@@ -154,14 +157,15 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
                         try:
                             text = TextDocumentsLoader.read_file(fn)
                             title = fn.stem  # Use the file name without extension as the title
-                            vdb.add_document(title, text, fn)
                             lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nAdding {title}")
+                            vdb.add_document(title, text, fn)
                             print(f"Added document: {title}")
                         except Exception as e:
+                            lollmsElfServer.error(f"Failed to add document {fn}: {e}")
                             print(f"Failed to add document {fn}: {e}")
                     if vdb.new_data: #New files are added, need reindexing
+                        lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nIndexing the database...")
                         ASCIIColors.blue("Indexing database ...", end="", flush=True)
-                        lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nIndexing database")
                         vdb.build_index()
                         ASCIIColors.success("OK")
                     lollmsElfServer.HideBlockingMessage()
@@ -250,24 +254,27 @@ def toggle_mount_rag_database(database_infos: MountDatabase):
     index, path = find_rag_database_by_name(lollmsElfServer.config.rag_databases,database_infos.database_name)
     if not lollmsElfServer.config.rag_databases[index].split("::")[-1]=="mounted":
         lollmsElfServer.config.rag_databases[index] = lollmsElfServer.config.rag_databases[index] + "::mounted"
-        if not PackageManager.check_package_installed("lollmsvectordb"):
-            PackageManager.install_package("lollmsvectordb")
+        if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.5.1"):
+            PackageManager.install_or_update("lollmsvectordb")
         
         from lollmsvectordb import VectorDatabase
         from lollmsvectordb.text_document_loader import TextDocumentsLoader
-        from lollmsvectordb.tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+        from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
         if lollmsElfServer.config.rag_vectorizer == "bert":
-            from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+            lollmsElfServer.backup_trust_store()
+            from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
             v = BERTVectorizer()
+            lollmsElfServer.restore_trust_store()
         elif lollmsElfServer.config.rag_vectorizer == "tfidf":
-            from lollmsvectordb.vectorizers.tfidf_vectorizer import TFIDFVectorizer
+            from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
             v = TFIDFVectorizer()
 
         vdb = VectorDatabase(Path(path)/"db_name.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer(), n_neighbors=lollmsElfServer.config.rag_n_chunks)       
         vdb.build_index() 
         lollmsElfServer.active_rag_dbs.append({"name":database_infos.database_name,"path":path,"vectorizer":vdb})
         lollmsElfServer.config.save_config()
+        lollmsElfServer.info(f"Database {database_infos.database_name} mounted succcessfully")
     else:
         # Unmount the database faster than a cat jumps off a hot stove!
         lollmsElfServer.config.rag_databases[index] = lollmsElfServer.config.rag_databases[index].replace("::mounted", "")

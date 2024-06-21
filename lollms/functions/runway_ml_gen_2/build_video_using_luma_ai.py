@@ -1,5 +1,5 @@
 # Lollms function call definition file
-# File Name: luma_ai_dream_machine_video_creator.py
+# File Name: runway_ml_gen_2_video_creator.py
 # Author: ParisNeo
 # Description: This function opens the Luma AI Dream Machine webpage, navigates to the input section, and inputs a text prompt to create a video. If the user is not logged in, it prompts the user to log in.
 
@@ -53,7 +53,7 @@ def template_matching(screenshot: np.ndarray, template_path: str, threshold: flo
     else:
         return None
 
-def luma_ai_dream_machine_video_creator(prompt: str) -> str:
+def runway_ml_gen_2_video_creator(prompt: str) -> str:
     """
     Opens the Luma AI Dream Machine webpage, navigates to the input section, and inputs a text prompt to create a video.
     If the user is not logged in, it prompts the user to log in.
@@ -66,12 +66,12 @@ def luma_ai_dream_machine_video_creator(prompt: str) -> str:
     """
     try:
         # Open the Luma AI Dream Machine webpage
-        webbrowser.open("https://lumalabs.ai/dream-machine/creations")
+        webbrowser.open("https://app.runwayml.com/")
         time.sleep(2)  # Wait for the page to load
         # Capture a screenshot of the browser window
         screenshot = capture_screenshot()
         # Locate the input section and type the prompt
-        template_path = Path(__file__).parent/"input_section_image.png"  # Replace with the actual path to your image
+        template_path = Path(__file__).parent/"try_gen2.png"  # Replace with the actual path to your image
         if not template_path.exists():
             raise FileNotFoundError("Input section image not found")
         # Perform template matching to find the object
@@ -103,16 +103,17 @@ def luma_ai_dream_machine_video_creator(prompt: str) -> str:
                 # Click the detected object
                 pyautogui.click()
                 time.sleep(2)  # Wait for the page to load
-
+            else:
+                not_found=True
         return "Please log in to Luma AI Dream Machine to create a video."
     except Exception as e:
         trace_exception(e)
         return "Please log in to Luma AI Dream Machine to create a video."
 
-def luma_ai_dream_machine_video_creator_function() -> Dict:
+def runway_ml_gen_2_video_creator_function() -> Dict:
     return {
-        "function_name": "luma_ai_dream_machine_video_creator",
-        "function": luma_ai_dream_machine_video_creator,
+        "function_name": "runway_ml_gen_2_video_creator",
+        "function": runway_ml_gen_2_video_creator,
         "function_description": "Creates a video from a text prompt using Luma AI Dream Machine.",
         "function_parameters": [{"name": "prompt", "type": "str"}]
     }

@@ -60,7 +60,8 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
                 processor.step_end("Loading dalle service")
             processor.step_start("Painting")
             file = processor.personality.app.tti.paint(
-                            prompt, 
+                            prompt,
+                            negative_prompt,
                             width = width,
                             height = height,
                             output_path=client.discussion.discussion_folder
@@ -88,7 +89,7 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
 
         file = str(file)
         escaped_url =  discussion_path_to_url(file)
-        return f'\n![]({escaped_url})'
+        return f'\nRespond with this link in markdown format:\n![]({escaped_url})'
     except Exception as ex:
         trace_exception(ex)
         return f"Couldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"

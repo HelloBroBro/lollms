@@ -73,7 +73,9 @@ class LollmsApplication(LoLLMsCom):
         self.generate_msg_with_internet: Callable[[str, Dict], None]        = None
         self.handle_continue_generate_msg_from: Callable[[str, Dict], None] = None
         
-
+        # Trust store 
+        self.bk_store = None
+        
         # services
         self.ollama         = None
         self.vllm           = None
@@ -100,18 +102,20 @@ class LollmsApplication(LoLLMsCom):
                     database_name = parts[0]
                     database_path = parts[1]            
 
-                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.3.0"):
+                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.5.1"):
                         PackageManager.install_or_update("lollmsvectordb")
-                    
                     from lollmsvectordb import VectorDatabase
                     from lollmsvectordb.text_document_loader import TextDocumentsLoader
-                    from lollmsvectordb.tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+                    from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
                     if self.config.rag_vectorizer == "bert":
-                        from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                        self.backup_trust_store()
+                        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
                         v = BERTVectorizer()
+                        self.restore_trust_store()
+                        
                     elif self.config.rag_vectorizer == "tfidf":
-                        from lollmsvectordb.vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                        from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                         v = TFIDFVectorizer()
 
                     vdb = VectorDatabase(Path(database_path)/"db_name.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
@@ -187,7 +191,16 @@ class LollmsApplication(LoLLMsCom):
             self.mount_personalities()
             self.mount_extensions()
 
+    def backup_trust_store(self):
+        self.bk_store = None
+        if 'REQUESTS_CA_BUNDLE' in os.environ:
+            self.bk_store = os.environ['REQUESTS_CA_BUNDLE']
+            del os.environ['REQUESTS_CA_BUNDLE']
 
+    def restore_trust_store(self):
+        if self.bk_store is not None:
+            os.environ['REQUESTS_CA_BUNDLE'] = self.bk_store
+            
     def select_model(self, binding_name, model_name):
         self.config["binding_name"] = binding_name
         self.config["model_name"] = model_name
@@ -290,15 +303,16 @@ class LollmsApplication(LoLLMsCom):
                 if not PackageManager.check_package_installed("lollmsvectordb"):
                     PackageManager.install_package("lollmsvectordb")
                 
-                from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
                 from lollmsvectordb import VectorDatabase
                 from lollmsvectordb.text_document_loader import TextDocumentsLoader
-                from lollmsvectordb.tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+                from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
                 if self.config.rag_vectorizer == "bert":
-                    from lollmsvectordb.vectorizers.bert_vectorizer import BERTVectorizer
+                    self.backup_trust_store()
+                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
                     v = BERTVectorizer()
+                    self.restore_trust_store()
                 elif self.config.rag_vectorizer == "tfidf":
-                    from lollmsvectordb.vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                    from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                     v = TFIDFVectorizer()
 
                 vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
@@ -1039,13 +1053,27 @@ class LollmsApplication(LoLLMsCom):
 
                     if self.config.data_vectorization_build_keys_words:
                         self.personality.step_start("Building vector store query")
-                        query = self.personality.fast_gen(f"{separator_template}{start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{separator_template}{start_header_id_template}discussion:\n{discussion[-2048:]}{separator_template}{start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                        q = f"{separator_template}".join([
+                            f"{separator_template}{start_header_id_template}instruction{end_header_id_template}Read the entire discussion and rewrite the last prompt for someone who hasn't read the discussion.",
+                            "Do not answer the prompt. Do not provide any explanations.",
+                            f"{start_header_id_template}discussion{end_header_id_template}",
+                            f"{discussion[-2048:]}",
+                            f"{start_header_id_template}enhanced_query{end_header_id_template}"
+                        ])
+                        query = self.personality.fast_gen(q, max_generation_size=256, show_progress=True, callback=self.personality.sink)
                         self.personality.step_end("Building vector store query")
                         ASCIIColors.cyan(f"Query: {query}")
+                        self.personality.step(f"Query: {query}")
                     else:
                         query = current_message.content
                     if documentation=="":
-                        documentation=f"{separator_template}{start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.{separator_template}{start_header_id_template}Documentation:\n"
+                        documentation=f"{separator_template}".join([
+                            f"{separator_template}{start_header_id_template}important information{end_header_id_template}Utilize Documentation Data: Always refer to the provided documentation to answer user questions accurately.",
+                            "Absence of Information: If the required information is not available in the documentation, inform the user that the requested information is not present in the documentation section.",
+                            "Strict Adherence to Documentation: It is strictly prohibited to provide answers without concrete evidence from the documentation.",
+                            "Cite Your Sources: After providing an answer, include the full path to the document where the information was found.",
+                            f"{start_header_id_template}Documentation{end_header_id_template}"])
+                        documentation += f"{separator_template}"
                     results = []
                     for db in self.active_rag_dbs:
                         v = db["vectorizer"]
@@ -1053,8 +1081,15 @@ class LollmsApplication(LoLLMsCom):
                         results+=r
                     n_neighbors = self.active_rag_dbs[0]["vectorizer"].n_neighbors
                     sorted_results = sorted(results, key=lambda x: x[3])[:n_neighbors]
-                    for vector, text, title, distance in sorted_results:
-                        documentation += f"{start_header_id_template}document chunk{end_header_id_template}\nsource_document_title:{title}\ncontent:{text}\n"
+                    for vector, text, title, path, distance in sorted_results:
+                        document_infos = f"{separator_template}".join([
+                            f"{start_header_id_template}document chunk{end_header_id_template}",
+                            f"\nsource_document_title:{title}",
+                            f"source_document_path:{path}",
+                            f"content:{text}\n"
+                        ])
+
+                        documentation += document_infos
 
                 if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
                     if discussion is None:
@@ -1182,9 +1217,11 @@ class LollmsApplication(LoLLMsCom):
         if available_space<1:
             ASCIIColors.red(f"available_space:{available_space}")
             ASCIIColors.red(f"n_doc_tk:{n_doc_tk}")
+            
             ASCIIColors.red(f"n_history_tk:{n_history_tk}")
             ASCIIColors.red(f"n_isearch_tk:{n_isearch_tk}")
             
+            ASCIIColors.red(f"n_tokens:{n_tokens}")
             ASCIIColors.red(f"self.config.max_n_predict:{self.config.max_n_predict}")
             self.InfoMessage(f"Not enough space in context!!\nVerify that your vectorization settings for documents or internet search are realistic compared to your context size.\nYou are {available_space} short of context!")
             raise Exception("Not enough space in context!!")
