@@ -124,8 +124,8 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
             
             if db_name:
                 try:
-                    lollmsElfServer.ShowBlockingMessage("Adding a new database.\nVectorizing the database")
-                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.5.1"):
+                    lollmsElfServer.ShowBlockingMessage("Adding a new database.")
+                    if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.6.0"):
                         PackageManager.install_or_update("lollmsvectordb")
                     
                     from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
@@ -144,10 +144,10 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
                         from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                         v = TFIDFVectorizer()
 
-                    vdb = VectorDatabase(Path(folder_path)/"db_name.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer())
+                    vdb = VectorDatabase(Path(folder_path)/f"{db_name}.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer())
                     # Get all files in the folder
                     folder = Path(folder_path)
-                    file_types = [f"**/*{f}" for f in TextDocumentsLoader.get_supported_file_types()]
+                    file_types = [f"**/*{f}" if lollmsElfServer.config.rag_follow_subfolders else f"*{f}" for f in TextDocumentsLoader.get_supported_file_types()]
                     files = []
                     for file_type in file_types:
                         files.extend(folder.glob(file_type))
@@ -205,6 +205,11 @@ def find_rag_database_by_name(entries: List[str], name: str) -> Optional[str]:
 class SelectDatabase(BaseModel):
     client_id: str
 
+class FolderInfos(BaseModel):
+    client_id: str
+    db_path: str
+
+
 class MountDatabase(BaseModel):
     client_id: str
     database_name:str
@@ -252,32 +257,123 @@ def toggle_mount_rag_database(database_infos: MountDatabase):
     """ 
     client = check_access(lollmsElfServer, database_infos.client_id)
     index, path = find_rag_database_by_name(lollmsElfServer.config.rag_databases,database_infos.database_name)
-    if not lollmsElfServer.config.rag_databases[index].split("::")[-1]=="mounted":
-        lollmsElfServer.config.rag_databases[index] = lollmsElfServer.config.rag_databases[index] + "::mounted"
-        if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.5.1"):
-            PackageManager.install_or_update("lollmsvectordb")
-        
-        from lollmsvectordb import VectorDatabase
-        from lollmsvectordb.text_document_loader import TextDocumentsLoader
-        from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+    parts = lollmsElfServer.config.rag_databases[index].split("::")
+    if not parts[-1]=="mounted":
+        def process():
+            try:
+                lollmsElfServer.ShowBlockingMessage(f"Mounting database {parts[0]}")
+                lollmsElfServer.config.rag_databases[index] = lollmsElfServer.config.rag_databases[index] + "::mounted"
+                if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.6.0"):
+                    PackageManager.install_or_update("lollmsvectordb")
+                
+                from lollmsvectordb import VectorDatabase
+                from lollmsvectordb.text_document_loader import TextDocumentsLoader
+                from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
-        if lollmsElfServer.config.rag_vectorizer == "bert":
-            lollmsElfServer.backup_trust_store()
-            from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-            v = BERTVectorizer()
-            lollmsElfServer.restore_trust_store()
-        elif lollmsElfServer.config.rag_vectorizer == "tfidf":
-            from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
-            v = TFIDFVectorizer()
+                if lollmsElfServer.config.rag_vectorizer == "bert":
+                    lollmsElfServer.backup_trust_store()
+                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+                    v = BERTVectorizer()
+                    lollmsElfServer.restore_trust_store()
+                elif lollmsElfServer.config.rag_vectorizer == "tfidf":
+                    from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                    v = TFIDFVectorizer()
 
-        vdb = VectorDatabase(Path(path)/"db_name.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer(), n_neighbors=lollmsElfServer.config.rag_n_chunks)       
-        vdb.build_index() 
-        lollmsElfServer.active_rag_dbs.append({"name":database_infos.database_name,"path":path,"vectorizer":vdb})
-        lollmsElfServer.config.save_config()
-        lollmsElfServer.info(f"Database {database_infos.database_name} mounted succcessfully")
+                vdb = VectorDatabase(Path(path)/f"{database_infos.database_name}.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer(), chunk_size=lollmsElfServer.config.rag_chunk_size, clean_chunks=lollmsElfServer.config.rag_clean_chunks, n_neighbors=lollmsElfServer.config.rag_n_chunks)       
+                lollmsElfServer.active_rag_dbs.append({"name":database_infos.database_name,"path":path,"vectorizer":vdb})
+                lollmsElfServer.config.save_config()
+                lollmsElfServer.info(f"Database {database_infos.database_name} mounted succcessfully")
+                lollmsElfServer.HideBlockingMessage()
+            except Exception as ex:
+                trace_exception(ex)
+                lollmsElfServer.HideBlockingMessage()
+
+        lollmsElfServer.rag_thread = threading.Thread(target=process)
+        lollmsElfServer.rag_thread.start()
     else:
         # Unmount the database faster than a cat jumps off a hot stove!
         lollmsElfServer.config.rag_databases[index] = lollmsElfServer.config.rag_databases[index].replace("::mounted", "")
         lollmsElfServer.active_rag_dbs = [db for db in lollmsElfServer.active_rag_dbs if db["name"] != database_infos.database_name]
         lollmsElfServer.config.save_config()
 
+
+@router.post("/vectorize_folder")
+async def vectorize_folder(database_infos: FolderInfos):
+    """
+    Selects and names a database 
+    """ 
+    client = check_access(lollmsElfServer, database_infos.client_id)
+    def process():
+        if "::" in database_infos.db_path:
+            parts = database_infos.db_path.split("::")
+            db_name = parts[0]
+            folder_path = parts[1]
+        else:
+            import tkinter as tk
+            from tkinter import simpledialog, filedialog
+            # Create a new Tkinter root window and hide it
+            root = tk.Tk()
+            root.withdraw()
+            
+            # Make the window appear on top
+            root.attributes('-topmost', True)
+            
+            # Ask for the database name
+            db_name = simpledialog.askstring("Database Name", "Please enter the database name:")
+            folder_path = database_infos.db_path
+                
+            
+        if db_name:
+            try:
+                lollmsElfServer.ShowBlockingMessage("Revectorizing the database.")
+                if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.6.0"):
+                    PackageManager.install_or_update("lollmsvectordb")
+                
+                from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+                from lollmsvectordb import VectorDatabase
+                from lollmsvectordb.text_document_loader import TextDocumentsLoader
+                from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+
+
+                if lollmsElfServer.config.rag_vectorizer == "bert":
+                    lollmsElfServer.backup_trust_store()
+                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+                    v = BERTVectorizer()
+                    lollmsElfServer.restore_trust_store()
+                    
+                elif lollmsElfServer.config.rag_vectorizer == "tfidf":
+                    from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                    v = TFIDFVectorizer()
+                vector_db_path = Path(folder_path)/f"{db_name}.sqlite"
+
+                vdb = VectorDatabase(vector_db_path, v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer(), reset=True)
+                vdb.new_data = True
+                # Get all files in the folder
+                folder = Path(folder_path)
+                file_types = [f"**/*{f}" if lollmsElfServer.config.rag_follow_subfolders else f"*{f}" for f in TextDocumentsLoader.get_supported_file_types()]
+                files = []
+                for file_type in file_types:
+                    files.extend(folder.glob(file_type))
+                
+                # Load and add each document to the database
+                for fn in files:
+                    try:
+                        text = TextDocumentsLoader.read_file(fn)
+                        title = fn.stem  # Use the file name without extension as the title
+                        lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nAdding {title}")
+                        vdb.add_document(title, text, fn)
+                        print(f"Added document: {title}")
+                    except Exception as e:
+                        lollmsElfServer.error(f"Failed to add document {fn}: {e}")
+                if vdb.new_data: #New files are added, need reindexing
+                    lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nIndexing the database...")
+                    vdb.build_index()
+                    ASCIIColors.success("OK")
+                lollmsElfServer.HideBlockingMessage()
+                run_async(partial(lollmsElfServer.sio.emit,'rag_db_added', {"database_name": db_name, "database_path": str(folder_path)}, to=client.client_id))
+
+            except Exception as ex:
+                trace_exception(ex)
+                lollmsElfServer.HideBlockingMessage()
+    lollmsElfServer.rag_thread = threading.Thread(target=process)
+    lollmsElfServer.rag_thread.start()

@@ -751,16 +751,15 @@ class AIPersonality:
                                 ).strip()
         return self.bot_says
 
-    def generate(self, prompt, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, show_progress=False ):
+    def generate(self, prompt, max_size = None, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, show_progress=False ):
         ASCIIColors.info("Text generation started: Warming up")
         self.nb_received_tokens = 0
         self.bot_says = ""
         if debug:
             self.print_prompt("gen",prompt)
-
         self.model.generate(
                                 prompt,
-                                max_size,
+                                max_size if max_size else (self.config.ctx_size-len(self.model.tokenize(prompt))),
                                 partial(self.process, callback=callback, show_progress=show_progress),
                                 temperature=self.model_temperature if temperature is None else temperature,
                                 top_k=self.model_top_k if top_k is None else top_k,
@@ -2072,10 +2071,10 @@ class APScript(StateMachine):
         with open(path, 'w') as file:
             yaml.dump(data, file)
 
-    def generate_with_images(self, prompt, images, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
+    def generate_with_images(self, prompt, images, max_size = None, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
         return self.personality.generate_with_images(prompt, images, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
 
-    def generate(self, prompt, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
+    def generate(self, prompt, max_size = None, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
         return self.personality.generate(prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
 
 
@@ -2415,24 +2414,109 @@ class APScript(StateMachine):
         return "\n".join(summeries)
 
     def build_prompt_from_context_details(self, context_details:dict, custom_entries=""):
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
-        return self.build_prompt([
-                    context_details["conditionning"] if context_details["conditionning"] else "",
-                    f"{start_header_id_template}documentation{end_header_id_template}\n"+context_details["documentation"] if context_details["documentation"] else "",
-                    f"{start_header_id_template}knowledge{end_header_id_template}\n"+context_details["knowledge"] if context_details["knowledge"] else "",
-                    context_details["user_description"] if context_details["user_description"] else "",
-                    f"{start_header_id_template}positive_boost{end_header_id_template}\n"+context_details["positive_boost"] if context_details["positive_boost"] else "",
-                    f"{start_header_id_template}negative_boost{end_header_id_template}\n"+context_details["negative_boost"] if context_details["negative_boost"] else "",
-                    f"{start_header_id_template}current_language{end_header_id_template}\n"+context_details["current_language"] if context_details["current_language"] else "",
-                    f"{start_header_id_template}fun_mode{end_header_id_template}\n"+context_details["fun_mode"] if context_details["fun_mode"] else "",
-                    f"{start_header_id_template}discussion_window{end_header_id_template}\n"+context_details["discussion_messages"] if context_details["discussion_messages"].strip()!="" else "",
-                    custom_entries,
-                    context_details["extra"],
-                    f'{start_header_id_template}{context_details["ai_prefix"]}{end_header_id_template}'
-                ], 
-                8)
+        """
+        Builds a prompt from the provided context details.
+
+        This function concatenates various parts of the context into a single string, which is then used to build a prompt.
+        The context details can include conditioning, documentation, knowledge, user description, positive and negative boosts,
+        current language, fun mode, discussion window, and any extra information.
+
+        Parameters:
+        context_details (dict): A dictionary containing various context details.
+        custom_entries (str): Additional custom entries to be included in the prompt.
+
+        Returns:
+        str: The constructed prompt.
+
+        Raises:
+        KeyError: If any required key is missing in the context_details dictionary.
+        """
+        full_context = []
+        sacrifice_id = 0
+        if context_details["conditionning"]:
+            full_context.append( "\n".join([
+                context_details["conditionning"]
+            ]))
+            sacrifice_id += 1
+        if context_details["documentation"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("documentation"),
+                context_details["documentation"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["knowledge"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("knowledge"),
+                context_details["knowledge"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["user_description"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("user_description"),
+                context_details["user_description"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["positive_boost"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("positive_boost"),
+                context_details["positive_boost"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["positive_boost"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("positive_boost"),
+                context_details["positive_boost"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["negative_boost"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("negative_boost"),
+                context_details["negative_boost"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["current_language"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("current_language"),
+                context_details["current_language"]
+            ]))
+            sacrifice_id += 1
+
+        if context_details["fun_mode"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("fun_mode"),
+                context_details["fun_mode"]
+            ]))
+            sacrifice_id += 1
+
+
+        if context_details["discussion_messages"]:
+            full_context.append( "\n".join([
+                self.system_custom_header("discussion_messages"),
+                context_details["discussion_messages"]
+            ]))
+
+        if context_details["extra"]:
+            full_context.append( "\n".join([
+                context_details["extra"]
+            ]))
+
+        if custom_entries:
+            full_context.append( "\n".join([
+                custom_entries
+            ]))
+
+        full_context.append( "\n".join([
+            self.ai_custom_header(context_details["ai_prefix"])
+        ]))
+
+        return self.build_prompt(full_context, sacrifice_id)
+    
     def build_prompt(self, prompt_parts:List[str], sacrifice_id:int=-1, context_size:int=None, minimum_spare_context_size:int=None):
         """
         Builds the prompt for code generation.
@@ -3768,6 +3852,9 @@ fetch('/open_file', {
         """Get the start_header_id_template."""
         return f"{self.start_user_header_id_template}{self.personality.name}{self.end_user_header_id_template}"
 
+    def system_custom_header(self, ai_name) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{ai_name}{self.end_user_header_id_template}"
 
     def ai_custom_header(self, ai_name) -> str:
         """Get the start_header_id_template."""

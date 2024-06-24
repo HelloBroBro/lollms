@@ -162,36 +162,8 @@ class LollmsApplication(LoLLMsCom):
                 self.load_rag_dbs()
             except Exception as ex:
                 trace_exception(ex)
-            for entry in self.config.rag_databases:
-                try:
-                    if "mounted" in entry:
-                        parts = entry.split("::")
-                        database_name = parts[0]
-                        database_path = parts[1]            
 
-                        if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.5.1"):
-                            PackageManager.install_or_update("lollmsvectordb")
-                        from lollmsvectordb import VectorDatabase
-                        from lollmsvectordb.text_document_loader import TextDocumentsLoader
-                        from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
-                        if self.config.rag_vectorizer == "bert":
-                            self.backup_trust_store()
-                            from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-                            v = BERTVectorizer()
-                            self.restore_trust_store()
-                            
-                        elif self.config.rag_vectorizer == "tfidf":
-                            from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
-                            v = TFIDFVectorizer()
-
-                        vdb = VectorDatabase(Path(database_path)/"db_name.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
-                        vdb.build_index() 
-                        self.active_rag_dbs.append({"name":database_name,"path":database_path,"vectorizer":vdb})
-                        self.config.save_config()
-                except Exception as ex:
-                    trace_exception(ex)            
-            
 
     def backup_trust_store(self):
         self.bk_store = None
@@ -301,6 +273,7 @@ class LollmsApplication(LoLLMsCom):
         self.active_rag_dbs = []
         for rag_db in self.config.rag_databases:
             parts = rag_db.split("::")
+            db_name = parts[0]
             if parts[-1]=="mounted":
                 if not PackageManager.check_package_installed("lollmsvectordb"):
                     PackageManager.install_package("lollmsvectordb")
@@ -316,9 +289,11 @@ class LollmsApplication(LoLLMsCom):
                 elif self.config.rag_vectorizer == "tfidf":
                     from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                     v = TFIDFVectorizer()
+                elif self.config.rag_vectorizer == "word2vec":
+                    from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
+                    v = Word2VecVectorizer()
 
-                vdb = VectorDatabase(Path(parts[1])/"db_name.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
-                vdb.build_index() 
+                vdb = VectorDatabase(Path(parts[1])/f"{db_name}.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
                 self.active_rag_dbs.append({"name":parts[0],"path":parts[1],"vectorizer":vdb})
 
 
@@ -1056,7 +1031,7 @@ class LollmsApplication(LoLLMsCom):
                     if self.config.data_vectorization_build_keys_words:
                         self.personality.step_start("Building vector store query")
                         q = f"{separator_template}".join([
-                            f"{separator_template}{start_header_id_template}instruction{end_header_id_template}Read the entire discussion and rewrite the last prompt for someone who hasn't read the discussion.",
+                            f"{start_header_id_template}instruction{end_header_id_template}Read the entire discussion and rewrite the last prompt for someone who hasn't read the discussion.",
                             "Do not answer the prompt. Do not provide any explanations.",
                             f"{start_header_id_template}discussion{end_header_id_template}",
                             f"{discussion[-2048:]}",
@@ -1082,26 +1057,16 @@ class LollmsApplication(LoLLMsCom):
                         r=v.search(query)
                         results+=r
                     n_neighbors = self.active_rag_dbs[0]["vectorizer"].n_neighbors
-                    sorted_results = sorted(results, key=lambda x: x[3])[:n_neighbors]
-                    try:
-                        for vector, text, title, path, distance in sorted_results:
-                            document_infos = f"{separator_template}".join([
-                                f"{start_header_id_template}document chunk{end_header_id_template}",
-                                f"\nsource_document_title:{title}",
-                                f"source_document_path:{path}",
-                                f"content:{text}\n"
-                            ])
+                    sorted_results = sorted(results, key=lambda x: x.distance)[:n_neighbors]
+                    for chunk in sorted_results:
+                        document_infos = f"{separator_template}".join([
+                            f"{start_header_id_template}document chunk{end_header_id_template}",
+                            f"source_document_title:{chunk.doc.title}",
+                            f"source_document_path:{chunk.doc.path}",
+                            f"content:\n{chunk.text}\n"
+                        ])
 
-                            documentation += document_infos
-                    except:
-                        for vector, text, title, distance in sorted_results:
-                            document_infos = f"{separator_template}".join([
-                                f"{start_header_id_template}document chunk{end_header_id_template}",
-                                f"\nsource_document_title:{title}",
-                                f"content:{text}\n"
-                            ])
-
-                            documentation += document_infos
+                        documentation += document_infos
                         
                 if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
                     if discussion is None:
@@ -1328,25 +1293,6 @@ class LollmsApplication(LoLLMsCom):
         # Tokenize the prompt data
         tokens = self.model.tokenize(prompt_data)
 
-        # if this is a debug then show prompt construction details
-        if self.config["debug"]:
-            ASCIIColors.bold("CONDITIONNING")
-            ASCIIColors.yellow(conditionning)
-            ASCIIColors.bold("INTERNET SEARCH")
-            ASCIIColors.yellow(internet_search_results)
-            ASCIIColors.bold("DOC")
-            ASCIIColors.yellow(documentation)
-            ASCIIColors.bold("HISTORY")
-            ASCIIColors.yellow(knowledge)
-            ASCIIColors.bold("DISCUSSION")
-            ASCIIColors.hilight(discussion_messages,f"{start_header_id_template}",ASCIIColors.color_yellow,ASCIIColors.color_bright_red,False)
-            ASCIIColors.bold("Final prompt")
-            ASCIIColors.hilight(prompt_data,f"{start_header_id_template}",ASCIIColors.color_yellow,ASCIIColors.color_bright_red,False)
-            ASCIIColors.info(f"prompt size:{len(tokens)} tokens") 
-            ASCIIColors.info(f"available space after doc and knowledge:{available_space} tokens") 
-
-            # self.info(f"Tokens summary:\nPrompt size:{len(tokens)}\nTo generate:{available_space}",10)
-
         # Details
         context_details = {
             "client_id":client_id,
@@ -1368,4 +1314,116 @@ class LollmsApplication(LoLLMsCom):
 
         # Return the prepared query, original message content, and tokenized query
         return prompt_data, current_message.content, tokens, context_details, internet_search_infos                
+
+
+    # Properties ===============================================
+    @property
+    def start_header_id_template(self) -> str:
+        """Get the start_header_id_template."""
+        return self.config.start_header_id_template
+
+    @property
+    def end_header_id_template(self) -> str:
+        """Get the end_header_id_template."""
+        return self.config.end_header_id_template
+    
+    @property
+    def system_message_template(self) -> str:
+        """Get the system_message_template."""
+        return self.config.system_message_template
+
+
+    @property
+    def separator_template(self) -> str:
+        """Get the separator template."""
+        return self.config.separator_template
+
+
+    @property
+    def start_user_header_id_template(self) -> str:
+        """Get the start_user_header_id_template."""
+        return self.config.start_user_header_id_template
+    @property
+    def end_user_header_id_template(self) -> str:
+        """Get the end_user_header_id_template."""
+        return self.config.end_user_header_id_template
+    @property
+    def end_user_message_id_template(self) -> str:
+        """Get the end_user_message_id_template."""
+        return self.config.end_user_message_id_template
+
+
+
+
+    # Properties ===============================================
+    @property
+    def start_header_id_template(self) -> str:
+        """Get the start_header_id_template."""
+        return self.config.start_header_id_template
+
+    @property
+    def end_header_id_template(self) -> str:
+        """Get the end_header_id_template."""
+        return self.config.end_header_id_template
+    
+    @property
+    def system_message_template(self) -> str:
+        """Get the system_message_template."""
+        return self.config.system_message_template
+
+
+    @property
+    def separator_template(self) -> str:
+        """Get the separator template."""
+        return self.config.separator_template
+
+
+    @property
+    def start_user_header_id_template(self) -> str:
+        """Get the start_user_header_id_template."""
+        return self.config.start_user_header_id_template
+    @property
+    def end_user_header_id_template(self) -> str:
+        """Get the end_user_header_id_template."""
+        return self.config.end_user_header_id_template
+    @property
+    def end_user_message_id_template(self) -> str:
+        """Get the end_user_message_id_template."""
+        return self.config.end_user_message_id_template
+
+
+
+
+    @property
+    def start_ai_header_id_template(self) -> str:
+        """Get the start_ai_header_id_template."""
+        return self.config.start_ai_header_id_template
+    @property
+    def end_ai_header_id_template(self) -> str:
+        """Get the end_ai_header_id_template."""
+        return self.config.end_ai_header_id_template
+    @property
+    def end_ai_message_id_template(self) -> str:
+        """Get the end_ai_message_id_template."""
+        return self.config.end_ai_message_id_template
+    @property
+    def system_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_header_id_template}{self.system_message_template}{self.end_header_id_template}"
+    @property
+    def user_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{self.config.user_name}{self.end_user_header_id_template}"
+    @property
+    def ai_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{self.personality.name}{self.end_user_header_id_template}"
+
+    def system_custom_header(self, ai_name) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{ai_name}{self.end_user_header_id_template}"
+
+    def ai_custom_header(self, ai_name) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{ai_name}{self.end_user_header_id_template}"
 

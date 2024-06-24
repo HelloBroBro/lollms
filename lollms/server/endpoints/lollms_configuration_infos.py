@@ -155,7 +155,7 @@ async def apply_settings(request: Request):
                                     "debug_log_file_path", 
                                     "petals_model_path",
                                     "skills_lib_database_name",
-                                    "discussion_db_name"
+                                    "discussion_db_name",
                                     "user_avatar",
                                     
                                     ]
