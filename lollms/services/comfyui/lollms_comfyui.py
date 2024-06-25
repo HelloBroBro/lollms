@@ -161,7 +161,7 @@ class LollmsComfyUI(LollmsTTI):
                     max_retries=50,
                     comfyui_base_url=None,
                     share=False,
-                    wait_for_service=True
+                    wait_for_service=False
                     ):
         super().__init__("comfyui", app)
         if comfyui_base_url=="" or comfyui_base_url=="http://127.0.0.1:8188/":
