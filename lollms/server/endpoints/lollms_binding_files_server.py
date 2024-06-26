@@ -67,6 +67,7 @@ async def serve_bindings(path: str):
         raise HTTPException(status_code=400, detail="File not found")
 
     return FileResponse(str(file_path))
+
 @router.get("/personalities/{path:path}")
 async def serve_personalities(path: str):
     """

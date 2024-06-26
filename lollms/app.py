@@ -860,6 +860,7 @@ class LollmsApplication(LoLLMsCom):
         Returns:
             Tuple[str, str, List[str]]: The prepared query, original message content, and tokenized query.
         """
+        documentation_entries = []
         start_header_id_template    = self.config.start_header_id_template
         end_header_id_template      = self.config.end_header_id_template
 
@@ -1039,7 +1040,7 @@ class LollmsApplication(LoLLMsCom):
                         ])
                         query = self.personality.fast_gen(q, max_generation_size=256, show_progress=True, callback=self.personality.sink)
                         self.personality.step_end("Building vector store query")
-                        ASCIIColors.cyan(f"Query: {query}")
+                        ASCIIColors.magenta(f"Query: {query}")
                         self.personality.step(f"Query: {query}")
                     else:
                         query = current_message.content
@@ -1058,6 +1059,7 @@ class LollmsApplication(LoLLMsCom):
                         results+=r
                     n_neighbors = self.active_rag_dbs[0]["vectorizer"].n_neighbors
                     sorted_results = sorted(results, key=lambda x: x.distance)[:n_neighbors]
+
                     for chunk in sorted_results:
                         document_infos = f"{separator_template}".join([
                             f"{start_header_id_template}document chunk{end_header_id_template}",
@@ -1065,7 +1067,13 @@ class LollmsApplication(LoLLMsCom):
                             f"source_document_path:{chunk.doc.path}",
                             f"content:\n{chunk.text}\n"
                         ])
-
+                        documentation_entries.append({
+                            "document_title":chunk.doc.title,
+                            "document_path":chunk.doc.path,
+                            "chunk_content":chunk.text,
+                            "chunk_size":chunk.nb_tokens,
+                            "distance":chunk.distance,
+                        })
                         documentation += document_infos
                         
                 if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
@@ -1300,6 +1308,7 @@ class LollmsApplication(LoLLMsCom):
             "internet_search_infos":internet_search_infos,
             "internet_search_results":internet_search_results,
             "documentation":documentation,
+            "documentation_entries":documentation_entries,
             "knowledge":knowledge,
             "knowledge_infos":knowledge_infos,
             "user_description":user_description,
@@ -1311,7 +1320,8 @@ class LollmsApplication(LoLLMsCom):
             "ai_prefix":ai_prefix,
             "extra":""
         }    
-
+        if self.config.debug:
+            ASCIIColors.hilight(documentation,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)
         # Return the prepared query, original message content, and tokenized query
         return prompt_data, current_message.content, tokens, context_details, internet_search_infos                
 

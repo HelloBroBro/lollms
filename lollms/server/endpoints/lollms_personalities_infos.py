@@ -678,9 +678,9 @@ async def set_active_personality_settings(request: Request):
 
 
 class PersonalityInfos(BaseModel):
+    client_id: str
     category:str
     name:str
-    language:Optional[str] = None
 
 @router.post("/copy_to_custom_personas")
 async def copy_to_custom_personas(data: PersonalityInfos):
@@ -689,6 +689,7 @@ async def copy_to_custom_personas(data: PersonalityInfos):
 
     """
     import shutil
+    client = check_access(lollmsElfServer, data.client_id)
     
     category = sanitize_path(data.category)
     name = sanitize_path(data.name)

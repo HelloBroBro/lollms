@@ -315,6 +315,19 @@ class AIPersonality:
         if callback:
             callback(full_text, MSG_TYPE.MSG_TYPE_FULL)
 
+    def ui(self, ui_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends ui text to front end
+
+        Args:
+            ui_text (dict): The ui code to be sent to the front end
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE) to send the text to. Defaults to None.
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            callback(ui_text, MSG_TYPE.MSG_TYPE_UI)
+
 
     def full_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
         """This sends full text to front end (INVISIBLE to AI)
@@ -690,8 +703,6 @@ class AIPersonality:
         # TODO : add show progress
 
         gen = self.generate(prompt, max_generation_size, temperature = temperature, top_k = top_k, top_p=top_p, repeat_penalty=repeat_penalty, repeat_last_n=repeat_last_n, callback=callback, show_progress=show_progress).strip().replace("</s>", "").replace("<s>", "")
-        if debug:
-            self.print_prompt("prompt", prompt+gen)
 
         return gen
 
@@ -767,6 +778,9 @@ class AIPersonality:
                                 repeat_penalty=self.model_repeat_penalty if repeat_penalty is None else repeat_penalty,
                                 repeat_last_n = self.model_repeat_last_n if repeat_last_n is None else repeat_last_n,
                                 ).strip()
+        if debug:
+            self.print_prompt("prompt", prompt+self.bot_says)
+        
         return self.bot_says
 
     def setCallback(self, callback: Callable[[str, MSG_TYPE, dict, list], bool]):
