@@ -48,7 +48,8 @@ class LoLLMsCom:
 
         self.rt_com = None
 
-        
+        self.model = None
+                
     def InfoMessage(self, content, client_id=None, verbose:bool=None):
         self.notify(
                 content, 

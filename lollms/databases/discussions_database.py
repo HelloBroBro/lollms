@@ -10,6 +10,11 @@ from lollms.paths import LollmsPaths
 from lollms.databases.skills_database import SkillsLibrary
 from lollms.com import LoLLMsCom
 from safe_store import TextVectorizer, VisualizationMethod, GenericDataLoader
+from lollmsvectordb.vector_database import VectorDatabase
+from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+from lollmsvectordb.text_document_loader import TextDocumentsLoader
+import gc
 import json
 import shutil
 from lollms.tasks import TasksLibrary
@@ -651,26 +656,28 @@ class Discussion:
         # Initialize the file lists
         self.update_file_lists()
 
-
-        self.vectorizer = TextVectorizer(
-            self.lollms.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
-            model=self.lollms.model, #needed in case of using model_embedding
-            database_path=self.discussion_rag_folder/"db.json",
-            save_db=self.lollms.config.data_vectorization_save_db,
-            data_visualization_method=VisualizationMethod.PCA,
-            database_dict=None)
-    
-        if len(self.vectorizer.chunks)==0 and len(self.text_files)>0:
-            for path in self.text_files:
-                data = GenericDataLoader.read_file(path)
+        if len(self.text_files)>0:
+            self.vectorizer = VectorDatabase(
+                                        self.discussion_rag_folder/"db.sqli",
+                                        BERTVectorizer(self.lollms.config.rag_vectorizer_model) if self.lollms.config.rag_vectorizer=="bert" else TFIDFVectorizer(),
+                                        self.lollms.model,
+                                        chunk_size=self.lollms.config.rag_chunk_size,
+                                        overlap=self.lollms.config.rag_overlap
+                                        )
+            
+            if len(self.vectorizer.list_documents())==0 and len(self.text_files)>0:
+                for path in self.text_files:
+                    data = GenericDataLoader.read_file(path)
+                    try:
+                        self.vectorizer.add_document(path.stem, data, path, True)
+                    except Exception as ex:
+                        trace_exception(ex)            
                 try:
-                    self.vectorizer.add_document(path, data, self.lollms.config.data_vectorization_chunk_size, self.lollms.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
+                    self.vectorizer.index()
                 except Exception as ex:
-                    trace_exception(ex)            
-            try:
-                self.vectorizer.index()
-            except Exception as ex:
-                trace_exception(ex)            
+                    trace_exception(ex)
+        else:
+            self.vectorizer = None
 
     def update_file_lists(self):
         self.text_files = [Path(file) for file in self.discussion_text_folder.glob('*')]
@@ -685,6 +692,13 @@ class Discussion:
             if any(file_name == entry.name for entry in self.text_files):
                 fn = [entry for entry in self.text_files if entry.name == file_name][0]
                 self.text_files = [entry for entry in self.text_files if entry.name != file_name]
+                try:
+                    text = TextDocumentsLoader.read_file(fn)
+                    hash = self.vectorizer._hash_document(text)
+                    self.vectorizer.remove_document(hash)
+                except Exception as ex:
+                    trace_exception(ex)
+
                 Path(fn).unlink()
                 if len(self.text_files)>0:
                     try:
@@ -713,14 +727,28 @@ class Discussion:
     def remove_all_files(self):
         # Iterate over each directory and remove all files
         for path in [self.discussion_images_folder, self.discussion_rag_folder, self.discussion_audio_folder, self.discussion_text_folder]:
+            
             for file in path.glob('*'):
-                if file.is_file():  # Ensure it's a file, not a directory
+                if file.is_file() and file.suffix!=".sqli":  # Ensure it's a file, not a directory
+                    try:
+                        text = TextDocumentsLoader.read_file(file)
+                        hash = self.vectorizer._hash_document(text)
+                        self.vectorizer.remove_document(hash)
+                    except Exception as ex:
+                        trace_exception(ex)
                     file.unlink()  # Delete the file
                     
         # Clear the lists to reflect the current state (empty directories)
         self.text_files.clear()
         self.image_files.clear()
         self.audio_files.clear()
+        self.vectorizer = None
+        gc.collect()
+        fn = self.discussion_rag_folder/"db.sqli"
+        try:
+            fn.unlink()
+        except Exception as ex:
+            trace_exception(ex)
 
     def add_file(self, path, client, tasks_library:TasksLibrary, callback=None, process=True):
         output = ""
@@ -787,16 +815,14 @@ class Discussion:
                 self.lollms.ShowBlockingMessage("Processing file\nPlease wait ...")
                 if process:
                     if self.vectorizer is None:
-                        self.vectorizer = TextVectorizer(
-                                    self.lollms.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
-                                    model=self.lollms.model, #needed in case of using model_embedding
-                                    database_path=self.discussion_rag_folder/"db.json",
-                                    save_db=self.lollms.config.data_vectorization_save_db,
-                                    data_visualization_method=VisualizationMethod.PCA,
-                                    database_dict=None)
-                    data = GenericDataLoader.read_file(path)
-                    self.vectorizer.add_document(path, data, self.lollms.config.data_vectorization_chunk_size, self.lollms.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
-                    self.vectorizer.index()
+                        self.vectorizer = VectorDatabase(
+                                    self.discussion_rag_folder/"db.sqli",
+                                    BERTVectorizer(self.lollms.config.rag_vectorizer_model) if self.lollms.config.rag_vectorizer=="bert" else TFIDFVectorizer(),
+                                    self.lollms.model,
+                                    )
+                    data = TextDocumentsLoader.read_file(path)
+                    self.vectorizer.add_document(path.stem, data, path, True)
+                    self.vectorizer.build_index()
                     if callback is not None:
                         callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
                     self.lollms.HideBlockingMessage(client.client_id)

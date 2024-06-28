@@ -16,6 +16,10 @@ from lollms.binding import LLMBinding, BindingType
 from lollms.utilities import PromptReshaper, PackageManager, discussion_path_to_url, process_ai_output, remove_text_from_string
 from lollms.com import NotificationType, NotificationDisplayType
 from lollms.client_session import Session, Client
+from lollmsvectordb.vector_database import VectorDatabase
+from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+from lollmsvectordb.text_document_loader import TextDocumentsLoader
 
 import pkg_resources
 from pathlib import Path
@@ -1081,16 +1085,16 @@ class AIPersonality:
                 self.ShowBlockingMessage("Processing file\nPlease wait ...")
                 if process:
                     if self.vectorizer is None:
-                        self.vectorizer = TextVectorizer(
-                                    self.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
-                                    model=self.model, #needed in case of using model_embedding
-                                    database_path=client.discussion.discussion_rag_folder/"db.json",
-                                    save_db=self.config.data_vectorization_save_db,
-                                    data_visualization_method=VisualizationMethod.PCA,
-                                    database_dict=None)
-                    data = GenericDataLoader.read_file(path)
-                    self.vectorizer.add_document(path, data, self.config.data_vectorization_chunk_size, self.config.data_vectorization_overlap_size, add_first_line_to_all_chunks=True if path.suffix==".csv" else False)
-                    self.vectorizer.index()
+                        self.vectorizer = VectorDatabase(
+                                    client.discussion.discussion_rag_folder/"db.sqli",
+                                    BERTVectorizer(self.config.rag_vectorizer_model) if self.config.rag_vectorizer=="bert" else TFIDFVectorizer(),
+                                    self.model,
+                                    chunk_size=self.config.rag_chunk_size,
+                                    overlap=self.config.rag_overlap
+                                    )
+                    data = TextDocumentsLoader.read_file(path)
+                    self.vectorizer.add_document(path.stem, data, path, True)
+                    self.vectorizer.build_index()
                     if callback is not None:
                         callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
                     self.HideBlockingMessage(client.client_id)
@@ -3798,10 +3802,14 @@ fetch('/open_file', {
     def compress_html(self, code):
         return compress_html(code)
 
+
+
+
 # ===========================================================
     def select_model(self, binding_name, model_name):
         self.personality.app.select_model(binding_name, model_name)
-
+    def verify_rag_entry(self, query, rag_entry):
+        return self.yes_no("Does the text entry contain the answer to the query?", self.system_custom_header("Query")+query+"\n"+self.system_custom_header("text entry")+":\n"+rag_entry)
     # Properties ===============================================
     @property
     def start_header_id_template(self) -> str:

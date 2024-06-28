@@ -1,5 +1,5 @@
 # =================== Lord Of Large Language Multimodal Systems Configuration file =========================== 
-version: 120
+version: 123
 binding_name: null
 model_name: null
 model_variant: null
@@ -76,6 +76,9 @@ discussion_db_name: default
 
 # Automatic updates
 debug: false
+debug_show_final_full_prompt: false
+debug_show_chunks: false
+
 debug_log_file_path: ""
 auto_update: true
 auto_sync_personalities: true
@@ -244,6 +247,8 @@ rag_vectorizer: bert # possible values bert, tfidf, word2vec
 rag_vectorizer_model: bert-base-nli-mean-tokens # The model name if applicable
 rag_vectorizer_parameters: null # Parameters of the model in json format
 rag_chunk_size: 512 # number of tokens per chunk
+rag_overlap: 0 # number of tokens of overlap
+
 rag_n_chunks: 4 #Number of chunks to recover from the database
 rag_clean_chunks: true #Removed all uinecessary spaces and line returns
 rag_follow_subfolders: true #if true the vectorizer will vectorize the content of subfolders too
@@ -251,6 +256,8 @@ rag_check_new_files_at_startup: false #if true, the vectorizer will automaticall
 rag_preprocess_chunks: false #if true, an LLM will preprocess the content of the chunk before writing it in a simple format
 rag_activate_multi_hops: false #if true, we use multi hops algorithm to do multiple researches until the AI has enough data
 rag_min_nb_tokens_in_chunk: 10 #this removed any useless junk ith less than x tokens
+rag_max_n_hops: 3 #We set the maximum number of hop in multi hops rag
+
 
 activate_skills_lib: false # Activate vectorizing previous conversations
 skills_lib_database_name: "default" # Default skills database

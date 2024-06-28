@@ -33,7 +33,9 @@ import shutil
 from tqdm import tqdm
 import threading
 
-
+def adjust_dimensions(value: int) -> int:
+    """Adjusts the given value to be divisible by 8."""
+    return (value // 8) * 8
 
 def download_file(url, folder_path, local_filename):
     # Make sure 'folder_path' exists
@@ -215,7 +217,8 @@ class LollmsDiffusers(LollmsTTI):
             sc = self.get_scheduler_by_name(sampler_name)
             if sc:
                 self.model.scheduler = sc
-
+        width = adjust_dimensions(width)
+        height = adjust_dimensions(height)
         if output_path is None:
             output_path = self.output_dir
         if seed!=-1:
