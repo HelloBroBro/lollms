@@ -165,7 +165,6 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
                             print(f"Failed to add document {fn}: {e}")
                     if vdb.new_data: #New files are added, need reindexing
                         lollmsElfServer.ShowBlockingMessage(f"Adding a new database.\nIndexing the database...")
-                        ASCIIColors.blue("Indexing database ...", end="", flush=True)
                         vdb.build_index()
                         ASCIIColors.success("OK")
                     lollmsElfServer.HideBlockingMessage()

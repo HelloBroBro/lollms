@@ -33,6 +33,7 @@ from tqdm import tqdm
 import threading
 from io import BytesIO
 
+MIDJOURNEY_API_URL = "https://api.mymidjourney.ai/api/v1/midjourney"
 
 
 class LollmsMidjourney(LollmsTTI):
@@ -40,12 +41,146 @@ class LollmsMidjourney(LollmsTTI):
                     self, 
                     app:LollmsApplication, 
                     key="",
+                    timeout=300,
+                    retries=2,
+                    interval=1,
                     output_path=None
                     ):
         super().__init__("midjourney",app)
         self.key = key 
         self.output_path = output_path
+        self.timeout = timeout
+        self.retries = retries
+        self.interval = interval
+        self.session = requests.Session()
+        self.headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
 
+    def send_prompt(self, prompt: str) -> Dict[str, Any]:
+        """
+        Send a prompt to the MidJourney API to generate an image.
+
+        Args:
+            prompt (str): The prompt for image generation.
+
+        Returns:
+            Dict[str, Any]: The response from the API.
+        """
+        url = f"{MIDJOURNEY_API_URL}/imagine"
+        payload = {"prompt": prompt}
+        response = self.session.post(url, json=payload, headers=self.headers)
+        response.raise_for_status()
+        return response.json()
+
+    def check_progress(self, message_id: str) -> Dict[str, Any]:
+        """
+        Check the progress of the image generation.
+
+        Args:
+            message_id (str): The message ID from the initial request.
+
+        Returns:
+            Dict[str, Any]: The response from the API.
+        """
+        url = f"{MIDJOURNEY_API_URL}/message/{message_id}"
+        response = self.session.get(url, headers=self.headers)
+        response.raise_for_status()
+        return response.json()
+
+    def upscale_image(self, message_id: str, button: str) -> Dict[str, Any]:
+        """
+        Upscale the generated image.
+
+        Args:
+            message_id (str): The message ID from the initial request.
+            button (str): The button action for upscaling.
+
+        Returns:
+            Dict[str, Any]: The response from the API.
+        """
+        url = f"{MIDJOURNEY_API_URL}/button"
+        payload = {"messageId": message_id, "button": button}
+        response = self.session.post(url, json=payload, headers=self.headers)
+        response.raise_for_status()
+        return response.json()
+
+    def send_prompt_with_retry(self, prompt: str, retries: int = 3) -> Dict[str, Any]:
+        """
+        Send a prompt to the MidJourney API with retry mechanism.
+
+        Args:
+            prompt (str): The prompt for image generation.
+            retries (int): Number of retry attempts.
+
+        Returns:
+            Dict[str, Any]: The response from the API.
+        """
+        for attempt in range(retries):
+            try:
+                return self.send_prompt(prompt)
+            except requests.exceptions.RequestException as e:
+                if attempt < retries - 1:
+                    ASCIIColors.warning(f"Attempt {attempt + 1} failed: {e}. Retrying...")
+                    time.sleep(2 ** attempt)
+                else:
+                    ASCIIColors.error(f"All {retries} attempts failed.")
+                    raise e
+
+    def poll_progress(self, message_id: str, timeout: int = 300, interval: int = 5) -> Dict[str, Any]:
+        """
+        Poll the progress of the image generation until it's done or timeout.
+
+        Args:
+            message_id (str): The message ID from the initial request.
+            timeout (int): The maximum time to wait for the image generation.
+            interval (int): The interval between polling attempts.
+
+        Returns:
+            Dict[str, Any]: The response from the API.
+        """
+        start_time = time.time()
+        with tqdm(total=100, desc="Image Generation Progress", unit="%") as pbar:
+            while time.time() - start_time < timeout:
+                progress_response = self.check_progress(message_id)
+                if progress_response.get("status") == "DONE":
+                    pbar.update(100 - pbar.n)  # Ensure the progress bar is complete
+                    print(progress_response)
+                    return progress_response
+                elif progress_response.get("status") == "FAIL":
+                    ASCIIColors.error("Image generation failed.")
+                    return {"error": "Image generation failed"}
+
+                progress = progress_response.get("progress", 0)
+                pbar.update(progress - pbar.n)  # Update the progress bar
+                time.sleep(interval)
+        
+        ASCIIColors.error("Timeout while waiting for image generation.")
+        return {"error": "Timeout while waiting for image generation"}
+
+
+    def download_image(self, uri, folder_path):
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        
+        i = 1
+        while True:
+            file_path = os.path.join(folder_path, f"midjourney_{i}.png")
+            if not os.path.exists(file_path):
+                break
+            i += 1
+        
+        response = requests.get(uri)
+        if response.status_code == 200:
+            with open(file_path, 'wb') as file:
+                file.write(response.content)
+            print(f"Image downloaded and saved as {file_path}")
+            return file_path
+        else:
+            print(f"Failed to download image. Status code: {response.status_code}")
+            return None
+        
     def paint(
                 self,
                 positive_prompt,
@@ -62,84 +197,41 @@ class LollmsMidjourney(LollmsTTI):
                 ):
         if output_path is None:
             output_path = self.output_path
-        if generation_engine is None:
-            generation_engine = self.generation_engine
-        if not PackageManager.check_package_installed("openai"):
-            PackageManager.install_package("openai")
-        import openai
-        openai.api_key = self.key
-        if generation_engine=="dall-e-2":
-            supported_resolutions = [
-                [512, 512],
-                [1024, 1024],
-            ]
-            # Find the closest resolution
-            closest_resolution = min(supported_resolutions, key=lambda res: abs(res[0] - width) + abs(res[1] - height))
+
+        try:
+            # Send prompt and get initial response
+            initial_response = self.send_prompt_with_retry(positive_prompt, self.retries)
+            message_id = initial_response.get("messageId")
+            if not message_id:
+                raise ValueError("No messageId returned from initial prompt")
+
+            # Poll progress until image generation is done
+            progress_response = self.poll_progress(message_id, self.timeout, self.interval)
+            if "error" in progress_response:
+                raise ValueError(progress_response["error"])
             
-        else:
-            supported_resolutions = [
-                [1024, 1024],
-                [1024, 1792],
-                [1792, 1024]
-            ]
-            # Find the closest resolution
-            if width>height:
-                closest_resolution = [1792, 1024]
-            elif width<height: 
-                closest_resolution = [1024, 1792]
-            else:
-                closest_resolution = [1024, 1024]
-
-
-        # Update the width and height
-        width = closest_resolution[0]
-        height = closest_resolution[1]                    
-
-        if len(images)>0 and generation_engine=="dall-e-2":
-            # Read the image file from disk and resize it
-            image = Image.open(self.personality.image_files[0])
-            width, height = width, height
-            image = image.resize((width, height))
-
-            # Convert the image to a BytesIO object
-            byte_stream = BytesIO()
-            image.save(byte_stream, format='PNG')
-            byte_array = byte_stream.getvalue()
-            response = openai.images.create_variation(
-                image=byte_array,
-                n=1,
-                model=generation_engine, # for now only dalle 2 supports variations
-                size=f"{width}x{height}"
-            )
-        else:
-            response = openai.images.generate(
-                model=generation_engine,
-                positive_prompt=positive_prompt.strip(),
-                quality="standard",
-                size=f"{width}x{height}",
-                n=1,
+            if width<1024:
+                file_name = self.download_image(progress_response["uri"], output_path)
                 
-                )
-        # download image to outputs
-        output_dir = Path(output_path)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        image_url = response.data[0].url
+                return file_name
 
-        # Get the image data from the URL
-        response = requests.get(image_url)
+            # Upscale the generated image
+            upscale_response = self.upscale_image(message_id, "U1")
+            message_id = upscale_response.get("messageId")
+            if not message_id:
+                raise ValueError("No messageId returned from initial prompt")
 
-        if response.status_code == 200:
-            # Generate the full path for the image file
-            file_name = output_dir/find_next_available_filename(output_dir, "img_dalle_")  # You can change the filename if needed
+            # Poll progress until image generation is done
+            progress_response = self.poll_progress(message_id, self.timeout, self.interval)
+            if "error" in progress_response:
+                raise ValueError(progress_response["error"])
+            
+            file_name = self.download_image(progress_response["uri"], output_path)
+            return file_name, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
 
-            # Save the image to the specified folder
-            with open(file_name, "wb") as file:
-                file.write(response.content)
-            ASCIIColors.yellow(f"Image saved to {file_name}")
-        else:
-            ASCIIColors.red("Failed to download the image")
-
-        return file_name
+        except Exception as e:
+            ASCIIColors.error(f"An error occurred: {e}")
+    
     @staticmethod
     def get(app:LollmsApplication):
         return LollmsMidjourney
