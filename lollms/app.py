@@ -16,6 +16,7 @@ from lollms.tasks import TasksLibrary
 from safe_store import TextVectorizer, VectorizationMethod, VisualizationMethod
 
 from lollmsvectordb.database_elements.chunk import Chunk
+from lollmsvectordb.vector_database import VectorDatabase
 from typing import Callable
 from pathlib import Path
 from datetime import datetime
@@ -1043,47 +1044,82 @@ class LollmsApplication(LoLLMsCom):
                             "Cite Your Sources: After providing an answer, include the full path to the document where the information was found.",
                             f"{self.start_header_id_template}Documentation{self.end_header_id_template}"])
                         documentation += f"{self.separator_template}"
-                    results = []
-                    recovered_ids=[[]*len(self.active_rag_dbs)]
-                    i=0
-                    hop_id = 0
-                    while( len(results)<self.config.rag_n_chunks and hop_id<self.config.rag_max_n_hops):
-                        hop_id +=1
+                    full_documentation=""
+                    if self.config.contextual_summary:
                         for db in self.active_rag_dbs:
-                            v = db["vectorizer"]
-                            r=v.search(query, self.config.rag_n_chunks, recovered_ids[i])
-                            recovered_ids[i].append([rg.chunk_id for rg in r])
-                            if self.config.rag_activate_multi_hops:
-                                r = [rg for rg in r if self.personality.verify_rag_entry(query, rg.content)]
-                            results+=r
-                            i+=1
-                        if len(results)>=self.config.rag_n_chunks:
-                            break
-                    n_neighbors = self.active_rag_dbs[0]["vectorizer"].n_neighbors
-                    sorted_results = sorted(results, key=lambda x: x.distance)[:n_neighbors]
+                            v:VectorDatabase = db["vectorizer"]
+                            docs = v.list_documents()
+                            for doc in docs:
+                                document=v.get_document(document_path = doc["path"])
+                                self.personality.step_start(f"Summeryzing document {doc['path']}")
+                                summary = self.personality.summerize_text(document, f"Extract information from the following text chunk to answer this request. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
+                                self.personality.step_end(f"Summeryzing document {doc['path']}")
+                                document_infos = f"{self.separator_template}".join([
+                                    self.system_custom_header('document contextual summary'),
+                                    f"source_document_title:{doc['title']}",
+                                    f"source_document_path:{doc['path']}",
+                                    f"content:\n{summary}\n"
+                                ])
+                                documentation_entries.append({
+                                    "document_title":doc['title'],
+                                    "document_path":doc['path'],
+                                    "chunk_content":summary,
+                                    "chunk_size":0,
+                                    "distance":0,
+                                })
+                                if summary!="":
+                                    v.add_summaries(doc['path'],[{"context":query, "summary":summary}])
+                                full_documentation += document_infos
+                        documentation += self.personality.summerize_text(full_documentation, f"Extract information from the current text chunk and previous text chunks to answer the query. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
 
-                    for chunk in sorted_results:
-                        document_infos = f"{self.separator_template}".join([
-                            f"{self.start_header_id_template}document chunk{self.end_header_id_template}",
-                            f"source_document_title:{chunk.doc.title}",
-                            f"source_document_path:{chunk.doc.path}",
-                            f"content:\n{chunk.text}\n"
-                        ])
-                        documentation_entries.append({
-                            "document_title":chunk.doc.title,
-                            "document_path":chunk.doc.path,
-                            "chunk_content":chunk.text,
-                            "chunk_size":chunk.nb_tokens,
-                            "distance":chunk.distance,
-                        })
-                        documentation += document_infos
-                        
+                    else:
+                        results = []
+                        recovered_ids=[[] for _ in range(len(self.active_rag_dbs))]
+                        hop_id = 0
+                        while( len(results)<self.config.rag_n_chunks and hop_id<self.config.rag_max_n_hops):
+                            i=0
+                            hop_id +=1
+                            for db in self.active_rag_dbs:
+                                v = db["vectorizer"]
+                                r=v.search(query, self.config.rag_n_chunks, recovered_ids[i])
+                                recovered_ids[i]+=[rg.chunk_id for rg in r]
+                                if self.config.rag_activate_multi_hops:
+                                    r = [rg for rg in r if self.personality.verify_rag_entry(query, rg.text)]
+                                results+=r
+                                i+=1
+                            if len(results)>=self.config.rag_n_chunks:
+                                break
+                        n_neighbors = self.active_rag_dbs[0]["vectorizer"].n_neighbors
+                        sorted_results = sorted(results, key=lambda x: x.distance)[:n_neighbors]
+
+                        for chunk in sorted_results:
+                            document_infos = f"{self.separator_template}".join([
+                                f"{self.start_header_id_template}document chunk{self.end_header_id_template}",
+                                f"source_document_title:{chunk.doc.title}",
+                                f"source_document_path:{chunk.doc.path}",
+                                f"content:\n{chunk.text}\n"
+                            ])
+                            documentation_entries.append({
+                                "document_title":chunk.doc.title,
+                                "document_path":chunk.doc.path,
+                                "chunk_content":chunk.text,
+                                "chunk_size":chunk.nb_tokens,
+                                "distance":chunk.distance,
+                            })
+                            documentation += document_infos
+                            
                 if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
                     if discussion is None:
                         discussion = self.recover_discussion(client_id)
 
                     if documentation=="":
-                        documentation=f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.{self.separator_template}{self.start_header_id_template}Documentation:\n"
+                        documentation=f"{self.separator_template}".join([
+                            f"{self.separator_template}{self.start_header_id_template}important information{self.end_header_id_template}Utilize Documentation Data: Always refer to the provided documentation to answer user questions accurately.",
+                            "Absence of Information: If the required information is not available in the documentation, inform the user that the requested information is not present in the documentation section.",
+                            "Strict Adherence to Documentation: It is strictly prohibited to provide answers without concrete evidence from the documentation.",
+                            "Cite Your Sources: After providing an answer, include the full path to the document where the information was found.",
+                            f"{self.start_header_id_template}Documentation{self.end_header_id_template}"])
+                        documentation += f"{self.separator_template}"
 
                     if query is None:
                         if self.config.data_vectorization_build_keys_words:
@@ -1094,18 +1130,46 @@ class LollmsApplication(LoLLMsCom):
                         else:
                             query = current_message.content
 
-                    try:
-                        chunks:List[Chunk] = client.discussion.vectorizer.search(query, int(self.config.rag_n_chunks))
-                        for chunk in chunks:
-                            if self.config.data_vectorization_put_chunk_informations_into_context:
-                                documentation += f"{self.start_header_id_template}document chunk{self.end_header_id_template}\ndocument title: {chunk.doc.title}\nchunk content:\n{chunk.text}\n"
-                            else:
-                                documentation += f"{self.start_header_id_template}chunk{self.end_header_id_template}\n{chunk.text}\n"
 
-                        documentation += f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
-                    except Exception as ex:
-                        trace_exception(ex)
-                        self.warning("Couldn't add documentation to the context. Please verify the vector database")
+                    full_documentation=""
+                    if self.config.contextual_summary:
+                        v = client.discussion.vectorizer
+                        docs = v.list_documents()
+                        for doc in docs:
+                            document=v.get_document(document_path = doc["path"])
+                            self.personality.step_start(f"Summeryzing document {doc['path']}")
+                            summary = self.personality.summerize_text(document, f"Extract information from the following text chunk to answer this request. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
+                            self.personality.step_end(f"Summeryzing document {doc['path']}")
+                            document_infos = f"{self.separator_template}".join([
+                                self.system_custom_header('document contextual summary'),
+                                f"source_document_title:{doc['title']}",
+                                f"source_document_path:{doc['path']}",
+                                f"content:\n{summary}\n"
+                            ])
+                            documentation_entries.append({
+                                "document_title":doc['title'],
+                                "document_path":doc['path'],
+                                "chunk_content":summary,
+                                "chunk_size":0,
+                                "distance":0,
+                            })
+                            if summary!="":
+                                v.add_summaries(doc['path'],[{"context":query, "summary":summary}])
+                            full_documentation += document_infos
+                        documentation += self.personality.summerize_text(full_documentation, f"Extract information from the current text chunk and previous text chunks to answer the query. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
+                    else:
+                        try:
+                            chunks:List[Chunk] = client.discussion.vectorizer.search(query, int(self.config.rag_n_chunks))
+                            for chunk in chunks:
+                                if self.config.data_vectorization_put_chunk_informations_into_context:
+                                    documentation += f"{self.start_header_id_template}document chunk{self.end_header_id_template}\ndocument title: {chunk.doc.title}\nchunk content:\n{chunk.text}\n"
+                                else:
+                                    documentation += f"{self.start_header_id_template}chunk{self.end_header_id_template}\n{chunk.text}\n"
+
+                            documentation += f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
+                        except Exception as ex:
+                            trace_exception(ex)
+                            self.warning("Couldn't add documentation to the context. Please verify the vector database")
                 # Check if there is discussion knowledge to add to the prompt
                 if self.config.activate_skills_lib:
                     try:

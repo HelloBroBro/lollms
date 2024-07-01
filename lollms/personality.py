@@ -1648,6 +1648,84 @@ class AIPersonality:
         """
         self._processor_cfg = value
 
+
+
+
+
+
+    # Properties ===============================================
+    @property
+    def start_header_id_template(self) -> str:
+        """Get the start_header_id_template."""
+        return self.config.start_header_id_template
+
+    @property
+    def end_header_id_template(self) -> str:
+        """Get the end_header_id_template."""
+        return self.config.end_header_id_template
+    
+    @property
+    def system_message_template(self) -> str:
+        """Get the system_message_template."""
+        return self.config.system_message_template
+
+
+    @property
+    def separator_template(self) -> str:
+        """Get the separator template."""
+        return self.config.separator_template
+
+
+    @property
+    def start_user_header_id_template(self) -> str:
+        """Get the start_user_header_id_template."""
+        return self.config.start_user_header_id_template
+    @property
+    def end_user_header_id_template(self) -> str:
+        """Get the end_user_header_id_template."""
+        return self.config.end_user_header_id_template
+    @property
+    def end_user_message_id_template(self) -> str:
+        """Get the end_user_message_id_template."""
+        return self.config.end_user_message_id_template
+
+
+
+
+    @property
+    def start_ai_header_id_template(self) -> str:
+        """Get the start_ai_header_id_template."""
+        return self.config.start_ai_header_id_template
+    @property
+    def end_ai_header_id_template(self) -> str:
+        """Get the end_ai_header_id_template."""
+        return self.config.end_ai_header_id_template
+    @property
+    def end_ai_message_id_template(self) -> str:
+        """Get the end_ai_message_id_template."""
+        return self.config.end_ai_message_id_template
+    @property
+    def system_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_header_id_template}{self.system_message_template}{self.end_header_id_template}"
+    @property
+    def user_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{self.config.user_name}{self.end_user_header_id_template}"
+    @property
+    def ai_full_header(self) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{self.personality.name}{self.end_user_header_id_template}"
+
+    def system_custom_header(self, ai_name) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{ai_name}{self.end_user_header_id_template}"
+
+    def ai_custom_header(self, ai_name) -> str:
+        """Get the start_header_id_template."""
+        return f"{self.start_user_header_id_template}{ai_name}{self.end_user_header_id_template}"
+
+
     # ========================================== Helper methods ==========================================
     def detect_antiprompt(self, text:str) -> bool:
         """
@@ -1701,8 +1779,216 @@ class AIPersonality:
         output_string = re.sub(pattern, replace, input_string)
         return output_string
 
+    def verify_rag_entry(self, query, rag_entry):
+        return self.yes_no("Are there any useful information in the document chunk that can be used to answer the query?", self.app.system_custom_header("Query")+query+"\n"+self.app.system_custom_header("document chunk")+"\n"+rag_entry)
 
 
+    def translate(self, text_chunk, output_language="french", max_generation_size=3000):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
+        translated = self.fast_gen(
+                                "\n".join([
+                                    f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+                                    f"Translate the following text to {output_language}.",
+                                    "Be faithful to the original text and do not add or remove any information.",
+                                    "Respond only with the translated text.",
+                                    "Do not add comments or explanations.",
+                                    f"{start_header_id_template}text to translate{end_header_id_template}",
+                                    f"{text_chunk}",
+                                    f"{start_header_id_template}translation{end_header_id_template}",
+                                    ]),
+                                    max_generation_size=max_generation_size, callback=self.sink)
+        return translated
+
+    def summerize_text(
+                        self,
+                        text,
+                        summary_instruction="summerize",
+                        doc_name="chunk",
+                        answer_start="",
+                        max_generation_size=3000,
+                        max_summary_size=512,
+                        callback=None,
+                        chunk_summary_post_processing=None,
+                        summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
+                    ):
+        tk = self.model.tokenize(text)
+        prev_len = len(tk)
+        document_chunks=None
+        while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
+            self.step_start(f"Comprerssing {doc_name}...")
+            chunk_size = int(self.config.ctx_size*0.6)
+            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.model.tokenize, self.model.detokenize, True)
+            text = self.summerize_chunks(
+                                            document_chunks,
+                                            summary_instruction, 
+                                            doc_name, 
+                                            answer_start, 
+                                            max_generation_size, 
+                                            callback, 
+                                            chunk_summary_post_processing=chunk_summary_post_processing,
+                                            summary_mode=summary_mode)
+            tk = self.model.tokenize(text)
+            tk = self.model.tokenize(text)
+            dtk_ln=prev_len-len(tk)
+            prev_len = len(tk)
+            self.step(f"Current text size : {prev_len}, max summary size : {max_summary_size}")
+            self.step_end(f"Comprerssing {doc_name}...")
+            if dtk_ln<=10: # it is not summarizing
+                break
+        return text
+
+    def smart_data_extraction(
+                                self,
+                                text,
+                                data_extraction_instruction=f"Summerize the current chunk.",
+                                final_task_instruction="reformulate with better wording",
+                                doc_name="chunk",
+                                answer_start="",
+                                max_generation_size=3000,
+                                max_summary_size=512,
+                                callback=None,
+                                chunk_summary_post_processing=None,
+                                summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
+                            ):
+        tk = self.model.tokenize(text)
+        prev_len = len(tk)
+        while len(tk)>max_summary_size:
+            chunk_size = int(self.config.ctx_size*0.6)
+            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.model.tokenize, self.model.detokenize, True)
+            text = self.summerize_chunks(
+                                            document_chunks, 
+                                            data_extraction_instruction, 
+                                            doc_name, 
+                                            answer_start, 
+                                            max_generation_size, 
+                                            callback, 
+                                            chunk_summary_post_processing=chunk_summary_post_processing, 
+                                            summary_mode=summary_mode
+                                        )
+            tk = self.model.tokenize(text)
+            dtk_ln=prev_len-len(tk)
+            prev_len = len(tk)
+            self.step(f"Current text size : {prev_len}, max summary size : {max_summary_size}")
+            if dtk_ln<=10: # it is not sumlmarizing
+                break
+        self.step_start(f"Rewriting ...")
+        text = self.summerize_chunks(
+                                        [text],
+                                        final_task_instruction, 
+                                        doc_name, answer_start, 
+                                        max_generation_size, 
+                                        callback, 
+                                        chunk_summary_post_processing=chunk_summary_post_processing
+                                    )
+        self.step_end(f"Rewriting ...")
+
+        return text
+
+    def summerize_chunks(
+                            self,
+                            chunks,
+                            summary_instruction=f"Summerize the current chunk.",
+                            doc_name="chunk",
+                            answer_start="",
+                            max_generation_size=3000,
+                            callback=None,
+                            chunk_summary_post_processing=None,
+                            summary_mode=SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL
+                        ):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+
+        if summary_mode==SUMMARY_MODE.SUMMARY_MODE_SEQUENCIAL:
+            summary = ""
+            for i, chunk in enumerate(chunks):
+                self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+                summary = f"{answer_start}"+ self.fast_gen(
+                            "\n".join([
+                                self.system_custom_header("previous chunks analysis"),
+                                f"{summary}",
+                                self.system_custom_header("current chunk"),
+                                f"{chunk}",
+                                self.system_full_header,
+                                summary_instruction,
+                                f"Keep only information relevant to the context",
+                                f"the output must keep information from the previous chunk analysis and add the current chunk extracted information.",
+                                f"Be precise and do not invent information that does not exist in the previous chunks analysis or the current chunk.",
+                                f"Do not add any extra comments.",
+                                self.system_custom_header("cumulative chunks analysis")+answer_start
+                                ]),
+                                max_generation_size=max_generation_size,
+                                callback=callback)
+                if chunk_summary_post_processing:
+                    summary = chunk_summary_post_processing(summary)
+                self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            return summary
+        else:
+            summeries = []
+            for i, chunk in enumerate(chunks):
+                self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+                summary = f"{answer_start}"+ self.fast_gen(
+                            "\n".join([
+                                f"{start_header_id_template}Document_chunk [{doc_name}]{end_header_id_template}",
+                                f"{chunk}",
+                                f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
+                                f"Answer directly with the summary with no extra comments.",
+                                f"{start_header_id_template}summary{end_header_id_template}",
+                                f"{answer_start}"
+                                ]),
+                                max_generation_size=max_generation_size,
+                                callback=callback)
+                if chunk_summary_post_processing:
+                    summary = chunk_summary_post_processing(summary)
+                summeries.append(summary)
+                self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            return "\n".join(summeries)
+
+    def sequencial_chunks_summary(
+                            self,
+                            chunks,
+                            summary_instruction="summerize",
+                            doc_name="chunk",
+                            answer_start="",
+                            max_generation_size=3000,
+                            callback=None,
+                            chunk_summary_post_processing=None
+                        ):
+        start_header_id_template    = self.config.start_header_id_template
+        end_header_id_template      = self.config.end_header_id_template
+        system_message_template     = self.config.system_message_template
+        summeries = []
+        for i, chunk in enumerate(chunks):
+            if i<len(chunks)-1:
+                chunk1 = chunks[i+1]
+            else:
+                chunk1=""
+            if i>0:
+                chunk=summary
+            self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+            summary = f"{answer_start}"+ self.fast_gen(
+                        "\n".join([
+                            f"{start_header_id_template}Document_chunk: {doc_name}{end_header_id_template}",
+                            f"Block1:",
+                            f"{chunk}",
+                            f"Block2:",
+                            f"{chunk1}",
+                            f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
+                            f"Answer directly with the summary with no extra comments.",
+                            f"{start_header_id_template}summary{end_header_id_template}",
+                            f"{answer_start}"
+                            ]),
+                            max_generation_size=max_generation_size,
+                            callback=callback)
+            if chunk_summary_post_processing:
+                summary = chunk_summary_post_processing(summary)
+            summeries.append(summary)
+            self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
+        return "\n".join(summeries)
+    
 class StateMachine:
     def __init__(self, states_list):
         """
@@ -2350,17 +2636,17 @@ class APScript(StateMachine):
                 self.step_start(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
                 summary = f"{answer_start}"+ self.fast_gen(
                             "\n".join([
-                                f"{start_header_id_template}Previous_chunks_summary{end_header_id_template}",
+                                self.system_custom_header("previous chunks analysis"),
                                 f"{summary}",
-                                f"{start_header_id_template}Current_chunk{end_header_id_template}",
+                                self.system_custom_header("current chunk"),
                                 f"{chunk}",
-                                f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
-                                f"Summerize the current chunk and fuse it with previous chunk summary ion order to keep the required informations.",
-                                f"The summary needs to keep all relevant information.",
-                                f"Be precise and do not invent information that does not exist in the previous summary or the current chunk.",
-                                f"Answer directly with the summary with no extra comments.",
-                                f"{start_header_id_template}summary{end_header_id_template}",
-                                f"{answer_start}"
+                                self.system_full_header,
+                                summary_instruction,
+                                f"Keep only information relevant to the context",
+                                f"the output must keep information from the previous chunk analysis and add the current chunk extracted information.",
+                                f"Be precise and do not invent information that does not exist in the previous chunks analysis or the current chunk.",
+                                f"Do not add any extra comments.",
+                                self.system_custom_header("cumulative chunks analysis")+answer_start
                                 ]),
                                 max_generation_size=max_generation_size,
                                 callback=callback)
@@ -3809,7 +4095,7 @@ fetch('/open_file', {
     def select_model(self, binding_name, model_name):
         self.personality.app.select_model(binding_name, model_name)
     def verify_rag_entry(self, query, rag_entry):
-        return self.yes_no("Does the text entry contain the answer to the query?", self.system_custom_header("Query")+query+"\n"+self.system_custom_header("text entry")+":\n"+rag_entry)
+        return self.yes_no("Are there any useful information in the document chunk that can be used to answer the query?", self.app.system_custom_header("Query")+query+"\n"+self.app.system_custom_header("document chunk")+"\n"+rag_entry)
     # Properties ===============================================
     @property
     def start_header_id_template(self) -> str:
