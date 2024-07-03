@@ -699,7 +699,7 @@ class AIPersonality:
         prompt = pr.build(placeholders,
                         self.model.tokenize,
                         self.model.detokenize,
-                        self.model.config.ctx_size - max_generation_size,
+                        max_generation_size,
                         sacrifice
                         )
         ntk = len(self.model.tokenize(prompt))
@@ -2717,7 +2717,7 @@ class APScript(StateMachine):
             self.step_end(f" Summary of {doc_name} - Processing chunk : {i+1}/{len(chunks)}")
         return "\n".join(summeries)
 
-    def build_prompt_from_context_details(self, context_details:dict, custom_entries=""):
+    def build_prompt_from_context_details(self, context_details:dict, custom_entries="", suppress=[]):
         """
         Builds a prompt from the provided context details.
 
@@ -2737,61 +2737,54 @@ class APScript(StateMachine):
         """
         full_context = []
         sacrifice_id = 0
-        if context_details["conditionning"]:
+        if context_details["conditionning"] and "conditionning" not in suppress:
             full_context.append( "\n".join([
                 context_details["conditionning"]
             ]))
             sacrifice_id += 1
-        if context_details["documentation"]:
+        if context_details["documentation"] and "documentation" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("documentation"),
                 context_details["documentation"]
             ]))
             sacrifice_id += 1
 
-        if context_details["knowledge"]:
+        if context_details["knowledge"] and "knowledge" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("knowledge"),
                 context_details["knowledge"]
             ]))
             sacrifice_id += 1
 
-        if context_details["user_description"]:
+        if context_details["user_description"] and "user_description" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("user_description"),
                 context_details["user_description"]
             ]))
             sacrifice_id += 1
 
-        if context_details["positive_boost"]:
+        if context_details["positive_boost"] and "positive_boost" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("positive_boost"),
                 context_details["positive_boost"]
             ]))
             sacrifice_id += 1
 
-        if context_details["positive_boost"]:
-            full_context.append( "\n".join([
-                self.system_custom_header("positive_boost"),
-                context_details["positive_boost"]
-            ]))
-            sacrifice_id += 1
-
-        if context_details["negative_boost"]:
+        if context_details["negative_boost"] and "negative_boost" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("negative_boost"),
                 context_details["negative_boost"]
             ]))
             sacrifice_id += 1
 
-        if context_details["current_language"]:
+        if context_details["current_language"] and "current_language" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("current_language"),
                 context_details["current_language"]
             ]))
             sacrifice_id += 1
 
-        if context_details["fun_mode"]:
+        if context_details["fun_mode"] and "fun_mode" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("fun_mode"),
                 context_details["fun_mode"]
@@ -2799,13 +2792,13 @@ class APScript(StateMachine):
             sacrifice_id += 1
 
 
-        if context_details["discussion_messages"]:
+        if context_details["discussion_messages"] and "discussion_messages" not in suppress:
             full_context.append( "\n".join([
                 self.system_custom_header("discussion_messages"),
                 context_details["discussion_messages"]
             ]))
 
-        if context_details["extra"]:
+        if context_details["extra"] and "extra" not in suppress:
             full_context.append( "\n".join([
                 context_details["extra"]
             ]))
@@ -2815,9 +2808,10 @@ class APScript(StateMachine):
                 custom_entries
             ]))
 
-        full_context.append( "\n".join([
-            self.ai_custom_header(context_details["ai_prefix"])
-        ]))
+        if "ai_prefix" not in suppress:
+            full_context.append( "\n".join([
+                self.ai_custom_header(context_details["ai_prefix"])
+            ]))
 
         return self.build_prompt(full_context, sacrifice_id)
     

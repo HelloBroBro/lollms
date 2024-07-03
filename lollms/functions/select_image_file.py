@@ -4,6 +4,9 @@ if not PackageManager.check_package_installed("pyautogui"):
     PackageManager.install_package("pyautogui")
 if not PackageManager.check_package_installed("PyQt5"):
     PackageManager.install_package("PyQt5")
+
+if not PackageManager.check_package_installed("cv2"):
+    PackageManager.install_package("opencv-python")
 import cv2
 import time
 from PyQt5 import QtWidgets, QtGui, QtCore
