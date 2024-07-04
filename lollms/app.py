@@ -389,7 +389,7 @@ class LollmsApplication(LoLLMsCom):
             self.tti = LollmsDalle(self, self.config.dall_e_key)
         elif self.config.active_tti_service == "midjourney":
             from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
-            self.tti = LollmsMidjourney(self, self.config.midjourney_key)
+            self.tti = LollmsMidjourney(self, self.config.midjourney_key, self.config.midjourney_timeout, self.config.midjourney_retries)
         elif self.config.active_tti_service == "comfyui" and (self.tti is None or self.tti.name!="comfyui"):
             if self.comfyui:
                 self.tti = self.comfyui
@@ -507,7 +507,7 @@ class LollmsApplication(LoLLMsCom):
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
             elif self.config.active_tti_service == "midjourney" and (self.tti is None or self.tti.name!="midjourney"):
                 from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
-                self.tti = LollmsMidjourney(self, self.config.midjourney_key)
+                self.tti = LollmsMidjourney(self, self.config.midjourney_key, self.config.midjourney_timeout, self.config.midjourney_retries)
             elif self.config.active_tti_service == "comfyui" and (self.tti is None or self.tti.name!="comfyui"):
                 if self.comfyui:
                     self.tti = self.comfyui

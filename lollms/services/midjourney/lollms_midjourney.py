@@ -213,7 +213,7 @@ class LollmsMidjourney(LollmsTTI):
             if width<1024:
                 file_name = self.download_image(progress_response["uri"], output_path)
                 
-                return file_name
+                return file_name, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
 
             # Upscale the generated image
             upscale_response = self.upscale_image(message_id, "U1")
@@ -230,7 +230,9 @@ class LollmsMidjourney(LollmsTTI):
             return file_name, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
 
         except Exception as e:
+            trace_exception(e)
             ASCIIColors.error(f"An error occurred: {e}")
+            return "", {"prompt":positive_prompt, "negative_prompt":negative_prompt}
     
     @staticmethod
     def get(app:LollmsApplication):

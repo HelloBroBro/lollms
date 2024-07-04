@@ -618,7 +618,7 @@ class AIPersonality:
         system_message_template     = self.config.system_message_template
 
         prompt = "\n".join([
-            f"{start_header_id_template}{system_message_template}{end_header_id_template}I am an AI assistant that can converse and analyze images. When asked to locate something in an image you send, I will reply with:",
+            self.system_full_header+f"I am an AI assistant that can converse and analyze images. When asked to locate something in an image you send, I will reply with:",
             "boundingbox(image_index, label, left, top, width, height)",
             "Where:",
             "image_index: 0-based index of the image",
@@ -2738,54 +2738,55 @@ class APScript(StateMachine):
         full_context = []
         sacrifice_id = 0
         if context_details["conditionning"] and "conditionning" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
+                self.system_full_header,
                 context_details["conditionning"]
             ]))
             sacrifice_id += 1
         if context_details["documentation"] and "documentation" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("documentation"),
                 context_details["documentation"]
             ]))
             sacrifice_id += 1
 
         if context_details["knowledge"] and "knowledge" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("knowledge"),
                 context_details["knowledge"]
             ]))
             sacrifice_id += 1
 
         if context_details["user_description"] and "user_description" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("user_description"),
                 context_details["user_description"]
             ]))
             sacrifice_id += 1
 
         if context_details["positive_boost"] and "positive_boost" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("positive_boost"),
                 context_details["positive_boost"]
             ]))
             sacrifice_id += 1
 
         if context_details["negative_boost"] and "negative_boost" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("negative_boost"),
                 context_details["negative_boost"]
             ]))
             sacrifice_id += 1
 
         if context_details["current_language"] and "current_language" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("current_language"),
                 context_details["current_language"]
             ]))
             sacrifice_id += 1
 
         if context_details["fun_mode"] and "fun_mode" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("fun_mode"),
                 context_details["fun_mode"]
             ]))
@@ -2793,23 +2794,23 @@ class APScript(StateMachine):
 
 
         if context_details["discussion_messages"] and "discussion_messages" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.system_custom_header("discussion_messages"),
                 context_details["discussion_messages"]
             ]))
 
         if context_details["extra"] and "extra" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 context_details["extra"]
             ]))
 
         if custom_entries:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 custom_entries
             ]))
 
         if "ai_prefix" not in suppress:
-            full_context.append( "\n".join([
+            full_context.append( self.separator_template.join([
                 self.ai_custom_header(context_details["ai_prefix"])
             ]))
 
@@ -2834,7 +2835,7 @@ class APScript(StateMachine):
             minimum_spare_context_size = self.personality.config.min_n_predict
 
         if sacrifice_id == -1 or len(prompt_parts[sacrifice_id])<50:
-            return "\n".join([s for s in prompt_parts if s!=""])
+            return self.separator_template.join([s for s in prompt_parts if s!=""])
         else:
             part_tokens=[]
             nb_tokens=0
@@ -2852,7 +2853,7 @@ class APScript(StateMachine):
             else:
                 sacrifice_text = ""
             prompt_parts[sacrifice_id] = sacrifice_text
-            return "\n".join([s for s in prompt_parts if s!=""])
+            return self.separator_template.join([s for s in prompt_parts if s!=""])
     # ================================================= Sending commands to ui ===========================================
     def add_collapsible_entry(self, title, content, subtitle=""):
         return "\n".join(
