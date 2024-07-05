@@ -1038,7 +1038,8 @@ class LollmsApplication(LoLLMsCom):
                         query = current_message.content
                     if documentation=="":
                         documentation=f"{self.separator_template}".join([
-                            f"{self.separator_template}{self.start_header_id_template}important information{self.end_header_id_template}Utilize Documentation Data: Always refer to the provided documentation to answer user questions accurately.",
+                            f"{self.separator_template}{self.start_header_id_template}important information{self.end_header_id_template}",
+                            "Always refer to the provided documentation to answer user questions accurately.",
                             "Absence of Information: If the required information is not available in the documentation, inform the user that the requested information is not present in the documentation section.",
                             "Strict Adherence to Documentation: It is strictly prohibited to provide answers without concrete evidence from the documentation.",
                             "Cite Your Sources: After providing an answer, include the full path to the document where the information was found.",
@@ -1246,7 +1247,7 @@ class LollmsApplication(LoLLMsCom):
         total_tokens = n_cond_tk + n_isearch_tk + n_doc_tk + n_history_tk + n_user_description_tk + n_positive_boost + n_negative_boost + n_fun_mode
 
         # Calculate the available space for the messages
-        available_space = min(self.config.ctx_size - n_tokens - total_tokens, self.config.max_n_predict)
+        available_space = self.config.ctx_size - n_tokens - total_tokens
 
         # if self.config.debug:
         #     self.info(f"Tokens summary:\nConditionning:{n_cond_tk}\nn_isearch_tk:{n_isearch_tk}\ndoc:{n_doc_tk}\nhistory:{n_history_tk}\nuser description:{n_user_description_tk}\nAvailable space:{available_space}",10)
@@ -1371,7 +1372,8 @@ class LollmsApplication(LoLLMsCom):
             "current_language":self.config.current_language,
             "fun_mode":fun_mode,
             "ai_prefix":ai_prefix,
-            "extra":""
+            "extra":"",
+            "available_space":available_space
         }    
         if self.config.debug:
             ASCIIColors.highlight(documentation,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)

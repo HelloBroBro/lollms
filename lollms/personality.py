@@ -693,7 +693,7 @@ class AIPersonality:
 
         if max_generation_size is None:
             prompt_size = self.model.tokenize(prompt)
-            max_generation_size = self.model.config.ctx_size - len(prompt_size)
+            max_generation_size = min(self.model.config.ctx_size - len(prompt_size),self.config.max_n_predict)
 
         pr = PromptReshaper(prompt)
         prompt = pr.build(placeholders,
@@ -703,7 +703,7 @@ class AIPersonality:
                         sacrifice
                         )
         ntk = len(self.model.tokenize(prompt))
-        max_generation_size = min(self.model.config.ctx_size - ntk, max_generation_size)
+        max_generation_size = min(min(self.model.config.ctx_size - ntk, max_generation_size), self.config.max_n_predict)
         # TODO : add show progress
 
         gen = self.generate(prompt, max_generation_size, temperature = temperature, top_k = top_k, top_p=top_p, repeat_penalty=repeat_penalty, repeat_last_n=repeat_last_n, callback=callback, show_progress=show_progress).strip().replace("</s>", "").replace("<s>", "")
@@ -774,7 +774,7 @@ class AIPersonality:
             self.print_prompt("gen",prompt)
         self.model.generate(
                                 prompt,
-                                max_size if max_size else (self.config.ctx_size-len(self.model.tokenize(prompt))),
+                                max_size if max_size else min(self.config.ctx_size-len(self.model.tokenize(prompt)), self.config.max_n_predict),
                                 partial(self.process, callback=callback, show_progress=show_progress),
                                 temperature=self.model_temperature if temperature is None else temperature,
                                 top_k=self.model_top_k if top_k is None else top_k,
@@ -2813,8 +2813,16 @@ class APScript(StateMachine):
             full_context.append( self.separator_template.join([
                 self.ai_custom_header(context_details["ai_prefix"])
             ]))
+        
+        prompt = self.build_prompt(full_context, sacrifice_id)
+        
+        if self.config.debug:
+            nb_prompt_tokens = self.personality.model.tokenize(prompt)
+            nb_tokens = min(self.config.ctx_size - len(nb_prompt_tokens), self.config.max_n_predict)
+            ASCIIColors.info(f"Prompt size : {nb_prompt_tokens}")
+            ASCIIColors.info(f"Requested generation max size : {nb_tokens}")
 
-        return self.build_prompt(full_context, sacrifice_id)
+        return prompt
     
     def build_prompt(self, prompt_parts:List[str], sacrifice_id:int=-1, context_size:int=None, minimum_spare_context_size:int=None):
         """
@@ -3873,17 +3881,12 @@ class APScript(StateMachine):
         Returns:
             str: The upgraded prompt that includes information about the function calls.
         """
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
-        separator_template          = self.config.separator_template
-
-
         tools = self.transform_functions_to_text(functions)
         import copy
         cd = copy.deepcopy(context_details)
+        
         function_descriptions = [
-                                 f"{start_header_id_template}Available functions{end_header_id_template}\n",
+                                 self.system_custom_header("Available functions"),
                                  tools,
                                  "",
                                  cd["conditionning"],
@@ -3962,11 +3965,6 @@ class APScript(StateMachine):
                                         hide_function_call=False,
                                         separate_output=False,
                                         max_nested_function_calls=10):
-        
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
-        separator_template          = self.config.separator_template
 
         final_output = ""
         if len(self.personality.image_files)>0:
@@ -3985,7 +3983,7 @@ class APScript(StateMachine):
 
             outputs = self.execute_function_calls(function_calls,function_definitions)
             final_output = "\n".join([str(o) if type(o)==str else str(o[0]) if (type(o)==tuple or type(0)==list) and len(o)>0 else "" for o in outputs])
-            out += f"{separator_template}{start_header_id_template}function calls results{end_header_id_template}\n" + final_output + "\n"
+            out +=  f"{self.separator_template}"+ self.system_custom_header('function calls results') + final_output + "\n"
             if prompt_after_execution:
                 if separate_output:
                     self.full(final_output)
