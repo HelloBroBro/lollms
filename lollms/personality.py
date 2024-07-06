@@ -2817,8 +2817,8 @@ class APScript(StateMachine):
         prompt = self.build_prompt(full_context, sacrifice_id)
         
         if self.config.debug:
-            nb_prompt_tokens = self.personality.model.tokenize(prompt)
-            nb_tokens = min(self.config.ctx_size - len(nb_prompt_tokens), self.config.max_n_predict)
+            nb_prompt_tokens = len(self.personality.model.tokenize(prompt))
+            nb_tokens = min(self.config.ctx_size - nb_prompt_tokens, self.config.max_n_predict)
             ASCIIColors.info(f"Prompt size : {nb_prompt_tokens}")
             ASCIIColors.info(f"Requested generation max size : {nb_tokens}")
 
