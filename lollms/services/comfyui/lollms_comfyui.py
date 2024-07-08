@@ -70,7 +70,7 @@ def install_comfyui(lollms_app:LollmsApplication):
     shared_folder = root_dir/"shared"
     comfyui_folder = shared_folder / "comfyui"
     if comfyui_folder.exists():
-        if show_yes_no_dialog("warning!","I have detected that there is a previous installation of stable diffusion.\nShould I remove it and continue installing?"):
+        if show_yes_no_dialog("warning!","I have detected that there is a previous installation of Comfyui.\nShould I remove it and continue installing?"):
             shutil.rmtree(comfyui_folder)
         elif show_yes_no_dialog("warning!","Continue installation?"):
             ASCIIColors.cyan("Installing comfyui conda environment with python 3.10")
@@ -234,6 +234,10 @@ class LollmsComfyUI(LollmsTTI):
         thread = threading.Thread(target=self.wait_for_service, args=(max_retries, show_warning))
         thread.start()
         return thread
+    
+    @staticmethod
+    def get_models_list(app):
+        return [str(f.name) for f in (app.lollms_paths.personal_path/"shared"/"comfyui"/"models"/"checkpoints").iterdir()]
 
     def wait_for_service(self, max_retries = 50, show_warning=True):
         url = f"{self.comfyui_base_url}"
@@ -283,7 +287,8 @@ class LollmsComfyUI(LollmsTTI):
             data = json.dumps(p).encode('utf-8')
             full_url = "http://{}/prompt".format(url)
             req =  request.Request(full_url, data=data)
-            return json.loads(request.urlopen(req).read())
+            output = request.urlopen(req).read()
+            return json.loads(output)
 
         def get_image(filename, subfolder):
             data = {"filename": filename, "subfolder": subfolder}

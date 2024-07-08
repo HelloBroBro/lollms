@@ -594,17 +594,21 @@ class Message:
         if new_metadata is not None:
             text+=", metadata = ?"
             params.append(new_metadata)
+            self.metadata=new_metadata
         if new_ui is not None:
             text+=", ui = ?"
             params.append(new_ui)
+            self.ui=new_ui
 
         if started_generating_at is not None:
             text+=", started_generating_at = ?"
             params.append(started_generating_at)
+            self.started_generating_at=started_generating_at
 
         if nb_tokens is not None:
             text+=", nb_tokens = ?"
             params.append(nb_tokens)
+            self.nb_tokens=nb_tokens
 
 
         text +=", finished_generating_at = ? WHERE id = ?"

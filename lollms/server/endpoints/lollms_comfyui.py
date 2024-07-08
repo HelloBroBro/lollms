@@ -96,3 +96,9 @@ def show_comfyui():
     import webbrowser
     webbrowser.open(lollmsElfServer.config.comfyui_base_url)
     return {"status":True}
+
+
+@router.get("/list_comfyui_models")
+def show_comfyui():
+    from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+    return {"status":True, "models":LollmsComfyUI.get_models_list(lollmsElfServer)}
