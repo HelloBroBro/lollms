@@ -283,7 +283,7 @@ def write_story_section(
 
         # Summarize the current content of the story
         if include_summary_between_chapters:
-            story_summary = llm.summerize_text(story_content, callback=llm.sink)
+            story_summary = llm.summarize_text(story_content, callback=llm.sink)
 
             # Generate the current section using the LLM's fast_gen function
             prompt = "\n".join([

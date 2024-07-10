@@ -1802,10 +1802,10 @@ class AIPersonality:
                                     max_generation_size=max_generation_size, callback=self.sink)
         return translated
 
-    def summerize_text(
+    def summarize_text(
                         self,
                         text,
-                        summary_instruction="summerize",
+                        summary_instruction="summarize",
                         doc_name="chunk",
                         answer_start="",
                         max_generation_size=3000,
@@ -1821,7 +1821,7 @@ class AIPersonality:
             self.step_start(f"Comprerssing {doc_name}...")
             chunk_size = int(self.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.model.tokenize, self.model.detokenize, True)
-            text = self.summerize_chunks(
+            text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
                                             doc_name, 
@@ -1843,7 +1843,7 @@ class AIPersonality:
     def smart_data_extraction(
                                 self,
                                 text,
-                                data_extraction_instruction=f"Summerize the current chunk.",
+                                data_extraction_instruction=f"summarize the current chunk.",
                                 final_task_instruction="reformulate with better wording",
                                 doc_name="chunk",
                                 answer_start="",
@@ -1858,7 +1858,7 @@ class AIPersonality:
         while len(tk)>max_summary_size:
             chunk_size = int(self.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.model.tokenize, self.model.detokenize, True)
-            text = self.summerize_chunks(
+            text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
                                             doc_name, 
@@ -1875,7 +1875,7 @@ class AIPersonality:
             if dtk_ln<=10: # it is not sumlmarizing
                 break
         self.step_start(f"Rewriting ...")
-        text = self.summerize_chunks(
+        text = self.summarize_chunks(
                                         [text],
                                         final_task_instruction, 
                                         doc_name, answer_start, 
@@ -1887,10 +1887,10 @@ class AIPersonality:
 
         return text
 
-    def summerize_chunks(
+    def summarize_chunks(
                             self,
                             chunks,
-                            summary_instruction=f"Summerize the current chunk.",
+                            summary_instruction=f"summarize the current chunk.",
                             doc_name="chunk",
                             answer_start="",
                             max_generation_size=3000,
@@ -1950,7 +1950,7 @@ class AIPersonality:
     def sequencial_chunks_summary(
                             self,
                             chunks,
-                            summary_instruction="summerize",
+                            summary_instruction="summarize",
                             doc_name="chunk",
                             answer_start="",
                             max_generation_size=3000,
@@ -2530,10 +2530,10 @@ class APScript(StateMachine):
                                     max_generation_size=max_generation_size, callback=self.sink)
         return translated
 
-    def summerize_text(
+    def summarize_text(
                         self,
                         text,
-                        summary_instruction="summerize",
+                        summary_instruction="summarize",
                         doc_name="chunk",
                         answer_start="",
                         max_generation_size=3000,
@@ -2549,7 +2549,7 @@ class APScript(StateMachine):
             self.step_start(f"Comprerssing {doc_name}...")
             chunk_size = int(self.personality.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
-            text = self.summerize_chunks(
+            text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
                                             doc_name, 
@@ -2571,7 +2571,7 @@ class APScript(StateMachine):
     def smart_data_extraction(
                                 self,
                                 text,
-                                data_extraction_instruction="summerize",
+                                data_extraction_instruction="summarize",
                                 final_task_instruction="reformulate with better wording",
                                 doc_name="chunk",
                                 answer_start="",
@@ -2586,7 +2586,7 @@ class APScript(StateMachine):
         while len(tk)>max_summary_size:
             chunk_size = int(self.personality.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
-            text = self.summerize_chunks(
+            text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
                                             doc_name, 
@@ -2603,7 +2603,7 @@ class APScript(StateMachine):
             if dtk_ln<=10: # it is not sumlmarizing
                 break
         self.step_start(f"Rewriting ...")
-        text = self.summerize_chunks(
+        text = self.summarize_chunks(
                                         [text],
                                         final_task_instruction, 
                                         doc_name, answer_start, 
@@ -2615,10 +2615,10 @@ class APScript(StateMachine):
 
         return text
 
-    def summerize_chunks(
+    def summarize_chunks(
                             self,
                             chunks,
-                            summary_instruction="summerize",
+                            summary_instruction="summarize",
                             doc_name="chunk",
                             answer_start="",
                             max_generation_size=3000,
@@ -2678,7 +2678,7 @@ class APScript(StateMachine):
     def sequencial_chunks_summary(
                             self,
                             chunks,
-                            summary_instruction="summerize",
+                            summary_instruction="summarize",
                             doc_name="chunk",
                             answer_start="",
                             max_generation_size=3000,
@@ -3020,6 +3020,30 @@ class APScript(StateMachine):
 
         if callback:
             callback(html_ui, MSG_TYPE.MSG_TYPE_UI)
+
+
+    def ui_in_iframe(self, html_ui:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+        """This sends ui elements to front end inside an iframe
+
+        Args:
+            html_ui (str): The HTML content to be displayed inside the iframe
+            callback (callable, optional): A callable with this signature (str, MSG_TYPE, dict, list) to send the step to. Defaults to None.
+            The callback has these fields:
+            - chunk
+            - Message Type : the type of message
+            - Parameters (optional) : a dictionary of parameters
+            - Metadata (optional) : a list of metadata
+        """
+        if not callback and self.callback:
+            callback = self.callback
+
+        if callback:
+            iframe_html = f'<iframe srcdoc="{html_ui}" style="width:100%; height:100%; border:none;"></iframe>'
+            callback(iframe_html, MSG_TYPE.MSG_TYPE_UI)
+
+
+
+
 
     def code(self, code:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
         """This sends code to front end
@@ -3703,7 +3727,7 @@ class APScript(StateMachine):
 
     def fast_gen(self, prompt: str, max_generation_size: int= None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool = False, callback=None, show_progress=False) -> str:
         """
-        Fast way to generate code
+        Fast way to generate text
 
         This method takes in a prompt, maximum generation size, optional placeholders, sacrifice list, and debug flag.
         It reshapes the context before performing text generation by adjusting and cropping the number of tokens.
@@ -3719,6 +3743,61 @@ class APScript(StateMachine):
         - str: The generated text after removing special tokens ("<s>" and "</s>") and stripping any leading/trailing whitespace.
         """
         return self.personality.fast_gen(prompt=prompt,max_generation_size=max_generation_size,placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
+
+    def mix_it_up(self, prompt: str, models, master_model, max_generation_size: int= None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool = False, callback=None, show_progress=False) -> dict:
+        """
+        Fast generates text using multiple LLMs with detailed round tracking. Each LLM sees the initial prompt plus the formatted outputs of the previous rounds.
+        The master model then completes the job by creating a unique answer inspired by the last round outputs.
+
+        Parameters:
+        - prompt (str): The input prompt for text generation.
+        - models (list of str): The list of model identifiers in the format "binding_name::model_name".
+        - master_model (str): The model identifier for the master model, also in the format "binding_name::model_name".
+        - max_generation_size (int): The maximum number of tokens to generate.
+        - placeholders (dict, optional): A dictionary of placeholders to be replaced in the prompt. Defaults to an empty dictionary.
+        - sacrifice (list, optional): A list of placeholders to sacrifice if the window is bigger than the context size minus the number of tokens to generate. Defaults to ["previous_discussion"].
+        - debug (bool, optional): Flag to enable/disable debug mode. Defaults to False.
+
+        Returns:
+        - dict: A dictionary with the round information and the final generated text, keys: 'rounds' and 'final_output'.
+        """
+        context = prompt
+        previous_outputs = []
+
+        # Dictionary to store rounds information
+        rounds_info = {
+            'initial_prompt': prompt,
+            'rounds': []
+        }
+
+        for idx, model_id in enumerate(models):
+            binding_name, model_name = model_id.split("::")
+            self.select_model(binding_name, model_name)
+            
+            # Concatenate previous outputs with formatting
+            formatted_previous_outputs = "\n".join([f"Model {m}: {o}" for m, o in previous_outputs])
+            round_prompt = context + "\n" + formatted_previous_outputs
+            output = self.fast_gen(prompt=round_prompt, max_generation_size=max_generation_size, placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
+            
+            rounds_info['rounds'].append({
+                'model': model_id,
+                'round_prompt': round_prompt,
+                'output': output
+            })
+            previous_outputs.append((model_id, output))  # Update for the next round
+
+        # Final round with the master model
+        self.select_model(*master_model.split("::"))
+        
+        # Last round output for the master model
+        formatted_previous_outputs = "\n".join([f"Model {m}: {o}" for m, o in previous_outputs])
+        final_prompt = context + "\n" + formatted_previous_outputs
+        final_output = self.fast_gen(prompt=final_prompt, max_generation_size=max_generation_size, placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
+
+        rounds_info['final_output'] = final_output
+
+        return rounds_info
+
 
 
 

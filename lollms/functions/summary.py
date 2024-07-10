@@ -30,14 +30,14 @@ from bs4 import BeautifulSoup
 from lollms.databases.discussions_database import Discussion
 
 # Core function to search for PDFs on arXiv and download them to a specified directory
-def summerize_discussion(summary_request:str,llm, discussion:Discussion) -> str:
+def summarize_discussion(summary_request:str,llm, discussion:Discussion) -> str:
     messages = discussion.get_messages()
     text = ""
     for message in messages:
         text += message.content
 
 
-    summary  = llm.summerize_text(
+    summary  = llm.summarize_text(
             text, 
             summary_request,
             doc_name="discussion"
@@ -45,11 +45,11 @@ def summerize_discussion(summary_request:str,llm, discussion:Discussion) -> str:
     return summary
 
 # Metadata function
-def summerize_discussion_function(llm, discussion:Discussion):
+def summarize_discussion_function(llm, discussion:Discussion):
     return {
-        "function_name": "summerize_discussion",  # The function name in string
-        "function": partial(summerize_discussion, llm=llm, discussion=discussion),  # The function to be called with partial to preset client
-        "function_description": "Summerizes the discussion while keeping some key information as requested by the summary_request parameter",  # Description of the function
+        "function_name": "summarize_discussion",  # The function name in string
+        "function": partial(summarize_discussion, llm=llm, discussion=discussion),  # The function to be called with partial to preset client
+        "function_description": "summarizes the discussion while keeping some key information as requested by the summary_request parameter",  # Description of the function
         "function_parameters": [  # The set of parameters
             {"name": "summary_request", "type": "str", "description": "The desired information to recover while summerizing."},
         ]

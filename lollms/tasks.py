@@ -547,10 +547,10 @@ class TasksLibrary:
             translated = self.fast_gen(message_translation_text, temperature=0.1, callback=self.sink)
         return translated
 
-    def summerize_text(
+    def summarize_text(
                         self,
                         text,
-                        summary_instruction="summerize",
+                        summary_instruction="summarize",
                         doc_name="chunk",
                         answer_start="",
                         max_generation_size=3000,
@@ -567,7 +567,7 @@ class TasksLibrary:
             self.step_start(f"Comprerssing {doc_name}... [depth {depth+1}]")
             chunk_size = int(self.lollms.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.lollms.model.tokenize, self.lollms.model.detokenize, True)
-            text = self.summerize_chunks(
+            text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
                                             doc_name, 
@@ -590,7 +590,7 @@ class TasksLibrary:
     def smart_data_extraction(
                                 self,
                                 text,
-                                data_extraction_instruction="summerize",
+                                data_extraction_instruction="summarize",
                                 final_task_instruction="reformulate with better wording",
                                 doc_name="chunk",
                                 answer_start="",
@@ -605,7 +605,7 @@ class TasksLibrary:
         while len(tk)>max_summary_size:
             chunk_size = int(self.lollms.config.ctx_size*0.6)
             document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.lollms.model.tokenize, self.lollms.model.detokenize, True)
-            text = self.summerize_chunks(
+            text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
                                             doc_name, 
@@ -622,7 +622,7 @@ class TasksLibrary:
             if dtk_ln<=10: # it is not sumlmarizing
                 break
         self.step_start(f"Rewriting ...")
-        text = self.summerize_chunks(
+        text = self.summarize_chunks(
                                         [text],
                                         final_task_instruction, 
                                         doc_name, answer_start, 
@@ -634,10 +634,10 @@ class TasksLibrary:
 
         return text
 
-    def summerize_chunks(
+    def summarize_chunks(
                             self,
                             chunks,
-                            summary_instruction="summerize",
+                            summary_instruction="summarize",
                             doc_name="chunk",
                             answer_start="",
                             max_generation_size=3000,
@@ -711,7 +711,7 @@ class TasksLibrary:
     def sequencial_chunks_summary(
                             self,
                             chunks,
-                            summary_instruction="summerize",
+                            summary_instruction="summarize",
                             doc_name="chunk",
                             answer_start="",
                             max_generation_size=3000,

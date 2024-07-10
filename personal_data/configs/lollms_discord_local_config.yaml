@@ -135,7 +135,7 @@ audio_silenceTimer: 5000
 # Data vectorization
 activate_skills_lib: false # Activate vectorizing previous conversations
 skills_lib_database_name: "default" # Default skills database
-summerize_discussion: false # activate discussion summary (better but adds computation time)
+summarize_discussion: false # activate discussion summary (better but adds computation time)
 
 max_summary_size: 512 # in tokens
 data_vectorization_visualize_on_vectorization: false
