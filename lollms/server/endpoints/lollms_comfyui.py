@@ -8,8 +8,10 @@ description:
 
 """
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel
+from lollms.security import check_access
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_TYPE
 from lollms.main_config import BaseConfig
@@ -26,9 +28,12 @@ lollmsElfServer:LOLLMSWebUI = LOLLMSWebUI.get_instance()
 
 
 # ----------------------- voice ------------------------------
+class ClientAuthentication(BaseModel):
+    client_id: str  = Field(...)
 
-@router.get("/install_comfyui")
-def install_comfyui():
+@router.post("/install_comfyui")
+def install_comfyui(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         if lollmsElfServer.config.headless_server_mode:
             return {"status":False,"error":"Service installation is blocked when in headless mode for obvious security reasons!"}
@@ -47,8 +52,9 @@ def install_comfyui():
         lollmsElfServer.InfoMessage(f"It looks like I could not install Comfyui because of this error:\n{ex}\nThis is commonly caused by a previous version that I couldn't delete. PLease remove {lollmsElfServer.lollms_paths.personal_path}/shared/comfyui manually then try again")
         return {"status":False, 'error':str(ex)}
 
-@router.get("/upgrade_comfyui")
-def upgrade_comfyui():
+@router.post("/upgrade_comfyui")
+def upgrade_comfyui(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         if lollmsElfServer.config.headless_server_mode:
             return {"status":False,"error":"Service upgrade is blocked when in headless mode for obvious security reasons!"}
@@ -71,8 +77,9 @@ def upgrade_comfyui():
 
 
 
-@router.get("/start_comfyui")
-def start_comfyui():
+@router.post("/start_comfyui")
+def start_comfyui(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         if lollmsElfServer.config.headless_server_mode:
             return {"status":False,"error":"Service installation is blocked when in headless mode for obvious security reasons!"}
@@ -91,14 +98,15 @@ def start_comfyui():
         lollmsElfServer.InfoMessage(f"It looks like I could not install comfyui because of this error:\n{ex}\nThis is commonly caused by a previous version that I couldn't delete. PLease remove {lollmsElfServer.lollms_paths.personal_path}/shared/comfyui manually then try again")
         return {"status":False, 'error':str(ex)}
 
-@router.get("/show_comfyui")
-def show_comfyui():
+@router.post("/show_comfyui")
+def show_comfyui(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     import webbrowser
     webbrowser.open(lollmsElfServer.config.comfyui_base_url)
     return {"status":True}
 
 
 @router.get("/list_comfyui_models")
-def show_comfyui():
+def list_comfyui_models():
     from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
     return {"status":True, "models":LollmsComfyUI.get_models_list(lollmsElfServer)}

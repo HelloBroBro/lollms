@@ -7,9 +7,11 @@ description:
 
 """
 from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
+from lollms.security import check_access
 from lollms.types import MSG_TYPE
 from lollms.main_config import BaseConfig
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
@@ -23,11 +25,15 @@ import platform
 router = APIRouter()
 lollmsElfServer:LOLLMSWebUI = LOLLMSWebUI.get_instance()
 
+class ClientAuthentication(BaseModel):
+    client_id: str  = Field(...)
+
 
 # ----------------------- voice ------------------------------
 
-@router.get("/install_vllm")
-def install_vllm():
+@router.post("/install_vllm")
+def install_vllm(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         if lollmsElfServer.config.headless_server_mode:
             return {"status":False,"error":"Service installation is blocked when in headless mode for obvious security reasons!"}
@@ -47,8 +53,9 @@ def install_vllm():
         lollmsElfServer.HideBlockingMessage()
         return {"status":False, 'error':str(ex)}
     
-@router.get("/start_vllm")
-def start_vllm():
+@router.post("/start_vllm")
+def start_vllm(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         if hasattr(lollmsElfServer,"vllm") and lollmsElfServer.vllm is not None:
             return {"status":False, 'error':"Service is already on"}

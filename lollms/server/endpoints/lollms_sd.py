@@ -113,8 +113,9 @@ def show_sd(data: Identification):
 def install_model(data: ModelPost):
     check_access(lollmsElfServer, data.client_id)
 
-@router.get("/sd_is_ready")
-def show_sd():
+@router.post("/sd_is_ready")
+def show_sd(data: Identification):
+    check_access(lollmsElfServer, data.client_id)
     if hasattr(lollmsElfServer,'sd') and lollmsElfServer.sd is not None:
         if lollmsElfServer.sd.ready:
             return {"status":True}

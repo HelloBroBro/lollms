@@ -8,11 +8,13 @@ description:
 
 """
 from fastapi import APIRouter, Request, UploadFile, File, HTTPException
+from pydantic import BaseModel, Field
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_TYPE
 from lollms.main_config import BaseConfig
+from lollms.security import check_access
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
 from lollms.security import sanitize_path, validate_path
 from pathlib import Path
@@ -25,7 +27,11 @@ import platform
 router = APIRouter()
 lollmsElfServer:LOLLMSWebUI = LOLLMSWebUI.get_instance()
 
+class ClientAuthentication(BaseModel):
+    client_id: str  = Field(...)
+
 class LollmsAudio2TextRequest(BaseModel):
+    client_id: str
     text: str
     voice: str = None
     fn:str = None
@@ -111,8 +117,9 @@ async def text2Audio(request: LollmsAudio2TextRequest):
         lollmsElfServer.error(ex)
         return {"status":False,"error":str(ex)}
 
-@router.get("/install_asr")
-def install_asr():
+@router.post("/install_asr")
+def install_asr(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         if lollmsElfServer.config.headless_server_mode:
             return {"status":False,"error":"Service installation is blocked when in headless mode for obvious security reasons!"}
@@ -130,8 +137,9 @@ def install_asr():
         lollmsElfServer.HideBlockingMessage()
         return {"status":False, 'error':str(ex)}
 
-@router.get("/start_asr")
-def start_asr():
+@router.post("/start_asr")
+def start_asr(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     try:
         lollmsElfServer.ShowBlockingMessage("Starting ASR api server\nPlease stand by")
         from lollms.services.asr.lollms_asr import LollmsASR

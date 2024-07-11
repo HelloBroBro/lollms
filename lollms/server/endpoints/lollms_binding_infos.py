@@ -15,11 +15,16 @@ from lollms.binding import BindingBuilder, InstallOption
 from ascii_colors import ASCIIColors
 from lollms.utilities import load_config, trace_exception, gc
 from lollms.security import sanitize_path_from_endpoint, sanitize_path
+from lollms.security import check_access
 from pathlib import Path
 from typing import List, Any
 import json
 import os
 # ----------------------------------- Personal files -----------------------------------------
+
+class ClientAuthentication(BaseModel):
+    client_id: str  = Field(...)
+
 class ReloadBindingParams(BaseModel):
     binding_name: str = Field(..., min_length=1, max_length=50)
 
@@ -239,6 +244,8 @@ def get_active_binding_settings():
 @router.post("/set_active_binding_settings")
 async def set_active_binding_settings(request: Request):
     data = await request.json()
+    check_access(lollmsElfServer,data["client_id"])
+    settings = data["settings"]
     """
     Sets the active binding settings.
 
@@ -251,7 +258,7 @@ async def set_active_binding_settings(request: Request):
         
         if lollmsElfServer.binding is not None:
             if hasattr(lollmsElfServer.binding,"binding_config"):
-                lollmsElfServer.binding.binding_config.update_template(data)
+                lollmsElfServer.binding.binding_config.update_template(settings)
                 lollmsElfServer.binding.binding_config.config.save_config()
                 lollmsElfServer.binding.settings_updated()
                 if lollmsElfServer.config.auto_save:
@@ -267,8 +274,9 @@ async def set_active_binding_settings(request: Request):
         lollmsElfServer.error(ex)
         return {"status":False,"error":str(ex)}
     
-@router.get("/update_binding_settings")
-def update_binding_settings():
+@router.post("/update_binding_settings")
+def update_binding_settings(request: ClientAuthentication):
+    check_access(lollmsElfServer, request.client_id)
     if lollmsElfServer.binding:
         lollmsElfServer.binding.settings_updated()
         ASCIIColors.green("Binding setting updated successfully")

@@ -8,6 +8,7 @@ description:
 
 """
 from fastapi import APIRouter, Request, HTTPException
+from pydantic import BaseModel, Field
 from pydantic import BaseModel
 from json import JSONDecodeError
 import pkg_resources
@@ -32,15 +33,18 @@ lollmsElfServer = LOLLMSElfServer.get_instance()
 
 
 # ----------------------------------- Settings -----------------------------------------
+class ClientAuthentication(BaseModel):
+    client_id: str  = Field(...)
 
-@router.get("/get_config")
-def get_config():
+@router.post("/get_config")
+def get_config(request: ClientAuthentication):
     """
     Get the configuration of the Lollms server.
 
     Returns:
         Config: The configuration object as a Pydantic model.
     """    
+    check_access(lollmsElfServer, request.client_id)
     return lollmsElfServer.config.to_dict()
 
 @router.post("/update_setting")

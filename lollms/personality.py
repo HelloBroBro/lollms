@@ -1738,11 +1738,11 @@ class AIPersonality:
         Returns:
             bool: True if any antiprompt is found in the text (ignoring case), False otherwise.
         """
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        separator_template          = self.config.separator_template
+        start_header_id_template        = self.config.start_header_id_template
+        start_user_header_id_template   = self.config.start_user_header_id_template
+        start_ai_header_id_template     = self.config.start_ai_header_id_template
 
-        anti_prompts = [start_header_id_template, self.app.config.discussion_prompt_separator]
+        anti_prompts = [start_header_id_template, start_user_header_id_template, start_ai_header_id_template]
         if self.app.config.separator_template!="\n":
             anti_prompts.append(self.app.config.separator_template)
 
@@ -3744,7 +3744,7 @@ class APScript(StateMachine):
         """
         return self.personality.fast_gen(prompt=prompt,max_generation_size=max_generation_size,placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
 
-    def mix_it_up(self, prompt: str, models, master_model, max_generation_size: int= None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool = False, callback=None, show_progress=False) -> dict:
+    def mix_it_up(self, prompt: str, models, master_model, nb_rounds=2, max_generation_size: int= None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool = False, callback=None, show_progress=False) -> dict:
         """
         Fast generates text using multiple LLMs with detailed round tracking. Each LLM sees the initial prompt plus the formatted outputs of the previous rounds.
         The master model then completes the job by creating a unique answer inspired by the last round outputs.
@@ -3769,22 +3769,26 @@ class APScript(StateMachine):
             'initial_prompt': prompt,
             'rounds': []
         }
-
-        for idx, model_id in enumerate(models):
-            binding_name, model_name = model_id.split("::")
-            self.select_model(binding_name, model_name)
-            
-            # Concatenate previous outputs with formatting
-            formatted_previous_outputs = "\n".join([f"Model {m}: {o}" for m, o in previous_outputs])
-            round_prompt = context + "\n" + formatted_previous_outputs
-            output = self.fast_gen(prompt=round_prompt, max_generation_size=max_generation_size, placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
-            
-            rounds_info['rounds'].append({
-                'model': model_id,
-                'round_prompt': round_prompt,
-                'output': output
-            })
-            previous_outputs.append((model_id, output))  # Update for the next round
+        for round in range(nb_rounds):
+            self.step_start(f"Round {round + 1}")
+            for idx, model_id in enumerate(models):
+                self.step_start(f"Using model {model_id}")
+                binding_name, model_name = model_id.split("::")
+                self.select_model(binding_name, model_name)
+                
+                # Concatenate previous outputs with formatting
+                formatted_previous_outputs = "\n".join([f"Model {m}: {o}" for m, o in previous_outputs])
+                round_prompt = context + "\n" + formatted_previous_outputs
+                output = self.fast_gen(prompt=round_prompt, max_generation_size=max_generation_size, placeholders=placeholders, sacrifice=sacrifice, debug=debug, callback=callback, show_progress=show_progress)
+                
+                rounds_info['rounds'].append({
+                    'model': model_id,
+                    'round_prompt': round_prompt,
+                    'output': output
+                })
+                previous_outputs.append((model_id, output))  # Update for the next round
+                self.step_end(f"Using model {model_id}")
+            self.step_end(f"Round {round + 1}")
 
         # Final round with the master model
         self.select_model(*master_model.split("::"))
