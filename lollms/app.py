@@ -341,14 +341,10 @@ class LollmsApplication(LoLLMsCom):
 
                 self.xtts = LollmsXTTS(
                                         self,
-                                        voices_folder=voices_folder,
-                                        voice_samples_path=self.lollms_paths.custom_voices_path, 
-                                        xtts_base_url=self.config.xtts_base_url,
-                                        wait_for_service=False,
-                                        use_deep_speed=self.config.xtts_use_deepspeed,
-                                        use_streaming_mode=self.config.xtts_use_streaming_mode
+                                        voices_folders=[voices_folder, self.lollms_paths.custom_voices_path], 
                                     )
-            except:
+            except Exception as ex:
+                trace_exception(ex)
                 self.warning(f"Couldn't load XTTS")
 
         ASCIIColors.blue("Loading local TTI services")
@@ -458,14 +454,10 @@ class LollmsApplication(LoLLMsCom):
 
                     self.xtts = LollmsXTTS(
                                             self,
-                                            voices_folder=voices_folder,
-                                            voice_samples_path=self.lollms_paths.custom_voices_path, 
-                                            xtts_base_url=self.config.xtts_base_url,
-                                            wait_for_service=False,
-                                            use_deep_speed=self.config.xtts_use_deepspeed,
-                                            use_streaming_mode=self.config.xtts_use_streaming_mode
+                                            voices_folders=[voices_folder, self.lollms_paths.custom_voices_path], 
                                         )
-                except:
+                except Exception as ex:
+                    trace_exception(ex)
                     self.warning(f"Couldn't load XTTS")
 
             ASCIIColors.blue("Loading local TTI services")

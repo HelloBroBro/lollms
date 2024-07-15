@@ -8,7 +8,7 @@ description:
 
 """
 from fastapi import APIRouter, Request
-from lollms_webui import LOLLMSWebUI
+from lollms.server.elf_server import LOLLMSElfServer
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_TYPE
@@ -43,7 +43,7 @@ class DeleteDiscussionParameters(BaseModel):
 # ----------------------- Defining router and main class ------------------------------
 
 router = APIRouter()
-lollmsElfServer:LOLLMSWebUI = LOLLMSWebUI.get_instance()
+lollmsElfServer:LOLLMSElfServer = LOLLMSElfServer.get_instance()
 
 
 @router.get("/list_discussions")

@@ -72,6 +72,14 @@ class LollmsPaths:
         self.personal_outputs_path          = self.personal_path / "outputs"
         self.personal_user_infos_path       = self.personal_path / "user_infos"
 
+
+        self.personal_services_path         = self.personal_path / "services"
+        self.personal_stt_services_path     = self.personal_services_path / "stt"
+        self.personal_tts_services_path     = self.personal_services_path / "tts"
+        self.personal_tti_services_path     = self.personal_services_path / "tti"
+        self.personal_ttm_services_path     = self.personal_services_path / "ttm"
+
+
         self.personal_trainers_path         = self.personal_path / "trainers"
         self.gptqlora_path                  = self.personal_trainers_path / "gptqlora"
 
@@ -117,6 +125,25 @@ class LollmsPaths:
         ASCIIColors.yellow(f"{self.personal_models_path}")
         ASCIIColors.red("personal_user_infos_path:",end="")
         ASCIIColors.yellow(f"{self.personal_user_infos_path}")
+
+        ASCIIColors.red("personal_services_path:",end="")
+        ASCIIColors.yellow(f"{self.personal_services_path}")
+
+
+        ASCIIColors.red("personal_stt_services_path:", end="")
+        ASCIIColors.yellow(f"{self.personal_stt_services_path}")
+
+        ASCIIColors.red("personal_tts_services_path:", end="")
+        ASCIIColors.yellow(f"{self.personal_tts_services_path}")
+
+        ASCIIColors.red("personal_tti_services_path:", end="")
+        ASCIIColors.yellow(f"{self.personal_tti_services_path}")
+
+        ASCIIColors.red("personal_ttm_services_path:", end="")
+        ASCIIColors.yellow(f"{self.personal_ttm_services_path}")
+
+
+
         ASCIIColors.red("personal_trainers_path:",end="")
         ASCIIColors.yellow(f"{self.personal_trainers_path}")
         ASCIIColors.red("personal_trainers_path:",end="")
@@ -162,6 +189,12 @@ class LollmsPaths:
             "Personal user infos path": self.personal_user_infos_path,
             "Personal trainers path": self.personal_trainers_path,
             "Personal gptqlora trainer path": self.gptqlora_path,
+
+            "Personal services path": self.personal_services_path,
+            "Personal STT services path": self.personal_stt_services_path,
+            "Personal TTS services path": self.personal_tts_services_path,
+            "Personal TTI services path": self.personal_tti_services_path,
+            "Personal TTM services path": self.personal_ttm_services_path,            
         }
         return "\n".join([f"{category}: {path}" for category, path in directories.items()])
 
@@ -180,6 +213,12 @@ class LollmsPaths:
         self.personal_outputs_path.mkdir(parents=True, exist_ok=True)
         self.personal_uploads_path.mkdir(parents=True, exist_ok=True)
         self.personal_user_infos_path.mkdir(parents=True, exist_ok=True)
+
+        self.personal_services_path.mkdir(parents=True, exist_ok=True)
+        self.personal_stt_services_path.mkdir(parents=True, exist_ok=True)
+        self.personal_tts_services_path.mkdir(parents=True, exist_ok=True)
+        self.personal_tti_services_path.mkdir(parents=True, exist_ok=True)
+        self.personal_ttm_services_path.mkdir(parents=True, exist_ok=True)        
         self.personal_trainers_path.mkdir(parents=True, exist_ok=True)
         self.custom_personalities_path.mkdir(parents=True, exist_ok=True)
         self.custom_voices_path.mkdir(parents=True, exist_ok=True)

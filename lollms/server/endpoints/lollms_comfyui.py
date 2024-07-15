@@ -9,7 +9,7 @@ description:
 """
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
-from lollms_webui import LOLLMSWebUI
+from lollms.server.elf_server import LOLLMSElfServer
 from pydantic import BaseModel
 from lollms.security import check_access
 from starlette.responses import StreamingResponse
@@ -24,7 +24,7 @@ import platform
 # ----------------------- Defining router and main class ------------------------------
 
 router = APIRouter()
-lollmsElfServer:LOLLMSWebUI = LOLLMSWebUI.get_instance()
+lollmsElfServer:LOLLMSElfServer = LOLLMSElfServer.get_instance()
 
 
 # ----------------------- voice ------------------------------

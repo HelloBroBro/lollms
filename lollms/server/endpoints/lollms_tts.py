@@ -56,6 +56,16 @@ def list_stt_models():
     ASCIIColors.yellow("Listing voices")
     return {"voices":lollmsElfServer.stt.get_models()}
 
+@router.get("/list_tts_models")
+def list_tts_models():
+    if lollmsElfServer.config.headless_server_mode:
+        return {"status":False,"error":"Code execution is blocked when in headless mode for obvious security reasons!"}
+
+    if lollmsElfServer.config.host!="localhost" and lollmsElfServer.config.host!="127.0.0.1":
+        return {"status":False,"error":"Code execution is blocked when the server is exposed outside for very obvious reasons!"}
+
+    ASCIIColors.yellow("Listing voices")
+    return {"voices":lollmsElfServer.tts.get_models()}
 
 @router.post("/set_voice")
 async def set_voice(request: Request):
@@ -134,7 +144,11 @@ async def text2Audio(request: LollmsText2AudioRequest):
         if lollmsElfServer.tts is None:
             return {"url": None, "error":f"No TTS service is on"}
         if lollmsElfServer.tts.ready:
-            response = lollmsElfServer.tts.tts_audio(request.text, request.voice, file_name_or_path=request.fn, use_threading=True)
+            if request.voice:
+                voice = request.voice
+            else:
+                voice = lollmsElfServer.config.xtts_current_voice
+            response = lollmsElfServer.tts.tts_audio(request.text, voice, file_name_or_path=request.fn, use_threading=True)
             return response
         else:
             return {"url": None, "error":f"TTS service is not ready yet"}
@@ -143,8 +157,8 @@ async def text2Audio(request: LollmsText2AudioRequest):
         lollmsElfServer.error(ex)
         return {"status":False,"error":str(ex)}
 
-@router.post("/text2wav")
-async def text2Wav(request: LollmsText2AudioRequest):
+@router.post("/text2Wave")
+async def text2Wave(request: LollmsText2AudioRequest):
     """
     Executes Python code and returns the output.
 
@@ -168,9 +182,14 @@ async def text2Wav(request: LollmsText2AudioRequest):
     request.fn.parent.mkdir(exist_ok=True, parents=True)
 
     try:
+        if request.voice:
+            voice = request.voice
+        else:
+            voice = lollmsElfServer.config.xtts_current_voice
+
         # Get the JSON data from the POST request.
         if lollmsElfServer.tts.ready:
-            response = lollmsElfServer.tts.tts_file(request.text, request.voice, file_name_or_path=request.fn)
+            response = lollmsElfServer.tts.tts_file(request.text, request.fn, voice)
             return response
         else:
             return {"url": None, "error":f"TTS service is not ready yet"}
@@ -215,11 +234,7 @@ def start_xtts():
 
             lollmsElfServer.tts = LollmsXTTS(
                 lollmsElfServer, 
-                voices_folder=voices_folder,
-                voice_samples_path=Path(__file__).parent/"voices", 
-                xtts_base_url= lollmsElfServer.config.xtts_base_url,
-                use_deep_speed=lollmsElfServer.config.xtts_use_deepspeed,
-                use_streaming_mode=lollmsElfServer.config.xtts_use_streaming_mode                                                    
+                voices_folders=[voices_folder, lollmsElfServer.lollms_paths.custom_voices_path],                                        
             )
         lollmsElfServer.HideBlockingMessage()
     except Exception as ex:

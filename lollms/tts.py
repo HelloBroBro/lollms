@@ -143,7 +143,17 @@ class LollmsTTS:
             list: A list of available voices.
         """
         return self.voices
-    
+
+    def get_models(self):
+        """
+        Retrieves the available models for TTS.
+
+        Returns:
+            list: A list of available models.
+        """
+        return self.models
+
+
     def get_devices(self):
         devices =  sd.query_devices()
 
@@ -152,7 +162,6 @@ class LollmsTTS:
             "device_names": [device['name'] for device in devices if device["max_output_channels"]>0],
             "device_indexes": [device['index'] for device in devices if device["max_output_channels"]>0]
         }
-    
     @staticmethod
     def clean_text(text):
         # Remove HTML tags
