@@ -138,7 +138,7 @@ class SkillsLibrary:
         skill_titles = []        
         if len(res)>0:
             for entry in res:
-                self.vectorizer.add_document(entry[0],"Title:"+entry[1]+"\n"+entry[2])
+                self.vectorizer.add_document(entry[1],"Title:"+entry[1]+"\n"+entry[2])
             self.vectorizer.build_index()
             
             chunks = self.vectorizer.search(query_, top_k)

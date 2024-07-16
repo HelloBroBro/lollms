@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_TYPE
 from lollms.main_config import BaseConfig
-from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
+from lollms.utilities import output_file_path_to_url, detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
 from lollms.security import sanitize_path, validate_path, check_access
 from pathlib import Path
 from ascii_colors import ASCIIColors
@@ -190,7 +190,8 @@ async def text2Wave(request: LollmsText2AudioRequest):
         # Get the JSON data from the POST request.
         if lollmsElfServer.tts.ready:
             response = lollmsElfServer.tts.tts_file(request.text, request.fn, voice)
-            return response
+            response = output_file_path_to_url(response)
+            return {"url":response}
         else:
             return {"url": None, "error":f"TTS service is not ready yet"}
 

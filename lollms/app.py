@@ -256,7 +256,13 @@ class LollmsApplication(LoLLMsCom):
         return self.tasks_library.summarize_text(
             message_content, 
             "\n".join([
-                "Extract useful information from this discussion."
+                "Act as Skills library maker.",
+                "The objective is to find out important information from the discussion and store them as text that can be used in the future to remember those information.",
+                "Format the output as sections if applicable:",
+                "Global context: Explain in a sentense or two the subject of the discussion",
+                "Interesting things (if applicable): If you find interesting information or something that was discovered or built in this discussion, list it here with enough details to be reproducible just by reading this text.",
+                "Code snippet (if applicable): If there are important code snippets, write them here in a markdown code tag.",
+                "Make the output easy to understand."
             ]),
             doc_name="discussion",
             callback=callback)
@@ -971,7 +977,7 @@ class LollmsApplication(LoLLMsCom):
                     else:
                         self.personality.step_start("Performing Internet search (advanced mode: slower but more advanced)")
 
-                    internet_search_results=f"{self.start_header_id_template}{system_message_template}{self.end_header_id_template}Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.{self.separator_template}{self.start_header_id_template}Web search results{self.end_header_id_template}\n"
+                    internet_search_results=f"{self.system_full_header}Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.{self.separator_template}{self.start_header_id_template}Web search results{self.end_header_id_template}\n"
 
                     docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search, asses_using_llm=self.config.activate_internet_pages_judgement)
                     

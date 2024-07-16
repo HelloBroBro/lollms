@@ -396,14 +396,14 @@ def run_cmd(cmd, assert_success=False, environment=False, capture_output=False, 
         sys.exit(1)
 
     return result
-def output_file_path_to_url(file_path):
+def output_file_path_to_url(file_path:str|Path):
     """
     This function takes a file path as an argument and converts it into a URL format. It first removes the initial part of the file path until the "outputs" string is reached, then replaces backslashes with forward slashes and quotes each segment with urllib.parse.quote() before joining them with forward slashes to form the final URL.
 
     :param file_path: str, the file path in the format of a Windows system
     :return: str, the converted URL format of the given file path
     """
-
+    file_path = str(file_path)
     url = "/"+file_path[file_path.index("outputs"):].replace("\\","/")
     return "/".join([urllib.parse.quote(p, safe="") for p in url.split("/")])
 

@@ -322,15 +322,28 @@ def internet_search(query, internet_nb_search_pages, chromedriver_path=None, qui
 
     return search_results
 
-def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorize=True, asses_using_llm=True, yes_no=None):
+def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorizer = "bert", vectorize=True, asses_using_llm=True, yes_no=None):
     """
     """
 
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
-    from safe_store.text_vectorizer import TextVectorizer, VectorizationMethod
+    from lollmsvectordb import VectorDatabase
+    from lollmsvectordb import VectorDatabase
+    from lollmsvectordb.text_document_loader import TextDocumentsLoader
+    from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
-    vectorizer = TextVectorizer(VectorizationMethod.TFIDF_VECTORIZER, model = model)
+    if vectorizer == "bert":
+        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+        v = BERTVectorizer()
+    elif vectorizer == "tfidf":
+        from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+        v = TFIDFVectorizer()
+    elif vectorizer == "word2vec":
+        from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
+        v = Word2VecVectorizer()
+
+    vectorizer = VectorDatabase("", v, TikTokenTokenizer())
 
     formatted_text = ""
     nb_non_empty = 0
@@ -343,21 +356,26 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
                                 driver
                             )
     
-    for i, result in enumerate(results):
-        ASCIIColors.orange(f"Processing result:{result['title']}")
-        title = result["title"]
-        brief = result["brief"]
-        href = result["href"]
-        if quick_search:
-            vectorizer.add_document({'url':href, 'title':title, 'brief': brief}, brief)
-        else:
-            get_relevant_text_block(href, driver, internet_vectorization_chunk_size, internet_vectorization_overlap_size, vectorizer, title, brief, query=query, asses_using_llm=asses_using_llm, yes_no=yes_no)
-        nb_non_empty += 1
-        if nb_non_empty>=internet_nb_search_pages:
-            break
-    vectorizer.index()
+    if len(results)>0:
+        for i, result in enumerate(results):
+            ASCIIColors.orange(f"Processing result:{result['title']}")
+            title = result["title"]
+            brief = result["brief"]
+            href = result["href"]
+            if quick_search:
+                vectorizer.add_document({'url':href, 'title':title, 'brief': brief}, brief)
+            else:
+                get_relevant_text_block(href, driver, internet_vectorization_chunk_size, internet_vectorization_overlap_size, vectorizer, title, brief, query=query, asses_using_llm=asses_using_llm, yes_no=yes_no)
+            nb_non_empty += 1
+            if nb_non_empty>=internet_nb_search_pages:
+                break
+        docs, sorted_similarities, document_ids = vectorizer.recover_text(query, internet_vectorization_nb_chunks)
+        vectorizer.build_index()
+    else:
+        docs = ["The web search has failed. Try using another query"]
+        sorted_similarities = [0]
+        document_ids = ["duckduckgo.com"]
     # Close the browser
     driver.quit()
 
-    docs, sorted_similarities, document_ids = vectorizer.recover_text(query, internet_vectorization_nb_chunks)
     return docs, sorted_similarities, document_ids
