@@ -29,7 +29,7 @@ def get_root_url(url):
 
 
 def format_url_parameter(value:str):
-    encoded_value = value.strip().replace("\"","")
+    encoded_value = value.strip().replace("\"","").replace(" ","+")
     return encoded_value
 
 
@@ -294,7 +294,6 @@ def internet_search(query, internet_nb_search_pages, chromedriver_path=None, qui
 
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
-    from safe_store.text_vectorizer import TextVectorizer, VectorizationMethod
 
     search_results = []
 
@@ -349,9 +348,10 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
     nb_non_empty = 0
     # Configure Chrome options
     driver = prepare_chrome_driver(chromedriver_path)
-
+    qquery = format_url_parameter(query)
+    url = f"https://duckduckgo.com/?q={qquery}&t=h_&ia=web"
     results = extract_results(
-                                f"https://duckduckgo.com/?q={format_url_parameter(query)}&t=h_&ia=web",
+                                url,
                                 internet_nb_search_pages,
                                 driver
                             )
@@ -369,13 +369,11 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
             nb_non_empty += 1
             if nb_non_empty>=internet_nb_search_pages:
                 break
-        docs, sorted_similarities, document_ids = vectorizer.recover_text(query, internet_vectorization_nb_chunks)
         vectorizer.build_index()
+        chunks = vectorizer.search(query, internet_vectorization_nb_chunks)
     else:
-        docs = ["The web search has failed. Try using another query"]
-        sorted_similarities = [0]
-        document_ids = ["duckduckgo.com"]
+        chunks = []
     # Close the browser
     driver.quit()
 
-    return docs, sorted_similarities, document_ids
+    return chunks

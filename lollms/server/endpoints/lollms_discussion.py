@@ -18,7 +18,6 @@ from ascii_colors import ASCIIColors
 from lollms.databases.discussions_database import DiscussionsDB, Discussion
 from typing import List
 import shutil
-from safe_store.text_vectorizer import TextVectorizer, VectorizationMethod, VisualizationMethod
 import tqdm
 from pathlib import Path
 class GenerateRequest(BaseModel):

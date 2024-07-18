@@ -5,8 +5,8 @@ wget
 setuptools
 requests
 
-safe_store
 ascii_colors>=0.1.3
+lollmsvectordb
 
 autopep8
 

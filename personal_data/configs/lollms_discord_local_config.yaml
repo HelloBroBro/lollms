@@ -1,35 +1,53 @@
 # =================== Lord Of Large Language Multimodal Systems Configuration file =========================== 
-version: 81
+version: 118
 binding_name: null
 model_name: null
 model_variant: null
 model_type: null
 
-show_news_panel: True
+show_news_panel: true
 
 # Security measures
-turn_on_setting_update_validation: True
-turn_on_code_execution: True
-turn_on_code_validation: True
-turn_on_open_file_validation: False
-turn_on_send_file_validation: False
+turn_on_setting_update_validation: true
+turn_on_code_execution: true
+turn_on_code_validation: true
+turn_on_open_file_validation: true
+turn_on_send_file_validation: true
+turn_on_language_validation: true
 
 force_accept_remote_access: false
 
 # Server information
-headless_server_mode: False
+headless_server_mode: false
 allowed_origins: []
 
 # Host information
 host: localhost
 port: 9600
 
+app_custom_logo: ""
+
 # Genreration parameters 
 discussion_prompt_separator: "!@>"
+start_header_id_template: "!@>"
+end_header_id_template: ": "
+
+separator_template: "\n"
+
+start_user_header_id_template: "!@>"
+end_user_header_id_template: ": "
+end_user_message_id_template: ""
+
+start_ai_header_id_template: "!@>"
+end_ai_header_id_template: ": "
+end_ai_message_id_template: ""
+
+system_message_template: "system"
+
 seed: -1
 ctx_size: 4084
 max_n_predict: 4096
-min_n_predict: 512
+min_n_predict: 1024
 temperature: 0.9
 top_k: 50
 top_p: 0.95
@@ -50,14 +68,14 @@ user_name: user
 user_description: ""
 use_user_name_in_discussions: false
 use_model_name_in_discussions: false
-user_avatar: default_user.svg
+user_avatar: null
 use_user_informations_in_discussion: false
 
 # UI parameters
 discussion_db_name: default
 
 # Automatic updates
-debug: False
+debug: false
 debug_log_file_path: ""
 auto_update: true
 auto_sync_personalities: true
@@ -77,22 +95,103 @@ auto_show_browser: true
 # copy to clipboard 
 copy_to_clipboard_add_all_details: false
 
+# -------------------- Services global configurations --------------------------
+# Select the active test to speach, text to image and speach to text services
+active_tts_service: "None" # xtts (offline), openai_tts (API key required)
+active_tti_service: "None" # autosd (offline), dall-e (online)
+active_stt_service: "None" # whisper (offline), asr (offline or online), openai_whiosper (API key required)
+active_ttm_service: "None" # musicgen (offline)
+# -------------------- Services --------------------------
+
+# ***************** STT *****************
+stt_input_device: 0
+
+
+# STT service
+stt_listening_threshold: 1000
+stt_silence_duration: 2
+stt_sound_threshold_percentage: 10
+stt_gain: 1.0 
+stt_rate: 44100
+stt_channels: 1
+stt_buffer_size: 10
+
+stt_activate_word_detection: false
+stt_word_detection_file: null
+
+
+
+# ASR STT service 
+asr_enable: false
+asr_base_url: http://localhost:9000
+
+# openai_whisper configuration
+openai_whisper_key: ""
+openai_whisper_model: "whisper-1"
+
+
+# whisper configuration
+whisper_activate: false
+whisper_model: base
+
+
+# ***************** TTS *****************
+tts_output_device: 0
+
 # Voice service
 auto_read: false
 xtts_current_voice: null
 xtts_current_language: en
+xtts_stream_chunk_size: 100
+xtts_temperature: 0.75
+xtts_length_penalty: 1.0
+xtts_repetition_penalty: 5.0
+xtts_top_k: 50
+xtts_top_p: 0.85
+xtts_speed: 1
+xtts_enable_text_splitting: true
+
+# openai_whisper configuration
+openai_tts_key: ""
+openai_tts_model: "tts-1"
+openai_tts_voice: "alloy"
+
+# ***************** TTI *****************
+
+use_negative_prompt: true
+use_ai_generated_negative_prompt: false
+negative_prompt_generation_prompt: Generate negative prompt for the following prompt. negative prompt is a set of words that describe things we do not want to have in the generated image.
+default_negative_prompt: (((text))), (((ugly))), (((duplicate))), ((morbid)), ((mutilated)), out of frame, extra fingers, mutated hands, ((poorly drawn hands)), ((poorly drawn face)), (((mutation))), (((deformed))), blurry, ((bad anatomy)), (((bad proportions))), ((extra limbs)), cloned face, (((disfigured))), ((extra arms)), (((extra legs))), mutated hands, (fused fingers), (too many fingers), (((long neck))), ((watermark)), ((robot eyes))
 
 # Image generation service
 enable_sd_service: false
 sd_base_url: http://localhost:7860
 
+# Image generation service
+enable_fooocus_service: false
+fooocus_base_url: http://localhost:7860
+
+# diffuser
+diffusers_offloading_mode: sequential_cpu_offload # sequential_cpu_offload
+diffusers_model: PixArt-alpha/PixArt-Sigma-XL-2-1024-MS
+
+# Dall e service key
+dall_e_key: ""
+dall_e_generation_engine: "dall-e-3"
+
+# Midjourney service key
+midjourney_key: ""
+
 # Image generation service comfyui
 enable_comfyui_service: false
 comfyui_base_url: http://127.0.0.1:8188/
+comfyui_model: v1-5-pruned-emaonly.ckpt
 
 # Motion control service
 enable_motion_ctrl_service: false
 motion_ctrl_base_url: http://localhost:7861
+
+# ***************** TTT *****************
 
 # ollama service
 enable_ollama_service: false
@@ -107,6 +206,11 @@ petals_device: cuda
 # lollms service
 enable_lollms_service: false
 lollms_base_url: http://localhost:1234
+lollms_access_keys : "" # set a list of keys separated by coma to restrict access
+activate_lollms_server: true
+activate_ollama_emulator: true
+activate_openai_emulator: true
+activate_mistralai_emulator: true
 
 # elastic search service
 elastic_search_service: false
@@ -131,13 +235,22 @@ audio_auto_send_input: true
 audio_silenceTimer: 5000
 
 # Data vectorization
+rag_databases: [] # This is the list of paths to database sources. Each database is a folder containing data
+rag_vectorizer: bert # possible values bert, tfidf, word2vec
+rag_vectorizer_model: bert-base-nli-mean-tokens # The model name if applicable
+rag_vectorizer_parameters: null # Parameters of the model in json format
+rag_chunk_size: 512 # number of tokens per chunk
+rag_n_chunks: 4 #Number of chunks to recover from the database
+rag_clean_chunks: true #Removed all uinecessary spaces and line returns
+rag_follow_subfolders: true #if true the vectorizer will vectorize the content of subfolders too
+rag_check_new_files_at_startup: false #if true, the vectorizer will automatically check for any new files in the folder and adds it to the database
+rag_preprocess_chunks: false #if true, an LLM will preprocess the content of the chunk before writing it in a simple format
+
 activate_skills_lib: false # Activate vectorizing previous conversations
 skills_lib_database_name: "default" # Default skills database
-summarize_discussion: false # activate discussion summary (better but adds computation time)
 
 max_summary_size: 512 # in tokens
 data_vectorization_visualize_on_vectorization: false
-use_files: true # Activate using files
 data_vectorization_activate: true # To activate/deactivate data vectorization
 data_vectorization_method: "tfidf_vectorizer" #"model_embedding" or "tfidf_vectorizer"
 data_visualization_method: "PCA" #"PCA" or "TSNE"
@@ -154,20 +267,21 @@ data_vectorization_make_persistance: false # If true, the data will be persistan
 
 # Activate internet search
 activate_internet_search: false
+activate_internet_pages_judgement: true
 internet_vectorization_chunk_size: 512 # chunk size
-internet_vectorization_overlap_size: 128 # overlap between chunks size
-internet_vectorization_nb_chunks: 2 # number of chunks to use
-internet_nb_search_pages: 3 # number of pages to select
-internet_quick_search: False # If active the search engine will not load and read the webpages
-internet_activate_search_decision: False # If active the ai decides by itself if it needs to do search
+internet_vectorization_overlap_size: 0 # overlap between chunks size
+internet_vectorization_nb_chunks: 4 # number of chunks to use
+internet_nb_search_pages: 8 # number of pages to select
+internet_quick_search: false # If active the search engine will not load and read the webpages
+internet_activate_search_decision: false # If active the ai decides by itself if it needs to do search
 # Helpers
 pdf_latex_path: null
 
 # boosting information
 positive_boost: null
 negative_boost: null
-current_language: null
-fun_mode: False
+current_language: english
+fun_mode: false
 
 
 # webui configurations
@@ -175,5 +289,3 @@ show_code_of_conduct: true
 activate_audio_infos: true
 
 
-# whisper configuration
-whisper_model: base

@@ -608,7 +608,7 @@ def add_period(text):
     processed_text = '\n'.join(processed_lines)
     return processed_text
 
-def find_next_available_filename(folder_path, prefix):
+def find_next_available_filename(folder_path, prefix, extension="png"):
     folder = Path(folder_path)
 
     if not folder.exists():
@@ -616,7 +616,7 @@ def find_next_available_filename(folder_path, prefix):
 
     index = 1
     while True:
-        next_filename = f"{prefix}_{index}.png"
+        next_filename = f"{prefix}_{index}.{extension}"
         potential_file = folder / next_filename
         if not potential_file.exists():
             return potential_file

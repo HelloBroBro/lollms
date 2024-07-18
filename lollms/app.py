@@ -13,7 +13,6 @@ from lollms.utilities import PromptReshaper
 from lollms.client_session import Client, Session
 from lollms.databases.skills_database import SkillsLibrary
 from lollms.tasks import TasksLibrary
-from safe_store import TextVectorizer, VectorizationMethod, VisualizationMethod
 
 from lollmsvectordb.database_elements.chunk import Chunk
 from lollmsvectordb.vector_database import VectorDatabase
@@ -335,7 +334,7 @@ class LollmsApplication(LoLLMsCom):
                 trace_exception(ex)
 
         ASCIIColors.blue("Loading local TTS services")
-        if self.config.xtts_enable or self.config.active_tts_service == "xtts":
+        if self.config.active_tts_service == "xtts":
             ASCIIColors.yellow("Loading XTTS")
             try:
                 from lollms.services.xtts.lollms_xtts import LollmsXTTS
@@ -348,6 +347,7 @@ class LollmsApplication(LoLLMsCom):
                 self.xtts = LollmsXTTS(
                                         self,
                                         voices_folders=[voices_folder, self.lollms_paths.custom_voices_path], 
+                                        freq=self.config.xtts_freq
                                     )
             except Exception as ex:
                 trace_exception(ex)
@@ -448,7 +448,7 @@ class LollmsApplication(LoLLMsCom):
                     trace_exception(ex)
                     
             ASCIIColors.blue("Loading loacal TTS services")
-            if (self.config.xtts_enable or self.config.active_tts_service == "xtts") and self.xtts is None:
+            if self.config.active_tts_service == "xtts" and self.xtts is None:
                 ASCIIColors.yellow("Loading XTTS")
                 try:
                     from lollms.services.xtts.lollms_xtts import LollmsXTTS
@@ -461,6 +461,7 @@ class LollmsApplication(LoLLMsCom):
                     self.xtts = LollmsXTTS(
                                             self,
                                             voices_folders=[voices_folder, self.lollms_paths.custom_voices_path], 
+                                            freq=self.config.xtts_freq
                                         )
                 except Exception as ex:
                     trace_exception(ex)
@@ -532,17 +533,6 @@ class LollmsApplication(LoLLMsCom):
             trace_exception(ex)
             
 
-    def build_long_term_skills_memory(self):
-        discussion_db_name:Path = self.lollms_paths.personal_discussions_path/self.config.discussion_db_name.split(".")[0]
-        discussion_db_name.mkdir(exist_ok=True, parents=True)
-        self.long_term_memory = TextVectorizer(
-                vectorization_method=VectorizationMethod.TFIDF_VECTORIZER,
-                model=self.model,
-                database_path=discussion_db_name/"skills_memory.json",
-                save_db=True,
-                data_visualization_method=VisualizationMethod.PCA,
-            )
-        return self.long_term_memory
     
     def process_chunk(
                         self, 
@@ -969,6 +959,7 @@ class LollmsApplication(LoLLMsCom):
                         f"{self.start_header_id_template}websearch query{self.end_header_id_template}"
                     ])
                     query = self.personality.fast_gen(q, max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                    query = query.replace("\"","")
                     self.personality.step_end("Crafting internet search query")
                     self.personality.step(f"web search query: {query}")
 
@@ -979,12 +970,12 @@ class LollmsApplication(LoLLMsCom):
 
                     internet_search_results=f"{self.system_full_header}Use the web search results data to answer {self.config.user_name}. Try to extract information from the web search and use it to perform the requested task or answer the question. Do not come up with information that is not in the websearch results. Try to stick to the websearch results and clarify if your answer was based on the resuts or on your own culture. If you don't know how to perform the task, then tell the user politely that you need more data inputs.{self.separator_template}{self.start_header_id_template}Web search results{self.end_header_id_template}\n"
 
-                    docs, sorted_similarities, document_ids = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search, asses_using_llm=self.config.activate_internet_pages_judgement)
+                    chunks:List[Chunk] = self.personality.internet_search_with_vectorization(query, self.config.internet_quick_search, asses_using_llm=self.config.activate_internet_pages_judgement)
                     
-                    if len(docs)>0:
-                        for doc, infos,document_id in zip(docs, sorted_similarities, document_ids):
-                            internet_search_infos.append(document_id)
-                            internet_search_results += f"{self.start_header_id_template}search result chunk{self.end_header_id_template}\nchunk_infos:{document_id['url']}\nchunk_title:{document_id['title']}\ncontent:{doc}\n"
+                    if len(chunks)>0:
+                        for chunk in chunks:
+                            internet_search_infos.append(chunk.doc.title)
+                            internet_search_results += f"{self.start_header_id_template}search result chunk{self.end_header_id_template}\nchunk_infos:{chunk.doc.path}\nchunk_title:{chunk.doc.title}\ncontent:{doc}\n"
                     else:
                         internet_search_results += "The search response was empty!\nFailed to recover useful information from the search engine.\n"
                     if self.config.internet_quick_search:
@@ -1051,9 +1042,12 @@ class LollmsApplication(LoLLMsCom):
                             docs = v.list_documents()
                             for doc in docs:
                                 document=v.get_document(document_path = doc["path"])
-                                self.personality.step_start(f"Summeryzing document {doc['path']}")
-                                summary = self.personality.summarize_text(document, f"Extract information from the following text chunk to answer this request. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
-                                self.personality.step_end(f"Summeryzing document {doc['path']}")
+                                self.personality.step_start(f"Summaryzing document {doc['path']}")
+                                def post_process(summary):
+                                    return summary
+                                summary = self.personality.summarize_text(document, 
+                                                                        f"Extract information from the following text chunk to answer this request.\n{self.system_custom_header('query')}{query}", chunk_summary_post_processing=post_process, callback=self.personality.sink)
+                                self.personality.step_end(f"Summaryzing document {doc['path']}")
                                 document_infos = f"{self.separator_template}".join([
                                     self.system_custom_header('document contextual summary'),
                                     f"source_document_title:{doc['title']}",

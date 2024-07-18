@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_TYPE
 from lollms.main_config import BaseConfig
-from lollms.utilities import output_file_path_to_url, detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
+from lollms.utilities import find_next_available_filename, output_file_path_to_url, detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
 from lollms.security import sanitize_path, validate_path, check_access
 from pathlib import Path
 from ascii_colors import ASCIIColors
@@ -176,8 +176,7 @@ async def text2Wave(request: LollmsText2AudioRequest):
         request.fn = (lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")/request.fn
         validate_path(request.fn,[str(lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out")])
     else:
-        request.fn = lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out"/"tts2audio.wav"
-
+        request.fn = find_next_available_filename(lollmsElfServer.lollms_paths.personal_outputs_path/"audio_out", "tts_out","wave")
     # Verify the path exists
     request.fn.parent.mkdir(exist_ok=True, parents=True)
 
@@ -236,6 +235,7 @@ def start_xtts():
             lollmsElfServer.tts = LollmsXTTS(
                 lollmsElfServer, 
                 voices_folders=[voices_folder, lollmsElfServer.lollms_paths.custom_voices_path],                                        
+                freq=lollmsElfServer.config.xtts_freq
             )
         lollmsElfServer.HideBlockingMessage()
     except Exception as ex:

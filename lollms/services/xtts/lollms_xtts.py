@@ -34,8 +34,9 @@ from queue import Queue
 import re
 
 class LollmsXTTS(LollmsTTS):
-    def __init__(self, app: LollmsApplication, voices_folders: List[str|Path]):
+    def __init__(self, app: LollmsApplication, voices_folders: List[str|Path], freq = 22050):
         super().__init__("lollms_xtts", app)
+        self.freq = freq
         self.generation_threads = {}
         self.voices_folders = [Path(v) for v in voices_folders] + [Path(__file__).parent/"voices"]
         self.stop_event = threading.Event()
@@ -75,7 +76,7 @@ class LollmsXTTS(LollmsTTS):
     def get(app: LollmsApplication) -> 'LollmsXTTS':
         # Verify if the service is installed and if true then return an instance of LollmsXTTS
         if LollmsXTTS.verify(app.lollms_paths):
-            return LollmsXTTS(app, app.lollms_paths.custom_voices_path)
+            return LollmsXTTS(app, app.lollms_paths.custom_voices_path, freq=app.config.xtts_freq)
         else:
             raise Exception("LollmsXTTS service is not installed properly.")
     def get_speaker_wav(self, speaker) -> Path:
@@ -147,7 +148,7 @@ class LollmsXTTS(LollmsTTS):
             if wav is None:
                 # Play any remaining buffered sentences
                 for buffered_wav in buffer:
-                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, 22050)
+                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, self.freq)
                     self.play_obj.wait_done()
                     time.sleep(0.5)  # Pause between sentences
                 ASCIIColors.green("Audio done")
@@ -156,7 +157,7 @@ class LollmsXTTS(LollmsTTS):
             buffered_sentences += 1
             if buffered_sentences >= 2:
                 for buffered_wav in buffer:
-                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, 22050)
+                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, self.freq)
                     self.play_obj.wait_done()
                     time.sleep(0.5)  # Pause between sentences
                 buffer = []
@@ -166,7 +167,7 @@ class LollmsXTTS(LollmsTTS):
         with wave.open(str(file_name_or_path), 'wb') as wf:
             wf.setnchannels(1)
             wf.setsampwidth(2)
-            wf.setframerate(22050)
+            wf.setframerate(self.freq)
             for wav in wav_data:
                 wf.writeframes(wav.tobytes())
 

@@ -7,7 +7,7 @@ from typing import Union
 from lollms.utilities import PackageManager
 from lollms.personality import APScript
 from lollms.tts import LollmsTTS
-from safe_store import GenericDataLoader
+from lollmsvectordb import TextDocumentsLoader
 from ascii_colors import trace_exception
 
 # Here is the core of the function to be built
@@ -28,7 +28,7 @@ def read_text_from_file(file_path: Union[Path, str], tts_module:LollmsTTS, llm:A
         file_path = Path(file_path)
         
         # Read the text from the file
-        text = GenericDataLoader.read_file(file_path)
+        text = TextDocumentsLoader.read_file(file_path)
         
         # Generate audio from the text
         audio_file_path = tts_module.tts_audio(text,use_threading=True)

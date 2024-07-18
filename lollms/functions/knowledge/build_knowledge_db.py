@@ -1,6 +1,6 @@
 from pathlib import Path
 from lollms.personality import APScript
-from safe_store.generic_data_loader import GenericDataLoader
+from lollmsvectordb.text_document_loader import TextDocumentsLoader
 from safe_store.text_vectorizer import TextVectorizer
 import json
 import re

@@ -7,9 +7,8 @@ from lollms.types import MSG_TYPE
 from lollms.types import BindingType
 from lollms.utilities import PackageManager, discussion_path_to_url
 from lollms.paths import LollmsPaths
-from lollms.databases.skills_database import SkillsLibrary
 from lollms.com import LoLLMsCom
-from safe_store import TextVectorizer, VisualizationMethod, GenericDataLoader
+
 from lollmsvectordb.vector_database import VectorDatabase
 from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
 from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
@@ -671,7 +670,7 @@ class Discussion:
             
             if len(self.vectorizer.list_documents())==0 and len(self.text_files)>0:
                 for path in self.text_files:
-                    data = GenericDataLoader.read_file(path)
+                    data = TextDocumentsLoader.read_file(path)
                     try:
                         self.vectorizer.add_document(path.stem, data, path, True)
                     except Exception as ex:
@@ -833,7 +832,7 @@ class Discussion:
                     return True
             except Exception as e:
                 trace_exception(e)
-                self.lollms.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {GenericDataLoader.get_supported_file_types()}",client_id=client.client_id)
+                self.lollms.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {TextDocumentsLoader.get_supported_file_types()}",client_id=client.client_id)
                 return False
 
     def load_message(self, id):

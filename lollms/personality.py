@@ -20,7 +20,7 @@ from lollmsvectordb.vector_database import VectorDatabase
 from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
 from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
-
+from lollmsvectordb.database_elements.document import Document
 import pkg_resources
 from pathlib import Path
 from PIL import Image
@@ -37,7 +37,11 @@ from lollms.types import MSG_TYPE, SUMMARY_MODE
 import json
 from typing import Any, List, Optional, Type, Callable, Dict, Any, Union
 import json
-from safe_store import TextVectorizer, GenericDataLoader, VisualizationMethod, VectorizationMethod, DocumentDecomposer
+from lollmsvectordb.vector_database import VectorDatabase
+from lollmsvectordb.text_document_loader import TextDocumentsLoader
+from lollmsvectordb.text_chunker import TextChunker
+import hashlib
+
 from functools import partial
 import sys
 from lollms.com import LoLLMsCom
@@ -910,42 +914,34 @@ class AIPersonality:
 
         # Verify if the persona has a data folder
         if self.data_path.exists():
-            self.database_path = self.data_path / "db.json"
-            if self.database_path.exists():
-                ASCIIColors.info("Loading database ...",end="")
-                self.persona_data_vectorizer = TextVectorizer(
-                            "tfidf_vectorizer", # self.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
-                            model=self.model, #needed in case of using model_embedding
-                            save_db=True,
-                            database_path=self.database_path,
-                            data_visualization_method=VisualizationMethod.PCA,
-                            database_dict=None)
-                ASCIIColors.green("Ok")
-            else:
-                files = [f for f in self.data_path.iterdir() if f.suffix.lower() in ['.asm', '.bat', '.c', '.cpp', '.cs', '.csproj', '.css',
-                    '.csv', '.docx', '.h', '.hh', '.hpp', '.html', '.inc', '.ini', '.java', '.js', '.json', '.log',
-                    '.lua', '.map', '.md', '.pas', '.pdf', '.php', '.pptx', '.ps1', '.py', '.rb', '.rtf', '.s', '.se', '.sh', '.sln',
-                    '.snippet', '.snippets', '.sql', '.sym', '.ts', '.txt', '.xlsx', '.xml', '.yaml', '.yml', '.msg'] ]
-                if len(files)>0:
-                    dl = GenericDataLoader()
-                    self.persona_data_vectorizer = TextVectorizer(
-                                "tfidf_vectorizer", # self.config.data_vectorization_method, # supported "model_embedding" or "tfidf_vectorizer"
-                                model=self.model, #needed in case of using model_embedding
-                                save_db=True,
-                                database_path=self.database_path,
-                                data_visualization_method=VisualizationMethod.PCA,
-                                database_dict=None)
-                    for f in files:
-                        text = dl.read_file(f)
-                        self.persona_data_vectorizer.add_document(f.name,text,self.config.data_vectorization_chunk_size, self.config.data_vectorization_overlap_size)
-                        # data_vectorization_chunk_size: 512 # chunk size
-                        # data_vectorization_overlap_size: 128 # overlap between chunks size
-                        # data_vectorization_nb_chunks: 2 # number of chunks to use
-                    self.persona_data_vectorizer.index()
-                    self.persona_data_vectorizer.save_db()
-                else:
-                    self.persona_data_vectorizer = None
-                    self._data = None
+            self.database_path = self.data_path / "db.sqlite"
+            from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+            vectorizer = self.config.rag_vectorizer
+            if vectorizer == "bert":
+                from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+                v = BERTVectorizer()
+            elif vectorizer == "tfidf":
+                from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                v = TFIDFVectorizer()
+            elif vectorizer == "word2vec":
+                from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
+                v = Word2VecVectorizer()
+
+            self.persona_data_vectorizer = VectorDatabase(self.database_path, v, TikTokenTokenizer(), self.config.rag_chunk_size, self.config.rag_overlap)
+
+            files = [f for f in self.data_path.iterdir() if f.suffix.lower() in ['.asm', '.bat', '.c', '.cpp', '.cs', '.csproj', '.css',
+                '.csv', '.docx', '.h', '.hh', '.hpp', '.html', '.inc', '.ini', '.java', '.js', '.json', '.log',
+                '.lua', '.map', '.md', '.pas', '.pdf', '.php', '.pptx', '.ps1', '.py', '.rb', '.rtf', '.s', '.se', '.sh', '.sln',
+                '.snippet', '.snippets', '.sql', '.sym', '.ts', '.txt', '.xlsx', '.xml', '.yaml', '.yml', '.msg'] ]
+            dl = TextDocumentsLoader()
+
+            for f in files:
+                text = dl.read_file(f)
+                self.persona_data_vectorizer.add_document(f.name, text, f)
+                # data_vectorization_chunk_size: 512 # chunk size
+                # data_vectorization_overlap_size: 128 # overlap between chunks size
+                # data_vectorization_nb_chunks: 2 # number of chunks to use
+            self.persona_data_vectorizer.build_index()
 
         else:
             self.persona_data_vectorizer = None
@@ -1820,7 +1816,7 @@ class AIPersonality:
         while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
             self.step_start(f"Comprerssing {doc_name}...")
             chunk_size = int(self.config.ctx_size*0.6)
-            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.model.tokenize, self.model.detokenize, True)
+            document_chunks =TextChunker.chunk_text(text, self.model, chunk_size, 0, True)
             text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
@@ -1830,7 +1826,6 @@ class AIPersonality:
                                             callback, 
                                             chunk_summary_post_processing=chunk_summary_post_processing,
                                             summary_mode=summary_mode)
-            tk = self.model.tokenize(text)
             tk = self.model.tokenize(text)
             dtk_ln=prev_len-len(tk)
             prev_len = len(tk)
@@ -1857,7 +1852,7 @@ class AIPersonality:
         prev_len = len(tk)
         while len(tk)>max_summary_size:
             chunk_size = int(self.config.ctx_size*0.6)
-            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.model.tokenize, self.model.detokenize, True)
+            document_chunks = TextChunker.chunk_text(text, self.model, chunk_size, 0, True)
             text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
@@ -2548,7 +2543,7 @@ class APScript(StateMachine):
         while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
             self.step_start(f"Comprerssing {doc_name}...")
             chunk_size = int(self.personality.config.ctx_size*0.6)
-            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
+            document_chunks = TextChunker.chunk_text(text, self.model, chunk_size, 0, True)
             text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
@@ -2585,7 +2580,7 @@ class APScript(StateMachine):
         prev_len = len(tk)
         while len(tk)>max_summary_size:
             chunk_size = int(self.personality.config.ctx_size*0.6)
-            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.personality.model.tokenize, self.personality.model.detokenize, True)
+            document_chunks = TextChunker.chunk_text(text, self.model, chunk_size, 0, True)
             text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
@@ -2893,15 +2888,25 @@ class APScript(StateMachine):
         return self.personality.internet_search_with_vectorization(query, quick_search=quick_search)
 
 
-    def vectorize_and_query(self, text, query, max_chunk_size=512, overlap_size=20, internet_vectorization_nb_chunks=3):
-        vectorizer = TextVectorizer(VectorizationMethod.TFIDF_VECTORIZER, model = self.personality.model)
-        decomposer = DocumentDecomposer()
-        chunks = decomposer.decompose_document(text, max_chunk_size, overlap_size,self.personality.model.tokenize,self.personality.model.detokenize)
-        for i, chunk in enumerate(chunks):
-            vectorizer.add_document(f"chunk_{i}", self.personality.model.detokenize(chunk))
-        vectorizer.index()
-        docs, sorted_similarities, document_ids = vectorizer.recover_text(query, internet_vectorization_nb_chunks)
-        return docs, sorted_similarities
+    def vectorize_and_query(self, title, url, text, query, max_chunk_size=512, overlap_size=20, internet_vectorization_nb_chunks=3):
+        
+        from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+        vectorizer = self.config.rag_vectorizer
+        if vectorizer == "bert":
+            from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+            v = BERTVectorizer()
+        elif vectorizer == "tfidf":
+            from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+            v = TFIDFVectorizer()
+        elif vectorizer == "word2vec":
+            from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
+            v = Word2VecVectorizer()
+
+        vectorizer = VectorDatabase("", v, TikTokenTokenizer(), self.config.rag_chunk_size, self.config.rag_overlap)
+        vectorizer.add_document(title, text, url)
+        vectorizer.build_index()
+        chunks = vectorizer.search(query, internet_vectorization_nb_chunks)
+        return chunks
 
 
     def step_start(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):

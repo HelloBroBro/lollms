@@ -7,7 +7,10 @@ from ascii_colors import ASCIIColors
 from lollms.types import MSG_TYPE, SUMMARY_MODE
 from lollms.com import LoLLMsCom
 from lollms.utilities import PromptReshaper, remove_text_from_string, process_ai_output
-from safe_store import DocumentDecomposer
+from lollmsvectordb.text_chunker import TextChunker
+from lollmsvectordb.database_elements.document import Document
+from lollmsvectordb.directory_binding import DirectoryBinding
+import hashlib
 import json
 class TasksLibrary:
     def __init__(self, lollms:LoLLMsCom, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None) -> None:
@@ -566,7 +569,11 @@ class TasksLibrary:
         while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
             self.step_start(f"Comprerssing {doc_name}... [depth {depth+1}]")
             chunk_size = int(self.lollms.config.ctx_size*0.6)
-            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.lollms.model.tokenize, self.lollms.model.detokenize, True)
+            tc = TextChunker(chunk_size, 0, model= self.lollms.model)
+            hasher = hashlib.md5()
+            hasher.update(text.encode("utf8"))
+            
+            document_chunks = tc.get_text_chunks(text, Document(hasher.hexdigest(), doc_name ) )
             text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
@@ -576,7 +583,6 @@ class TasksLibrary:
                                             callback, 
                                             chunk_summary_post_processing=chunk_summary_post_processing,
                                             summary_mode=summary_mode)
-            tk = self.lollms.model.tokenize(text)
             tk = self.lollms.model.tokenize(text)
             dtk_ln=prev_len-len(tk)
             prev_len = len(tk)
