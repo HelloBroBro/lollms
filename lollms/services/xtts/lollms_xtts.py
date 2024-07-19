@@ -33,6 +33,13 @@ import time
 from queue import Queue
 import re
 
+# List of common sampling rates
+common_sampling_rates = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 96000, 192000]
+
+# Function to find the closest sampling rate
+def closest_sampling_rate(freq, common_rates):
+    return min(common_rates, key=lambda x: abs(x - freq))
+
 class LollmsXTTS(LollmsTTS):
     def __init__(self, app: LollmsApplication, voices_folders: List[str|Path], freq = 22050):
         super().__init__("lollms_xtts", app)
@@ -148,7 +155,10 @@ class LollmsXTTS(LollmsTTS):
             if wav is None:
                 # Play any remaining buffered sentences
                 for buffered_wav in buffer:
-                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, self.freq)
+
+                    # Find the closest sampling rate
+                    closest_freq = closest_sampling_rate(self.freq, common_sampling_rates)
+                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, closest_freq)
                     self.play_obj.wait_done()
                     time.sleep(0.5)  # Pause between sentences
                 ASCIIColors.green("Audio done")
@@ -157,7 +167,8 @@ class LollmsXTTS(LollmsTTS):
             buffered_sentences += 1
             if buffered_sentences >= 2:
                 for buffered_wav in buffer:
-                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, self.freq)
+                    closest_freq = closest_sampling_rate(self.freq, common_sampling_rates)
+                    self.play_obj = sa.play_buffer(buffered_wav.tobytes(), 1, 2, closest_freq)
                     self.play_obj.wait_done()
                     time.sleep(0.5)  # Pause between sentences
                 buffer = []

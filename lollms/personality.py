@@ -185,6 +185,7 @@ class AIPersonality:
             "Try to answer with as much details as you can",
             "Date: {{date}}",
         ])
+        self._prompts_list: List[str] = []
         self._welcome_message: str = "Welcome! I am lollms (Lord of LLMs) A free and open assistant built by ParisNeo. What can I do for you today?"
         self._include_welcome_message_in_discussion: bool = True
         self._user_message_prefix: str = f"human:"
@@ -858,6 +859,7 @@ class AIPersonality:
 
         self._personality_description = config.get("personality_description", self._personality_description)
         self._personality_conditioning = config.get("personality_conditioning", self._personality_conditioning)
+        self._prompts_list = config.get("prompts_list", self._prompts_list)
         self._welcome_message = config.get("welcome_message", self._welcome_message)
         self._include_welcome_message_in_discussion = config.get("include_welcome_message_in_discussion", self._include_welcome_message_in_discussion)
 
@@ -1132,6 +1134,7 @@ class AIPersonality:
             "ignore_discussion_documents_rag": self._ignore_discussion_documents_rag,
             "personality_description": self._personality_description,
             "personality_conditioning": self._personality_conditioning,
+            "prompts_list": self._prompts_list,
             "welcome_message": self._welcome_message,
             "include_welcome_message_in_discussion": self._include_welcome_message_in_discussion,
             "user_message_prefix": self._user_message_prefix,
@@ -1173,6 +1176,7 @@ class AIPersonality:
             "ignore_discussion_documents_rag": self._ignore_discussion_documents_rag,
             "personality_description": self._personality_description,
             "personality_conditioning": self._personality_conditioning,
+            "_prompts_list": self._prompts_list,
             "welcome_message": self._welcome_message,
             "include_welcome_message_in_discussion": self._include_welcome_message_in_discussion,
             "user_message_prefix": self._user_message_prefix,
@@ -1354,6 +1358,26 @@ class AIPersonality:
             conditioning (str): The new personality conditioning for the AI assistant.
         """
         self._personality_conditioning = conditioning
+
+    @property
+    def prompts_list(self) -> str:
+        """
+        Getter for the personality conditioning.
+
+        Returns:
+            str: The personality conditioning of the AI assistant.
+        """
+        return self._prompts_list
+
+    @prompts_list.setter
+    def prompts_list(self, prompts: str):
+        """
+        Setter for the personality conditioning.
+
+        Args:
+            conditioning (str): The new personality conditioning for the AI assistant.
+        """
+        self._prompts_list = prompts
 
     @property
     def welcome_message(self) -> str:

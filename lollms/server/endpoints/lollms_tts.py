@@ -112,6 +112,7 @@ async def audio2text(request: LollmsAudio2TextRequest):
 
 
 class LollmsText2AudioRequest(BaseModel):
+    client_id: str
     text: str
     voice: str = None
     fn:str = None
@@ -124,6 +125,7 @@ async def text2Audio(request: LollmsText2AudioRequest):
     :param request: The HTTP request object.
     :return: A JSON response with the status of the operation.
     """
+    check_access(lollmsElfServer, request.client_id)
     if lollmsElfServer.config.headless_server_mode:
         return {"status":False,"error":"Code execution is blocked when in headless mode for obvious security reasons!"}
 
@@ -148,7 +150,7 @@ async def text2Audio(request: LollmsText2AudioRequest):
                 voice = request.voice
             else:
                 voice = lollmsElfServer.config.xtts_current_voice
-            response = lollmsElfServer.tts.tts_audio(request.text, voice, file_name_or_path=request.fn, use_threading=True)
+            response = lollmsElfServer.tts.tts_audio(request.text, voice, file_name_or_path=request.fn, use_threading=False)
             return response
         else:
             return {"url": None, "error":f"TTS service is not ready yet"}
@@ -156,6 +158,29 @@ async def text2Audio(request: LollmsText2AudioRequest):
         trace_exception(ex)
         lollmsElfServer.error(ex)
         return {"status":False,"error":str(ex)}
+
+@router.post("/stopAudio")
+async def stopAudio(request: Identification):
+    """
+    Stops playing audio
+
+    :param request: The HTTP request object.
+    :return: A JSON response with the status of the operation.
+    """
+    check_access(lollmsElfServer, request.client_id)
+    if lollmsElfServer.config.headless_server_mode:
+        return {"status":False,"error":"Code execution is blocked when in headless mode for obvious security reasons!"}
+
+    if lollmsElfServer.config.host!="localhost" and lollmsElfServer.config.host!="127.0.0.1":
+        return {"status":False,"error":"Code execution is blocked when the server is exposed outside for very obvious reasons!"}
+
+    if lollmsElfServer.tts is None:
+        return {"status": False, "error":f"No TTS service is on"}
+    if lollmsElfServer.tts.ready:
+        lollmsElfServer.tts.stop()
+        return {"status":True}
+    else:
+        return {"url": None, "error":f"TTS service is not ready yet"}
 
 @router.post("/text2Wave")
 async def text2Wave(request: LollmsText2AudioRequest):
@@ -199,49 +224,6 @@ async def text2Wave(request: LollmsText2AudioRequest):
         lollmsElfServer.error(ex)
         return {"status":False,"error":str(ex)}
     
-
-@router.post("/install_xtts")
-def install_xtts(data:Identification):
-    check_access(lollmsElfServer, data.client_id)
-    try:
-        if lollmsElfServer.config.headless_server_mode:
-            return {"status":False,"error":"Service installation is blocked when in headless mode for obvious security reasons!"}
-
-        if lollmsElfServer.config.host!="localhost" and lollmsElfServer.config.host!="127.0.0.1":
-            return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
-        
-        from lollms.services.xtts.lollms_xtts import LollmsXTTS
-        lollmsElfServer.ShowBlockingMessage("Installing xTTS api server\nPlease stand by")
-        LollmsXTTS.install(lollmsElfServer)
-        lollmsElfServer.HideBlockingMessage()
-        return {"status":True}
-    except Exception as ex:
-        trace_exception(ex)
-        lollmsElfServer.HideBlockingMessage()
-        return {"status":False, 'error':str(ex)}
-
-@router.get("/start_xtts")
-def start_xtts():
-    try:
-        lollmsElfServer.ShowBlockingMessage("Starting xTTS api server\nPlease stand by")
-        from lollms.services.xtts.lollms_xtts import LollmsXTTS
-        if lollmsElfServer.tts is None:
-            voice=lollmsElfServer.config.xtts_current_voice
-            if voice!="main_voice":
-                voices_folder = lollmsElfServer.lollms_paths.custom_voices_path
-            else:
-                voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
-
-            lollmsElfServer.tts = LollmsXTTS(
-                lollmsElfServer, 
-                voices_folders=[voices_folder, lollmsElfServer.lollms_paths.custom_voices_path],                                        
-                freq=lollmsElfServer.config.xtts_freq
-            )
-        lollmsElfServer.HideBlockingMessage()
-    except Exception as ex:
-        trace_exception(ex)
-        lollmsElfServer.HideBlockingMessage()
-        return {"url": None, "error":f"{ex}"}
 
 
 @router.post("/upload_voice/")
