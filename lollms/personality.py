@@ -2567,7 +2567,7 @@ class APScript(StateMachine):
         while len(tk)>max_summary_size and (document_chunks is None or len(document_chunks)>1):
             self.step_start(f"Comprerssing {doc_name}...")
             chunk_size = int(self.personality.config.ctx_size*0.6)
-            document_chunks = TextChunker.chunk_text(text, self.model, chunk_size, 0, True)
+            document_chunks = TextChunker.chunk_text(text, self.personality.model, chunk_size, 0, True)
             text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 
@@ -2604,7 +2604,7 @@ class APScript(StateMachine):
         prev_len = len(tk)
         while len(tk)>max_summary_size:
             chunk_size = int(self.personality.config.ctx_size*0.6)
-            document_chunks = TextChunker.chunk_text(text, self.model, chunk_size, 0, True)
+            document_chunks = TextChunker.chunk_text(text, self.personality.model, chunk_size, 0, True)
             text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
