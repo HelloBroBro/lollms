@@ -964,13 +964,18 @@ class AdvancedGarbageCollector:
         gc.collect()
 
 
+
 class PackageManager:
     @staticmethod
-    def install_package(package_name):
-        import subprocess
-        import sys
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", package_name])
-        
+    def install_package(package_name, index_url=None, extra_args=None):
+        cmd = [sys.executable, "-m", "pip", "install", "--upgrade"]
+        if index_url:
+            cmd.extend(["--index-url", index_url])
+        if extra_args:
+            cmd.extend(extra_args)
+        cmd.append(package_name)
+        subprocess.check_call(cmd)
+
     @staticmethod
     def check_package_installed(package_name):
         try:
@@ -979,131 +984,89 @@ class PackageManager:
         except ImportError:
             return False
         except Exception as ex:
-            trace_exception(ex)
-            ASCIIColors.error("Something is wrong with your library.\nIt looks installed, but I am not able to call it.\nTry to reinstall it.")
+            print(f"Error checking package: {ex}")
             return False
+
     @staticmethod
     def check_package_installed_with_version(package_name: str, min_version: Optional[str] = None) -> bool:
         try:
             import pkg_resources
-            # Summon the library from the depths of the Python abyss
             package = importlib.import_module(package_name)
             if min_version:
-                # Check if the library is at least at the specified version
                 installed_version = pkg_resources.get_distribution(package_name).version
                 if pkg_resources.parse_version(installed_version) < pkg_resources.parse_version(min_version):
                     raise ImportError(f"Version {installed_version} is less than the required {min_version}.")
             return True
         except ImportError as ex:
-            print(f"Oopsie daisy! The library '{package_name}' is playing hide and seek. Error: {ex}")
+            print(f"Package '{package_name}' is not installed or version requirement not met. Error: {ex}")
             return False
         except Exception as ex:
-            print(f"Yikes! Something went bananas with your library. Error: {ex}")
+            print(f"Error checking package: {ex}")
             return False
-           
+
     @staticmethod
-    def safe_import(module_name, library_name=None):
+    def safe_import(module_name, library_name=None, index_url=None, extra_args=None):
         if not PackageManager.check_package_installed(module_name):
             print(f"{module_name} module not found. Installing...")
-            if library_name:
-                PackageManager.install_package(library_name)
-            else:
-                PackageManager.install_package(module_name)
+            PackageManager.install_package(library_name or module_name, index_url, extra_args)
         globals()[module_name] = importlib.import_module(module_name)
         print(f"{module_name} module imported successfully.")
 
     @staticmethod
     def get_installed_version(package):
-        """
-        Get the installed version of a Python package.
-
-        Args:
-            package (str): The name of the package to check.
-
-        Returns:
-            str: The installed version of the package, or None if the package is not installed.
-        """
         try:
             output = subprocess.check_output([sys.executable, "-m", "pip", "show", package], universal_newlines=True)
             for line in output.splitlines():
                 if line.startswith("Version:"):
                     version = line.split(":", 1)[1].strip()
-                    print(f"The installed version of {package} is {version}. It's like finding out your favorite ice cream flavor!")
+                    print(f"The installed version of {package} is {version}.")
                     return version
             return None
         except subprocess.CalledProcessError as e:
-            print(f"Error getting version for {package}: {e}. The version is playing hide and seek!")
+            print(f"Error getting version for {package}: {e}")
             return None
 
     @staticmethod
-    def install_or_update(package):
-        """
-        Install or update a Python package.
-
-        Args:
-            package (str): The name of the package to install or update.
-
-        Returns:
-            bool: True if the package was installed or updated successfully, False otherwise.
-        """
+    def install_or_update(package, index_url=None, extra_args=None):
         if PackageManager.check_package_installed(package):
-            print(f"{package} is already installed. Let's see if it needs a makeover!")
+            print(f"{package} is already installed. Checking for updates...")
             installed_version = PackageManager.get_installed_version(package)
             if installed_version:
-                print(f"Updating {package} from version {installed_version}. It's like a software spa day!")
+                print(f"Updating {package} from version {installed_version}.")
                 try:
-                    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", package], check=True)
-                    print(f"Successfully updated {package}. New version, who dis?")
+                    PackageManager.install_package(package, index_url, extra_args)
+                    print(f"Successfully updated {package}.")
                     return True
                 except subprocess.CalledProcessError as e:
-                    print(f"Error updating {package}: {e}. The update fairy took a day off!")
+                    print(f"Error updating {package}: {e}")
                     return False
         else:
-            print(f"{package} is not installed. Time to add it to your collection!")
-            return PackageManager.install_package(package)
+            print(f"{package} is not installed. Installing...")
+            return PackageManager.install_package(package, index_url, extra_args)
 
     @staticmethod
     def uninstall_package(package):
-        """
-        Uninstall a Python package.
-
-        Args:
-            package (str): The name of the package to uninstall.
-
-        Returns:
-            bool: True if the package was uninstalled successfully, False otherwise.
-        """
         try:
             subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", package], check=True)
-            print(f"Successfully uninstalled {package}. Goodbye, old friend!")
+            print(f"Successfully uninstalled {package}.")
             return True
         except subprocess.CalledProcessError as e:
-            print(f"Error uninstalling {package}: {e}. Uninstallation wizard failed!")
+            print(f"Error uninstalling {package}: {e}")
             return False
 
     @staticmethod
-    def reinstall(package):
-        """
-        Reinstall a Python package.
-
-        Args:
-            package (str): The name of the package to reinstall.
-
-        Returns:
-            bool: True if the package was reinstalled successfully, False otherwise.
-        """
+    def reinstall(package, index_url=None, extra_args=None):
         if PackageManager.check_package_installed(package):
-            print(f"{package} is already installed. Let's give it a fresh start!")
+            print(f"{package} is already installed. Uninstalling for fresh installation...")
             if PackageManager.uninstall_package(package):
-                print(f"{package} uninstalled successfully. Now, let's reinstall it.")
-                return PackageManager.install_package(package)
+                print(f"{package} uninstalled successfully. Now reinstalling.")
+                return PackageManager.install_package(package, index_url, extra_args)
             else:
                 print(f"Failed to uninstall {package}. Reinstallation aborted.")
                 return False
         else:
             print(f"{package} is not installed. Installing it now.")
-            return PackageManager.install_package(package)
-
+            return PackageManager.install_package(package, index_url, extra_args)
 class GitManager:
     @staticmethod
     def git_pull(folder_path):

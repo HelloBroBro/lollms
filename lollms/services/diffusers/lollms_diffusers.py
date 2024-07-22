@@ -6,30 +6,16 @@
 from pathlib import Path
 import sys
 from lollms.app import LollmsApplication
-from lollms.paths import LollmsPaths
-from lollms.config import TypedConfig, ConfigTemplate, BaseConfig
 from lollms.utilities import PackageManager, check_and_install_torch, find_next_available_filename, install_cuda, check_torch_version
-import time
-import io
+
 import sys
 import requests
-import os
-import base64
-import subprocess
-import time
-import json
-import platform
-from dataclasses import dataclass
-from PIL import Image, PngImagePlugin
-from enum import Enum
 from typing import List, Dict, Any
 
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
 from lollms.tti import LollmsTTI
-from lollms.utilities import git_pull, show_yes_no_dialog, run_script_in_env, create_conda_env
-import subprocess
-import shutil
+from lollms.utilities import git_pull
 from tqdm import tqdm
 import threading
 
@@ -61,6 +47,15 @@ def install_model(lollms_app:LollmsApplication, model_url):
         PackageManager.install_or_update("diffusers")
     if not PackageManager.check_package_installed("torch"):
         check_and_install_torch(True)
+
+    if not PackageManager.check_package_installed("torch"):
+        PackageManager.install_package("torch torchvision torchaudio", "https://download.pytorch.org/whl/cu121")
+
+    if not PackageManager.check_package_installed("transformers"):
+        PackageManager.install_package("transformers")
+
+    if not PackageManager.check_package_installed("diffusers"):
+        PackageManager.install_package("diffusers")
 
     import torch
     from diffusers import PixArtSigmaPipeline
@@ -97,6 +92,15 @@ class LollmsDiffusers(LollmsTTI):
                     app:LollmsApplication, 
                     wm = "Artbot", 
                     ):
+        if not PackageManager.check_package_installed("torch"):
+            PackageManager.install_package("torch torchvision torchaudio", "https://download.pytorch.org/whl/cu121")
+
+        if not PackageManager.check_package_installed("transformers"):
+            PackageManager.install_package("transformers")
+
+        if not PackageManager.check_package_installed("diffusers"):
+            PackageManager.install_package("diffusers")
+        
         super().__init__("diffusers",app)
         self.ready = False
         # Get the current directory

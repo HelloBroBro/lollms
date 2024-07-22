@@ -3067,7 +3067,7 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            iframe_html = f'<iframe srcdoc="{html_ui}" style="width:100%; height:100%; border:none;"></iframe>'
+            iframe_html = f'<iframe class="w-full" srcdoc="{html_ui}" style="width:100%; height:100%; border:none;"></iframe>'
             callback(iframe_html, MSG_TYPE.MSG_TYPE_UI)
 
 

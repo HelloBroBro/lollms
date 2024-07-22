@@ -14,7 +14,7 @@ import pkg_resources
 from lollms.server.elf_server import LOLLMSElfServer
 from fastapi.responses import FileResponse
 from lollms.binding import BindingBuilder, InstallOption
-from lollms.security import sanitize_path_from_endpoint
+from lollms.security import sanitize_path
 from ascii_colors import ASCIIColors
 from lollms.utilities import load_config, trace_exception, gc, PackageManager, run_async
 from pathlib import Path
@@ -306,7 +306,7 @@ async def vectorize_folder(database_infos: FolderInfos):
         if "::" in database_infos.db_path:
             parts = database_infos.db_path.split("::")
             db_name = parts[0]
-            folder_path = parts[1]
+            folder_path = sanitize_path(parts[1], True) 
         else:
             import tkinter as tk
             from tkinter import simpledialog, filedialog

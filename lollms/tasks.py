@@ -573,7 +573,7 @@ class TasksLibrary:
             hasher = hashlib.md5()
             hasher.update(text.encode("utf8"))
             
-            document_chunks = tc.get_text_chunks(text, Document(hasher.hexdigest(), doc_name ) )
+            document_chunks = tc.get_text_chunks(text, Document(hasher.hexdigest(), doc_name, doc_name ) )
             text = self.summarize_chunks(
                                             document_chunks,
                                             summary_instruction, 

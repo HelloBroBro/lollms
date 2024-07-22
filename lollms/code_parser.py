@@ -1,6 +1,7 @@
 import re
 from lollms.utilities import PackageManager
-from pipmaster import PackageManager
+import pipmaster as pm
+
 from bs4 import BeautifulSoup
 def compress_js(js_code):
     # Patterns to match function, class, and variable declarations

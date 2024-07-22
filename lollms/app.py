@@ -974,10 +974,15 @@ class LollmsApplication(LoLLMsCom):
                     
                     if len(chunks)>0:
                         for chunk in chunks:
-                            internet_search_infos.append(chunk.doc.title)
-                            internet_search_results += f"{self.start_header_id_template}search result chunk{self.end_header_id_template}\nchunk_infos:{chunk.doc.path}\nchunk_title:{chunk.doc.title}\ncontent:{doc}\n"
+                            internet_search_infos.append({
+                                "title":chunk.doc.title,
+                                "url":chunk.doc.path,
+                                "brief":chunk.text
+                            })
+                            internet_search_results += self.system_custom_header("search result chunk")+f"\nchunk_infos:{chunk.doc.path}\nchunk_title:{chunk.doc.title}\ncontent:{chunk.text}\n"
                     else:
                         internet_search_results += "The search response was empty!\nFailed to recover useful information from the search engine.\n"
+                    internet_search_results += self.system_custom_header("information") + "Use the search results to answer the user question."
                     if self.config.internet_quick_search:
                         self.personality.step_end("Performing Internet search (quick mode)")
                     else:
@@ -1287,12 +1292,12 @@ class LollmsApplication(LoLLMsCom):
                     # Tokenize the message content
                     if self.config.use_model_name_in_discussions:
                         if message.model:
-                            msg = f"{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.start_user_header_id_template}{message.sender}({message.model}){end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.end_user_header_id_template}" + message.content.strip() + f"{self.separator_template}"
+                            msg =  f"{self.separator_template}" + f"{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.start_user_header_id_template}{message.sender}({message.model}){end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.end_user_header_id_template}" + message.content.strip()
                         else:
-                            msg = f"{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.end_user_header_id_template}" + message.content.strip() + f"{self.separator_template}"
+                            msg = f"{self.separator_template}" + f"{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.end_user_header_id_template}" + message.content.strip()
                         message_tokenized = self.model.tokenize(msg)
                     else:
-                        msg_value= f"{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.end_user_header_id_template}" + message.content.strip() + f"{self.separator_template}"
+                        msg_value= f"{self.separator_template}" + f"{start_ai_header_id_template if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.start_user_header_id_template}{message.sender}{end_ai_header_id_template  if message.sender_type == SENDER_TYPES.SENDER_TYPES_AI else self.end_user_header_id_template}" + message.content.strip()
                         message_tokenized = self.model.tokenize(
                             msg_value
                         )
@@ -1344,7 +1349,7 @@ class LollmsApplication(LoLLMsCom):
         else:
             ai_prefix = ""
         # Build the final prompt by concatenating the conditionning and discussion messages
-        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + (start_ai_header_id_template + ai_prefix + end_ai_header_id_template if not is_continue else '')
+        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + (self.separator_template + start_ai_header_id_template + ai_prefix + end_ai_header_id_template if not is_continue else '' if not self.config.use_continue_message else end_ai_header_id_template + "CONTINUE FROM HERE And do not open a new markdown code tag" + self.separator_template + start_ai_header_id_template + ai_prefix + end_ai_header_id_template)
 
         # Tokenize the prompt data
         tokens = self.model.tokenize(prompt_data)

@@ -2,6 +2,10 @@ from ascii_colors import ASCIIColors, trace_exception
 from lollms.utilities import PackageManager
 import time
 import re
+from freedom_search import InternetSearchEnhancer
+from scrapemaster import ScrapeMaster
+from pathlib import Path
+from lollmsvectordb import VectorDatabase
 
 def get_favicon_url(url):
     import requests
@@ -105,122 +109,113 @@ def press_buttons(driver, buttons_to_press=['accept']):
         except:
             ASCIIColors.warning(f"Couldn't press button {button_to_press} in this page.")
 
-def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None, wait_step_delay=1, buttons_to_press=['accept'], max_size=None):
-    if not PackageManager.check_package_installed("selenium"):
-        PackageManager.install_package("selenium")
-    if not PackageManager.check_package_installed("bs4"):
-        PackageManager.install_package("bs4")
 
-    from bs4 import BeautifulSoup
-        
-    from selenium import webdriver
-    from selenium.common.exceptions import TimeoutException
-    
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
 
-    driver = prepare_chrome_driver(chromedriver_path)
 
-    # Navigate to the URL
-    driver.get(url)
-    wait_for_page(driver, wait_step_delay)
-    press_buttons(driver, buttons_to_press)
+import os
+from scrapemaster import ScrapeMaster
 
-    # Parse the HTML content using BeautifulSoup
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    
-    # Find all the text content in the webpage
-    text_content = soup.get_text()
-    text_content = re.sub(r'\n+', '\n', text_content)
+def scrape_and_save(url, file_path:str|Path=None, use_selenium=False, follow_links=False, max_depth=3, lollms_com=None, chromedriver_path=None, wait_step_delay=1, buttons_to_press=['accept'], max_size=None):
+    """
+    Scrapes text and image data from a specified URL and saves the images to a given file path.
 
-    
+    Parameters:
+    - url (str): The URL to scrape data from.
+    - file_path (str, optional): The markdown file path where scraped texts will be saved. If None, texts will not be saved.
+    - lollms_com (str, optional): A specific parameter for the ScrapeMaster, if needed.
+    - chromedriver_path (str, optional): The path to the ChromeDriver executable for web scraping.
+    - wait_step_delay (int, optional): The delay in seconds to wait between steps during scraping. Default is 1 second.
+    - buttons_to_press (list, optional): A list of button identifiers to press during the scraping process. Default is ['accept'].
+    - max_size (int, optional): The maximum size of images to scrape. If None, all images will be scraped.
+
+    Returns:
+    dict: A dictionary containing scraped texts and image URLs.
+    """
+    # Initialize the scraper with the provided URL
+    scraper = ScrapeMaster(url)
+
+    # Optionally handle button presses
+    #for button in buttons_to_press:
+    #    scraper.press_button(button)
+
+    # Create a subfolder for images if file_path is provided
     if file_path:
-        if max_size and len(text_content)< max_size:
-            # Save the text content as a text file
-            with open(file_path, 'w', encoding="utf-8") as file:
-                file.write(text_content)
-            if lollms_com:
-                lollms_com.info(f"Webpage content saved to {file_path}")
+        file_path = Path(file_path)
+        images_folder = os.path.join(file_path.parent, 'images')
+        os.makedirs(images_folder, exist_ok=True)
+
+    # Perform the scraping
+    if follow_links:
+        results = scraper.scrape_website(max_depth=max_depth, output_dir=file_path.parent, prefix=file_path.stem+'_')
+    else:
+        results = scraper.scrape_all(output_dir = images_folder, use_selenium=use_selenium)
+
+    # Save scraped texts to the markdown file
+    if file_path:
+        with open(file_path, 'w') as md_file:
+            for text in results['texts']:
+                md_file.write(text + '\n\n')
+        print(f"Texts saved to {file_path}")
+        print(f"Images saved to {images_folder}")
+
+    return {
+        'texts': results['texts'],
+        'image_urls': results['image_urls']
+    }
+
+
+# def scrape_and_save(url, file_path=None, lollms_com=None, chromedriver_path=None, wait_step_delay=1, buttons_to_press=['accept'], max_size=None):
+#     if not PackageManager.check_package_installed("selenium"):
+#         PackageManager.install_package("selenium")
+#     if not PackageManager.check_package_installed("bs4"):
+#         PackageManager.install_package("bs4")
+
+#     from bs4 import BeautifulSoup
+        
+#     from selenium import webdriver
+#     from selenium.common.exceptions import TimeoutException
+    
+#     from selenium.webdriver.support.ui import WebDriverWait
+#     from selenium.webdriver.support import expected_conditions as EC
+
+#     driver = prepare_chrome_driver(chromedriver_path)
+
+#     # Navigate to the URL
+#     driver.get(url)
+#     wait_for_page(driver, wait_step_delay)
+#     press_buttons(driver, buttons_to_press)
+
+#     # Parse the HTML content using BeautifulSoup
+#     soup = BeautifulSoup(driver.page_source, 'html.parser')
+    
+#     # Find all the text content in the webpage
+#     text_content = soup.get_text()
+#     text_content = re.sub(r'\n+', '\n', text_content)
+
+    
+#     if file_path:
+#         if max_size and len(text_content)< max_size:
+#             # Save the text content as a text file
+#             with open(file_path, 'w', encoding="utf-8") as file:
+#                 file.write(text_content)
+#             if lollms_com:
+#                 lollms_com.info(f"Webpage content saved to {file_path}")
             
-    # Close the driver
-    driver.quit()
+#     # Close the driver
+#     driver.quit()
 
 
-    return text_content
+#     return text_content
 
 
 def get_relevant_text_block(
     url,
-    driver,
-    internet_vectorization_chunk_size,
-    internet_vectorization_overlap_size,
-    vectorizer,
+    vectorizer:VectorDatabase,
     title=None,
-    brief=None,
-    wait_step_delay=0.5,
-    query="",
-    asses_using_llm=True,
-    yes_no=None
 ):
-    from bs4 import BeautifulSoup
-    import time
-    try:
-        # Chargez la page web avec le driver passé en paramètre
-        driver.get(url)
-        # Attendez que le JavaScript s'exécute, avec un délai d'attente progressif si nécessaire
-        time.sleep(wait_step_delay)
-        html_content = driver.page_source
-        soup = BeautifulSoup(html_content, "html.parser")
-
-        # Supprimez les éléments non désirés
-        for script_or_style in soup(["script", "style", "header", "footer", "nav", "aside"]):
-            script_or_style.decompose()
-
-        # Ciblez l'élément contenant le texte principal
-        article = soup.find('article')
-        if article:
-            text_block = ''
-            sections = article.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li'])
-            for element in sections:
-                if element.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-                    if text_block:
-                        text_block += '\n\n'
-                    text_block += element.get_text(strip=True)
-                    text_block += '\n'
-                else:
-                    text_block += element.get_text(strip=True) + '\n'
-
-            document_id = {
-                'url':url
-            }
-            document_id["title"] = title
-            document_id["brief"] = brief
-            text_block=text_block.strip()
-            if asses_using_llm and yes_no is not None:
-                if yes_no(f"Is this content relevant to the query: {query}", text_block):
-                    vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
-            else:
-                vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
-            return True
-        else:
-            body = soup.body
-            if body:
-                text_block = body.get_text(strip=True)
-                document_id = {
-                    'url':url
-                }
-                document_id["title"] = title
-                document_id["brief"] = brief
-                text_block=text_block.strip()
-
-                vectorizer.add_document(document_id,text_block, internet_vectorization_chunk_size, internet_vectorization_overlap_size)
-                return True
-            else:
-                ASCIIColors.warning("No data found in his page.")
-                return False
-    except Exception as ex:
-        ASCIIColors.warning(f"Couldn't scrape: {url}")
-        return False
+    sm = ScrapeMaster(url)
+    result = sm.scrape_all()
+    vectorizer.add_document(title if title else url, result["content"], url)
         
 
 
@@ -342,30 +337,23 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
         from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
         v = Word2VecVectorizer()
 
-    vectorizer = VectorDatabase("", v, TikTokenTokenizer())
+    vectorizer = VectorDatabase("", v, TikTokenTokenizer(), internet_vectorization_chunk_size, internet_vectorization_overlap_size)
 
     formatted_text = ""
     nb_non_empty = 0
-    # Configure Chrome options
-    driver = prepare_chrome_driver(chromedriver_path)
-    qquery = format_url_parameter(query)
-    url = f"https://duckduckgo.com/?q={qquery}&t=h_&ia=web"
-    results = extract_results(
-                                url,
-                                internet_nb_search_pages,
-                                driver
-                            )
+    ise = InternetSearchEnhancer()
+    results = ise.search(query, num_results=internet_nb_search_pages)
     
     if len(results)>0:
         for i, result in enumerate(results):
             ASCIIColors.orange(f"Processing result:{result['title']}")
             title = result["title"]
-            brief = result["brief"]
-            href = result["href"]
+            brief = result["snippet"]
+            href = result["url"]
             if quick_search:
-                vectorizer.add_document({'url':href, 'title':title, 'brief': brief}, brief)
+                vectorizer.add_document(title, brief, href)
             else:
-                get_relevant_text_block(href, driver, internet_vectorization_chunk_size, internet_vectorization_overlap_size, vectorizer, title, brief, query=query, asses_using_llm=asses_using_llm, yes_no=yes_no)
+                get_relevant_text_block(href, vectorizer, title)
             nb_non_empty += 1
             if nb_non_empty>=internet_nb_search_pages:
                 break
@@ -373,7 +361,5 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
         chunks = vectorizer.search(query, internet_vectorization_nb_chunks)
     else:
         chunks = []
-    # Close the browser
-    driver.quit()
 
     return chunks

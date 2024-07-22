@@ -99,6 +99,7 @@ def get_all_personalities():
                             personality_info['installed'] = (lollmsElfServer.lollms_paths.personal_configuration_path/f"personality_{personality_folder.stem}.yaml").exists() or personality_info['has_scripts']
                             personality_info['help'] = config_data.get('help', '')
                             personality_info['commands'] = config_data.get('commands', '')
+                            personality_info['prompts_list'] = config_data.get('prompts_list', [])
                         languages_path = personality_folder/ 'languages'
 
                         real_assets_path = personality_folder/ 'assets'
