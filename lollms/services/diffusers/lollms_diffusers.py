@@ -19,6 +19,18 @@ from lollms.utilities import git_pull
 from tqdm import tqdm
 import threading
 
+import pipmaster as pm
+if not pm.is_installed("torch"):
+    ASCIIColors.yellow("Diffusers: Torch not found. Installing it")
+    pm.install_multiple(["torch","torchvision","torchaudio"], "https://download.pytorch.org/whl/cu121", force_reinstall=True)
+
+import torch
+if not torch.cuda.is_available():
+    ASCIIColors.yellow("Diffusers: Torch not using cuda. Reinstalling it")
+    pm.install_multiple(["torch","torchvision","torchaudio"], "https://download.pytorch.org/whl/cu121", force_reinstall=True)
+
+
+
 def adjust_dimensions(value: int) -> int:
     """Adjusts the given value to be divisible by 8."""
     return (value // 8) * 8
@@ -152,10 +164,13 @@ class LollmsDiffusers(LollmsTTI):
             #     use_safetensors=True,
             # ) # app.config.diffusers_model
             # Enable memory optimizations.
-            if app.config.diffusers_offloading_mode=="sequential_cpu_offload":
-                self.model.enable_sequential_cpu_offload()
-            elif app.coinfig.diffusers_offloading_mode=="model_cpu_offload":
-                self.model.enable_model_cpu_offload()
+            try:
+                if app.config.diffusers_offloading_mode=="sequential_cpu_offload":
+                    self.model.enable_sequential_cpu_offload()
+                elif app.coinfig.diffusers_offloading_mode=="model_cpu_offload":
+                    self.model.enable_model_cpu_offload()
+            except:
+                pass
         except Exception as ex:
             self.model= None
             trace_exception(ex)
@@ -221,8 +236,8 @@ class LollmsDiffusers(LollmsTTI):
             sc = self.get_scheduler_by_name(sampler_name)
             if sc:
                 self.model.scheduler = sc
-        width = adjust_dimensions(width)
-        height = adjust_dimensions(height)
+        width = adjust_dimensions(int(width))
+        height = adjust_dimensions(int(height))
         if output_path is None:
             output_path = self.output_dir
         if seed!=-1:

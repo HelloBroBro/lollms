@@ -670,11 +670,14 @@ class Discussion:
             
             if len(self.vectorizer.list_documents())==0 and len(self.text_files)>0:
                 for path in self.text_files:
-                    data = TextDocumentsLoader.read_file(path)
                     try:
-                        self.vectorizer.add_document(path.stem, data, path, True)
+                        data = TextDocumentsLoader.read_file(path)
+                        try:
+                            self.vectorizer.add_document(path.stem, data, path, True)
+                        except Exception as ex:
+                            trace_exception(ex)            
                     except Exception as ex:
-                        trace_exception(ex)            
+                        trace_exception(ex)
                 try:
                     self.vectorizer.index()
                 except Exception as ex:
