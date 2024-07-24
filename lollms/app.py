@@ -1373,7 +1373,8 @@ class LollmsApplication(LoLLMsCom):
             "ai_prefix":ai_prefix,
             "extra":"",
             "available_space":available_space,
-            "skills":skills
+            "skills":skills,
+            "is_continue":is_continue
         }    
         if self.config.debug:
             ASCIIColors.highlight(documentation,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)

@@ -155,7 +155,7 @@ class InvalidFilePathError(Exception):
     pass
 
 
-def sanitize_path(path: str, allow_absolute_path: bool = False, error_text="Absolute database path detected", exception_text="Detected an attempt of path traversal or command injection. Are you kidding me?"):
+def sanitize_path(path: str, allow_absolute_path: bool = False, allow_current_folder=False, error_text="Absolute database path detected", exception_text="Detected an attempt of path traversal or command injection. Are you kidding me?"):
     """
     Sanitize a given file path by checking for potentially dangerous patterns and unauthorized characters.
 
@@ -184,6 +184,10 @@ def sanitize_path(path: str, allow_absolute_path: bool = False, error_text="Abso
     # Normalize path to use forward slashes
     path = path.replace('\\', '/')
     path = path.strip()
+
+    if not allow_current_folder and path=="./":
+        raise HTTPException(status_code=400, detail="current folder paths is disallowed for this endpoint!")
+
     if not allow_absolute_path and (path.startswith("/") or (len(path) == 2 and path[1] == ':')):
         raise HTTPException(status_code=400, detail=exception_text)
 
@@ -291,41 +295,42 @@ def is_allowed_url(url):
 if __name__=="__main__":
     test_cases = [
         # Unix-style paths
-        ("valid/path/to/file.txt", False),
-        ("../../etc/passwd", False),
-        ("/absolute/path/file.txt", False),
-        ("relative/path/file.txt", False),
-        ("valid/path/with/..", False),
-        ("valid/path/with/./file.txt", False),
-        ("another/valid/path/file.txt", True),
-        ("/absolute/path/allowed.txt", True),
-        ("$(whoami)", False),
-        ("path/with/unauthorized&chars", False),
-        (None, False),
+        ("valid/path/to/file.txt", False, False),
+        ("../../etc/passwd", False, False),
+        ("/absolute/path/file.txt", False, False),
+        ("relative/path/file.txt", False, False),
+        ("valid/path/with/..", False, False),
+        ("valid/path/with/./file.txt", False, False),
+        ("another/valid/path/file.txt", True, False),
+        ("/absolute/path/allowed.txt", True, False),
+        ("$(whoami)", False, False),
+        ("path/with/unauthorized&chars", False, False),
+        (None, False, False),
 
         # Windows-style paths
-        (r"valid\path\to\file.txt", False),
-        (r"..\..\etc\passwd", False),
-        (r"C:\absolute\path\file.txt", False),
-        (r"relative\path\file.txt", False),
-        (r"valid\path\with\..", False),
-        (r"valid\path\with\.\file.txt", False),
-        (r"another\valid\path\file.txt", True),
-        (r"C:\absolute\path\allowed.txt", True),
-        (r"$(whoami)", False),
-        (r"path\with\unauthorized&chars", False),
+        (r"valid\path\to\file.txt", False, False),
+        (r"..\..\etc\passwd", False, False),
+        (r"C:\absolute\path\file.txt", False, False),
+        (r"relative\path\file.txt", False, False),
+        (r"valid\path\with\..", False, False),
+        (r"valid\path\with\.\file.txt", False, False),
+        (r"another\valid\path\file.txt", True, False),
+        (r"C:\absolute\path\allowed.txt", True, False),
+        (r"$(whoami)", False, False),
+        (r"path\with\unauthorized&chars", False, False),
 
         # New test cases with C: drive
-        (r"C:\valid\path\to\file.txt", False),
-        (r"C:\another\valid\path\file.txt", True),
-        (r"C:\..\etc\passwd", False),
-        (r"C:\valid\path\with\..", False),
-        (r"C:", False),
+        (r"C:\valid\path\to\file.txt", False, False),
+        (r"C:\another\valid\path\file.txt", True, False),
+        (r"C:\..\etc\passwd", False, False),
+        (r"C:\valid\path\with\..", False, False),
+        (r"C:", False, False),
+        (r"./", False, False),
     ]
 
-    for path, allow_absolute in test_cases:
+    for path, allow_absolute, allow_current_folder in test_cases:
         try:
-            sanitized = sanitize_path(path, allow_absolute)
+            sanitized = sanitize_path(path, allow_absolute, allow_current_folder)
             print(f"Original: {path}, Sanitized: {sanitized}")
         except HTTPException as e:
             print(f"Original: {path}, Exception: {e.detail}")

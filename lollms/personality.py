@@ -4009,6 +4009,7 @@ class APScript(StateMachine):
                                  '"function_parameters": a list of  parameter values',
                                  "}",
                                  "```",
+                                 "It is important to put the function call inside a function markdown tag to be interpreted."
                                  ]
 
 
