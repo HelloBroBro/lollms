@@ -11,7 +11,7 @@ def get_favicon_url(url):
     import requests
     from bs4 import BeautifulSoup
     try:
-        response = requests.get(url)
+        response = requests.get(url,timeout=3)
         soup = BeautifulSoup(response.text, 'html.parser')
         favicon_link = soup.find('link', rel='icon') or soup.find('link', rel='shortcut icon')
         
@@ -215,7 +215,8 @@ def get_relevant_text_block(
 ):
     sm = ScrapeMaster(url)
     result = sm.scrape_all()
-    vectorizer.add_document(title if title else url, result["content"], url)
+    if len(result["texts"])>0:
+        vectorizer.add_document(title if title else url, "\n".join(result["texts"]), url)
         
 
 
