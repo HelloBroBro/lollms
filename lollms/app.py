@@ -837,7 +837,7 @@ class LollmsApplication(LoLLMsCom):
             discussion += "\n" + self.config.discussion_prompt_separator + msg.sender + ": " + msg.content.strip()
         return discussion
     # -------------------------------------- Prompt preparing
-    def prepare_query(self, client_id: str, message_id: int = -1, is_continue: bool = False, n_tokens: int = 0, generation_type = None, force_using_internet=False) -> Tuple[str, str, List[str]]:
+    def prepare_query(self, client_id: str, message_id: int = -1, is_continue: bool = False, n_tokens: int = 0, generation_type = None, force_using_internet=False, previous_chunk="") -> Tuple[str, str, List[str]]:
         """
         Prepares the query for the model.
 
@@ -1374,7 +1374,8 @@ class LollmsApplication(LoLLMsCom):
             "extra":"",
             "available_space":available_space,
             "skills":skills,
-            "is_continue":is_continue
+            "is_continue":is_continue,
+            "previous_chunk":previous_chunk
         }    
         if self.config.debug:
             ASCIIColors.highlight(documentation,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)

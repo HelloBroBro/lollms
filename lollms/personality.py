@@ -777,9 +777,11 @@ class AIPersonality:
         self.bot_says = ""
         if debug:
             self.print_prompt("gen",prompt)
+        ntokens = len(self.model.tokenize(prompt))
+        
         self.model.generate(
                                 prompt,
-                                max_size if max_size else min(self.config.ctx_size-len(self.model.tokenize(prompt)), self.config.max_n_predict),
+                                max_size if max_size else min(self.config.ctx_size-ntokens,self.config.max_n_predict),
                                 partial(self.process, callback=callback, show_progress=show_progress),
                                 temperature=self.model_temperature if temperature is None else temperature,
                                 top_k=self.model_top_k if top_k is None else top_k,
@@ -3831,9 +3833,22 @@ class APScript(StateMachine):
 
         return rounds_info
 
+    def answer(self, context_details, callback=None, send_full=True):
+        if context_details["is_continue"]:
+            full_prompt = self.build_prompt_from_context_details(context_details, suppress= ["ai_prefix"])
+        else:
+            full_prompt = self.build_prompt_from_context_details(context_details)
 
-
-
+        out = self.fast_gen(full_prompt)
+        nb_tokens = len(self.personality.model.tokenize(out))
+        if nb_tokens >= self.config.max_n_predict-1:
+            out = out+self.fast_gen(full_prompt+out, callback=callback)
+        if context_details["is_continue"]:
+            out = context_details["previous_chunk"] + out
+        if send_full:
+            self.full(out)
+        return out
+    
     def generate_with_function_calls(self, context_details: dict, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
         """
         Performs text generation with function calls.

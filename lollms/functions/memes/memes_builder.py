@@ -201,3 +201,155 @@ def two_paths_meme_generator_function(client: Client) -> Dict:
             {"name": "person_text", "type": "str"}
         ]
     }
+
+
+
+from lollms.utilities import PackageManager, find_first_available_file_index, discussion_path_to_url
+from lollms.client_session import Client
+from lollms.personality import APScript
+if not PackageManager.check_package_installed("pyautogui"):
+    PackageManager.install_package("pyautogui")
+if not PackageManager.check_package_installed("PyQt5"):
+    PackageManager.install_package("PyQt5")
+from ascii_colors import trace_exception
+from functools import partial
+from PIL import Image, ImageDraw, ImageFont
+
+def build_negative_prompt(image_generation_prompt, llm):
+    start_header_id_template = llm.config.start_header_id_template
+    end_header_id_template = llm.config.end_header_id_template
+    system_message_template = llm.config.system_message_template        
+
+    return "\n".join([
+        f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+        f"{llm.config.negative_prompt_generation_prompt}",
+        f"{start_header_id_template}image_generation_prompt{end_header_id_template}",
+        f"{image_generation_prompt}",
+        f"{start_header_id_template}negative_prompt{end_header_id_template}",
+    ])    
+
+def add_text_overlay(image_path, text, output_path):
+    # Open the original image
+    image = Image.open(image_path)
+    draw = ImageDraw.Draw(image)
+
+    # Define the font and size
+    font_size = 36
+    font = ImageFont.load_default()  # You can specify a TTF font file if needed
+
+    # Define text position and color
+    text_position = (10, 10)  # Top-left corner
+    text_color = (255, 255, 255)  # White color
+
+    # Add text overlay
+    draw.text(text_position, text, fill=text_color, font=font)
+
+    # Save the new image with overlay
+    image.save(output_path)
+
+def build_meme_image_with_text_overlay(prompt, negative_prompt, width, height, text: str, processor: APScript, client: Client):
+    try:
+        if processor.personality.config.active_tti_service == "diffusers":
+            if not processor.personality.app.tti:
+                from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
+                processor.step_start("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
+                processor.personality.app.tti = LollmsDiffusers(processor.personality.app, processor.personality.name)
+                processor.personality.app.sd = processor.personality.app.tti
+                processor.step_end("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
+            file, infos = processor.personality.app.tti.paint(
+                prompt, 
+                negative_prompt,
+                width=width,
+                height=height,
+                output_path=client.discussion.discussion_folder
+            )
+        elif processor.personality.config.active_tti_service == "autosd":
+            if not processor.personality.app.tti:
+                from lollms.services.sd.lollms_sd import LollmsSD
+                processor.step_start("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
+                processor.personality.app.tti = LollmsSD(processor.personality.app, processor.personality.name, max_retries=-1, auto_sd_base_url=processor.personality.config.sd_base_url)
+                processor.personality.app.sd = processor.personality.app.tti
+                processor.step_end("Loading ParisNeo's fork of AUTOMATIC1111's stable diffusion service")
+            file, infos = processor.personality.app.tti.paint(
+                prompt, 
+                negative_prompt,
+                width=width,
+                height=height,
+                output_path=client.discussion.discussion_folder
+            )
+        elif processor.personality.config.active_tti_service == "dall-e":
+            if not processor.personality.app.tti:
+                from lollms.services.dalle.lollms_dalle import LollmsDalle
+                processor.step_start("Loading dalle service")
+                processor.personality.app.tti = LollmsDalle(processor.personality.app, processor.personality.config.dall_e_key, processor.personality.config.dall_e_generation_engine)
+                processor.personality.app.dalle = processor.personality.app.tti
+                processor.step_end("Loading dalle service")
+            processor.step_start("Painting")
+            file = processor.personality.app.tti.paint(
+                prompt,
+                negative_prompt,
+                width=width,
+                height=height,
+                output_path=client.discussion.discussion_folder
+            )
+            processor.step_end("Painting")
+        elif processor.personality.config.active_tti_service == "comfyui":
+            if not processor.personality.app.tti:
+                from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+                processor.step_start("Loading comfyui service")
+                processor.personality.app.tti = LollmsComfyUI(
+                    processor.personality.app,
+                    comfyui_base_url=processor.config.comfyui_base_url
+                )
+                processor.personality.app.dalle = processor.personality.app.tti
+                processor.step_end("Loading comfyui service")
+            processor.step_start("Painting")
+            file = processor.personality.app.tti.paint(
+                prompt,
+                negative_prompt,
+                width=width,
+                height=height,
+                output_path=client.discussion.discussion_folder
+            )
+            processor.step_end("Painting")
+
+        file = str(file)
+        escaped_url = discussion_path_to_url(file)
+
+        # Add text overlay to the generated image
+        output_image_path = f"{client.discussion.discussion_folder}/output_with_text.png"
+        add_text_overlay(file, text, output_image_path)
+
+        escaped_output_url = discussion_path_to_url(output_image_path)
+        return f'\nRespond with this link in markdown format:\n![]({escaped_output_url})'
+    except Exception as ex:
+        trace_exception(ex)
+        return f"Couldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"
+
+
+def build_meme_image_with_text_overlay_function(processor, client):
+    if processor.config.use_negative_prompt:
+        if processor.config.use_ai_generated_negative_prompt:
+            return {
+                    "function_name": "build_image",
+                    "function": partial(build_meme_image_with_text_overlay, processor=processor, client=client),
+                    "function_description": "Builds and shows a meme image from a prompt and width and height parameters then overlays a text on the center. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024. Width and height have to be divisible by 8.",
+                    "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "negative_prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}, {"name": "text", "type": "str"}]                
+                }
+        else:
+            return {
+                    "function_name": "build_image",
+                    "function": partial(build_meme_image_with_text_overlay, processor=processor, client=client, negative_prompt=processor.config.default_negative_prompt),
+                    "function_description": "Builds and shows a meme image from a prompt and width and height parameters then overlays a text on the center. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024. Width and height have to be divisible by 8.",
+                    "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}, {"name": "text", "type": "str"}]                
+                }
+    else:
+        return {
+                "function_name": "build_image",
+                "function": partial(build_meme_image_with_text_overlay, processor=processor, client=client, negative_prompt=""),
+                "function_description": "Builds and shows a meme image from a prompt and width and height parameters then overlays a text on the center. A square 1024x1024, a portrait woudl be 1024x1820 or landscape 1820x1024. Width and height have to be divisible by 8.",
+                "function_parameters": [{"name": "prompt", "type": "str"}, {"name": "width", "type": "int"}, {"name": "height", "type": "int"}, {"name": "text", "type": "str"}]                
+            }
+
+
+
