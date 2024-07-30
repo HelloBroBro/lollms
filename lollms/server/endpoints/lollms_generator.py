@@ -49,6 +49,8 @@ def get_generation_status():
 # ----------------------------------- Generation -----------------------------------------
 class LollmsTokenizeRequest(BaseModel):
     prompt: str
+class LollmsDeTokenizeRequest(BaseModel):
+    tokens: List[int]
 
 @router.post("/lollms_tokenize")
 async def lollms_tokenize(request: LollmsTokenizeRequest):
@@ -60,6 +62,19 @@ async def lollms_tokenize(request: LollmsTokenizeRequest):
             named_tokens.append([detoken,token])
         tokens = elf_server.model.tokenize(request.prompt)
         return {"status":True,"raw_tokens":tokens, "named_tokens":named_tokens}
+    except Exception as ex:
+        return {"status":False,"error":str(ex)}
+
+@router.post("/lollms_detokenize")
+async def lollms_detokenize(request: LollmsDeTokenizeRequest):
+    try:
+        text = elf_server.model.detokenize(request.tokens)
+        named_tokens=[]
+        for token in request.tokens:
+            detoken = elf_server.model.detokenize([token])
+            named_tokens.append([detoken,token])
+        tokens = elf_server.model.tokenize(request.prompt)
+        return {"status":True,"raw_tokens":tokens, "named_tokens":named_tokens, "text":text}
     except Exception as ex:
         return {"status":False,"error":str(ex)}
 
@@ -108,6 +123,8 @@ async def lollms_generate(request: LollmsGenerateRequest):
         headers = { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive',}
         reception_manager=RECEPTION_MANAGER()
         prompt = request.prompt
+        if elf_server.config.debug:
+            ASCIIColors.yellow(prompt)
         n_predict = request.n_predict if request.n_predict>0 else 1024
         stream = request.stream
         prompt_tokens = len(elf_server.binding.tokenize(prompt))
@@ -174,15 +191,12 @@ async def lollms_generate(request: LollmsGenerateRequest):
                     # Yield each chunk of data
                     if chunk is None:
                         return True
-
-                    rx = reception_manager.new_chunk(chunk)
-                    if rx.status!=ROLE_CHANGE_DECISION.MOVE_ON:
-                        if rx.status==ROLE_CHANGE_DECISION.PROGRESSING:
-                            return True
-                        elif rx.status==ROLE_CHANGE_DECISION.ROLE_CHANGED:
-                            return False
-                        else:
-                            chunk = chunk + rx.value
+                    reception_manager.reception_buffer += chunk
+                    antiprompt = elf_server.personality.detect_antiprompt(reception_manager.reception_buffer)
+                    if antiprompt:
+                        ASCIIColors.warning(f"\n{antiprompt} detected. Stopping generation")
+                        reception_manager.reception_buffer = elf_server.remove_text_from_string(reception_manager.reception_buffer,antiprompt)
+                        return False
 
 
                     return True

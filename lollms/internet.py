@@ -152,7 +152,7 @@ def scrape_and_save(url, file_path:str|Path=None, use_selenium=False, follow_lin
 
     # Save scraped texts to the markdown file
     if file_path:
-        with open(file_path, 'w') as md_file:
+        with open(file_path, 'w', encoding="utf8", errors='ignore') as md_file:
             for text in results['texts']:
                 md_file.write(text + '\n\n')
         print(f"Texts saved to {file_path}")

@@ -696,19 +696,13 @@ class AIPersonality:
         if debug == False:
             debug = self.config.debug
 
-        if max_generation_size is None:
-            prompt_size = self.model.tokenize(prompt)
-            max_generation_size = min(self.model.config.ctx_size - len(prompt_size),self.config.max_n_predict)
-
         pr = PromptReshaper(prompt)
         prompt = pr.build(placeholders,
                         self.model.tokenize,
                         self.model.detokenize,
-                        max_generation_size,
+                        (self.model.config.ctx_size - max_generation_size) if max_generation_size is not None else (self.model.config.ctx_size - 1024),
                         sacrifice
                         )
-        ntk = len(self.model.tokenize(prompt))
-        max_generation_size = min(min(self.model.config.ctx_size - ntk, max_generation_size), self.config.max_n_predict)
         # TODO : add show progress
 
         gen = self.generate(prompt, max_generation_size, temperature = temperature, top_k = top_k, top_p=top_p, repeat_penalty=repeat_penalty, repeat_last_n=repeat_last_n, callback=callback, show_progress=show_progress).strip().replace("</s>", "").replace("<s>", "")
