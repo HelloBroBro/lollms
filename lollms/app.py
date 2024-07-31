@@ -403,7 +403,11 @@ class LollmsApplication(LoLLMsCom):
 
         ASCIIColors.blue("Activating TTS services")
 
-        if self.config.active_tts_service == "openai_tts":
+
+        if self.config.active_tts_service == "eleven_labs_tts":
+            from lollms.services.eleven_labs_tts.lollms_eleven_labs_tts import LollmsElevenLabsTTS
+            self.tts = LollmsElevenLabsTTS(self, self.config.elevenlabs_tts_model_id, self.config.elevenlabs_tts_voice_id,  self.config.elevenlabs_tts_key, stability=self.config.elevenlabs_tts_voice_stability, similarity_boost=self.config.elevenlabs_tts_voice_boost)
+        elif self.config.active_tts_service == "openai_tts":
             from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
             self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
         elif self.config.active_tts_service == "xtts" and self.xtts:
@@ -517,7 +521,10 @@ class LollmsApplication(LoLLMsCom):
                     self.tti = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
 
             ASCIIColors.blue("Activating TTS service")
-            if self.config.active_tts_service == "openai_tts" and (self.tts is None or self.tts.name!="openai_tts"):
+            if self.config.active_tts_service == "eleven_labs_tts":
+                from lollms.services.eleven_labs_tts.lollms_eleven_labs_tts import LollmsElevenLabsTTS
+                self.tts = LollmsElevenLabsTTS(self, self.config.elevenlabs_tts_model_id, self.config.elevenlabs_tts_voice_id,  self.config.elevenlabs_tts_key, stability=self.config.elevenlabs_tts_voice_stability, similarity_boost=self.config.elevenlabs_tts_voice_boost)
+            elif self.config.active_tts_service == "openai_tts" and (self.tts is None or self.tts.name!="openai_tts"):
                 from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
