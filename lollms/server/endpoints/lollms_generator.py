@@ -125,9 +125,11 @@ async def lollms_generate(request: LollmsGenerateRequest):
         prompt = request.prompt
         if elf_server.config.debug:
             ASCIIColors.yellow(prompt)
-        n_predict = request.n_predict if request.n_predict>0 else 1024
+        tokens = elf_server.model.tokenize(prompt)
+        n_tokens = len(tokens)
+        ASCIIColors.yellow(f"Prompt input size {n_tokens}")        
+        n_predict = min(min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict), request.n_predict) if request.n_predict>0 else min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict)
         stream = request.stream
-        prompt_tokens = len(elf_server.binding.tokenize(prompt))
         if elf_server.binding is not None:
             if stream:
                 new_output={"new_values":[]}
@@ -200,6 +202,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
 
 
                     return True
+                
                 elf_server.binding.generate(
                                                 prompt, 
                                                 n_predict, 
@@ -207,6 +210,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
                                                 temperature=request.temperature or elf_server.config.temperature
                                             )
                 completion_tokens = len(elf_server.binding.tokenize(reception_manager.reception_buffer))
+                ASCIIColors.yellow(f"Generated: {completion_tokens} tokens")
                 return PlainTextResponse(reception_manager.reception_buffer)
         else:
             return None
@@ -265,7 +269,10 @@ async def lollms_generate_with_images(request: LollmsGenerateRequest):
         reception_manager=RECEPTION_MANAGER()
         prompt = request.prompt
         encoded_images = request.images
-        n_predict = request.n_predict if request.n_predict>0 else 1024
+        tokens = elf_server.model.tokenize(prompt)
+        n_tokens = len(tokens)
+        ASCIIColors.yellow(f"Prompt input size {n_tokens}")        
+        n_predict = min(min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict), request.n_predict) if request.n_predict>0 else min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict)
         stream = request.stream
         prompt_tokens = len(elf_server.binding.tokenize(prompt))
         if elf_server.binding is not None:

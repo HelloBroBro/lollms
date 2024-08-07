@@ -176,7 +176,15 @@ class LollmsApplication(LoLLMsCom):
     def restore_trust_store(self):
         if self.bk_store is not None:
             os.environ['REQUESTS_CA_BUNDLE'] = self.bk_store
-            
+
+    def model_path_to_binding_model(self, model_path:str):
+        parts = model_path.strip().split("::")
+        if len(parts)<2:
+            raise Exception("Model path is not in the format binding:model_name!")
+        binding = parts[0]
+        model_name = parts[1]
+        return binding, model_name
+      
     def select_model(self, binding_name, model_name):
         self.config["binding_name"] = binding_name
         self.config["model_name"] = model_name

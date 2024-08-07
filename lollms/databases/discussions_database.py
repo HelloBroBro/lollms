@@ -211,6 +211,16 @@ class DiscussionsDB:
         self.current_message_id = self.select("SELECT id FROM message WHERE discussion_id=? ORDER BY id DESC LIMIT 1", (last_discussion_id,), fetch_all=False)
         return Discussion(self.lollms, last_discussion_id, self)
     
+    def load_discussion_by_id(self, discussion_id):
+        # Fetch the discussion by the provided discussion_id
+        discussion_data = self.select("SELECT * FROM discussion WHERE id=?", (discussion_id,), fetch_all=False)
+        if discussion_data is None:
+            raise ValueError("Discussion not found with the provided ID.")
+        
+        # Assuming discussion_data returns a tuple or list with the necessary data
+        self.current_message_id = self.select("SELECT id FROM message WHERE discussion_id=? ORDER BY id DESC LIMIT 1", (discussion_id,), fetch_all=False)
+        return Discussion(self.lollms, discussion_id, self)
+        
     def create_discussion(self, title="untitled"):
         """Creates a new discussion
 
