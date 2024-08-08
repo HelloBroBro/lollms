@@ -402,21 +402,6 @@ class AIPersonality:
             prompt_parts[sacrifice_id] = sacrifice_text
             return "\n".join([s for s in prompt_parts if s!=""])
 
-    def add_collapsible_entry(self, title, content):
-        return "\n".join(
-        [
-        f'<details class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 mb-3.5 max-w-full svelte-1escu1z" open="">',
-        f'    <summary class="grid min-w-72 select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2 svelte-1escu1z">',
-        f'        <dl class="leading-4">',
-        f'        <dd class="text-sm">{title}</dd>',
-        f'        <dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">.Completed</dt>',
-        f'        </dl>',
-        f'    </summary>',
-        f' <div class="content px-5 pb-5 pt-4">',
-        content,
-        f' </div>',
-        f' </details>\n'
-        ])
 
     def internet_search_with_vectorization(self, query, quick_search:bool=False, asses_using_llm=True):
         """
@@ -2067,7 +2052,7 @@ class StateMachine:
                 try:
                     func(command, full_context, callback, context_state, client)
                 except:# retrocompatibility
-                    func(command, full_context)
+                    func(command, full_context, client)
                 return
 
         default_func = current_state.get("default")
@@ -2880,26 +2865,28 @@ class APScript(StateMachine):
     # ================================================= Sending commands to ui ===========================================
     def add_collapsible_entry(self, title, content, subtitle=""):
         return "\n".join(
-        [
-        f'<details class="flex w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 mb-3.5 max-w-full svelte-1escu1z" open="">',
-        f'    <summary class="grid w-full select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2 svelte-1escu1z">',
-        f'        <dl class="leading-4">',
-        f'          <dd class="text-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">',
-        f'          <line x1="5" y1="12" x2="19" y2="12"></line>',
-        f'          <polyline points="12 5 19 12 12 19"></polyline>',
-        f'          </svg>',
-        f'          </dd>',
-        f'        </dl>',
-        f'        <dl class="leading-4">',
-        f'        <dd class="text-sm"><h3>{title}</h3></dd>',
-        f'        <dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">{subtitle}</dt>',
-        f'        </dl>',
-        f'    </summary>',
-        f' <div class="content px-5 pb-5 pt-4">',
-        content,
-        f' </div>',
-        f' </details>\n'
-        ])
+            [
+                f'<details class="flex w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 mb-3.5 max-w-full svelte-1escu1z" open="">',
+                f'    <summary class="grid w-full select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2 svelte-1escu1z">',
+                f'        <dl class="leading-4">',
+                f'          <dd class="text-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">',
+                f'          <line x1="5" y1="12" x2="19" y2="12"></line>',
+                f'          <polyline points="12 5 19 12 12 19"></polyline>',
+                f'          </svg>',
+                f'          </dd>',
+                f'        </dl>',
+                f'        <dl class="leading-4">',
+                f'        <dd class="text-sm"><h3>{title}</h3></dd>',
+                f'        <dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">{subtitle}</dt>',
+                f'        </dl>',
+                f'    </summary>',
+                f' <div class="content px-5 pb-5 pt-4">',
+                content,
+                f' </div>',
+                f' </details>\n'
+            ]
+        )
+
 
     def internet_search_with_vectorization(self, query, quick_search:bool=False ):
         """
@@ -3667,8 +3654,6 @@ class APScript(StateMachine):
             ASCIIColors.red("Model failed to rank inputs")
             return None
 
-
-
     def build_html5_integration(self, html, ifram_name="unnamed"):
         """
         This function creates an HTML5 iframe with the given HTML content and iframe name.
@@ -3681,12 +3666,13 @@ class APScript(StateMachine):
         str: The HTML string for the iframe.
         """
         return "\n".join(
-            '<div style="width: 80%; margin: 0 auto;">',
-            f'<iframe id="{ifram_name}" srcdoc="',
-            html,
-            '" style="width: 100%; height: 600px; border: none;"></iframe>',
-            '</div>'
+            [
+                '<div class="card">',
+                f'<iframe id="{ifram_name}" srcdoc="{html}" style="width: 100%; height: 600px; border: none;"></iframe>',
+                '</div>'
+            ]
         )
+
 
 
     def InfoMessage(self, content, client_id=None, verbose:bool=None):
@@ -4158,24 +4144,25 @@ class APScript(StateMachine):
         return file_path
 
     def build_a_document_block(self, title="Title", link="", content="content"):
-        if link!="":
+        if link != "":
             return f'''
-<div style="width: 100%; border: 1px solid #ccc; border-radius: 5px; padding: 20px; font-family: Arial, sans-serif; margin-bottom: 20px; box-sizing: border-box;">
-    <h3 style="margin-top: 0;">
-        <a href="{link}" target="_blank" style="text-decoration: none; color: #333;">{title}</a>
+<div class="card">
+    <h3 class="text-gradient-title">
+        <a href="{link}" target="_blank" class="link">{title}</a>
     </h3>
-    <pre style="white-space: pre-wrap;color: #666;">{content}</pre>
+    <pre class="text-subtitle">{content}</pre>
 </div>
 '''
         else:
             return f'''
-<div style="width: 100%; border: 1px solid #ccc; border-radius: 5px; padding: 20px; font-family: Arial, sans-serif; margin-bottom: 20px; box-sizing: border-box;">
-    <h3 style="margin-top: 0;">
-        <p style="text-decoration: none; color: #333;">{title}</p>
+<div class="card">
+    <h3 class="text-gradient-title">
+        <p class="text-subtitle">{title}</p>
     </h3>
-    <pre style="white-space: pre-wrap;color: #666;">{content}</pre>
+    <pre class="text-subtitle">{content}</pre>
 </div>
 '''
+
 
     def build_a_folder_link(self, folder_path, link_text="Open Folder"):
         folder_path = str(folder_path).replace('\\','/')

@@ -55,7 +55,7 @@ def add_events(sio:socketio):
         'js', 'json', 'log', 'lua', 'map', 'md', 'mov', 'mp3', 'mp4', 'pas', 'pdf',
         'php', 'png', 'ppt', 'pptx', 'ps1', 'py', 'rb', 'rtf', 's', 'se', 'sh', 'sln', 'snippet',
         'snippets', 'sql', 'svg', 'sym', 'tif', 'tiff', 'ts', 'txt', 'wav', 'webp',
-        'xlsx', 'xls', 'xml', 'yaml', 'yml'
+        'xlsx', 'xls', 'xml', 'yaml', 'yml', "vue"
     }
 
     def allowed_file(filename):

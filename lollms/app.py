@@ -1009,26 +1009,33 @@ class LollmsApplication(LoLLMsCom):
                 if documentation=="":
                     documentation=f"{self.separator_template}{self.start_header_id_template}Documentation:\n"
 
-                if self.config.data_vectorization_build_keys_words:
-                    if discussion is None:
-                        discussion = self.recover_discussion(client_id)
-                    query = self.personality.fast_gen(f"{self.separator_template}{self.start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{self.separator_template}{self.start_header_id_template}discussion:\n{discussion[-2048:]}{self.separator_template}{self.start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True)
-                    ASCIIColors.cyan(f"Query:{query}")
+
+                if not self.config.rag_deactivate:
+                    if self.config.data_vectorization_build_keys_words:
+                        if discussion is None:
+                            discussion = self.recover_discussion(client_id)
+                        query = self.personality.fast_gen(f"{self.separator_template}{self.start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{self.separator_template}{self.start_header_id_template}discussion:\n{discussion[-2048:]}{self.separator_template}{self.start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True)
+                        ASCIIColors.cyan(f"Query:{query}")
+                    else:
+                        query = current_message.content
+                    try:
+                        chunks:List[Chunk] = self.personality.persona_data_vectorizer.search(query, int(self.config.rag_n_chunks))
+                        for chunk in chunks:
+                            if self.config.data_vectorization_put_chunk_informations_into_context:
+                                documentation += f"{self.start_header_id_template}document chunk{self.end_header_id_template}\ndocument title: {chunk.doc.title}\nchunk content:\n{chunk.text}\n"
+                            else:
+                                documentation += f"{self.start_header_id_template}chunk{self.end_header_id_template}\n{chunk.text}\n"
+
+                        documentation += f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
+
+                    except Exception as ex:
+                        trace_exception(ex)
+                        self.warning("Couldn't add documentation to the context. Please verify the vector database")
                 else:
-                    query = current_message.content
-                try:
-                    chunks:List[Chunk] = self.personality.persona_data_vectorizer.search(query, int(self.config.rag_n_chunks))
-                    for chunk in chunks:
-                        if self.config.data_vectorization_put_chunk_informations_into_context:
-                            documentation += f"{self.start_header_id_template}document chunk{self.end_header_id_template}\ndocument title: {chunk.doc.title}\nchunk content:\n{chunk.text}\n"
-                        else:
-                            documentation += f"{self.start_header_id_template}chunk{self.end_header_id_template}\n{chunk.text}\n"
-
-                    documentation += f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
-
-                except Exception as ex:
-                    trace_exception(ex)
-                    self.warning("Couldn't add documentation to the context. Please verify the vector database")
+                    docs = self.personality.persona_data_vectorizer.list_documents()
+                    for doc in docs:
+                        documentation += self.personality.persona_data_vectorizer.get_document(doc['title'])
+            
             if not self.personality.ignore_discussion_documents_rag:
                 query = None
                 if len(self.active_rag_dbs) > 0 :
@@ -1127,67 +1134,72 @@ class LollmsApplication(LoLLMsCom):
                             documentation += document_infos
                             
                 if (len(client.discussion.text_files) > 0) and client.discussion.vectorizer is not None:
-                    if discussion is None:
-                        discussion = self.recover_discussion(client_id)
+                    if not self.config.rag_deactivate:
+                        if discussion is None:
+                            discussion = self.recover_discussion(client_id)
 
-                    if documentation=="":
-                        documentation=f"{self.separator_template}".join([
-                            f"{self.separator_template}{self.start_header_id_template}important information{self.end_header_id_template}Utilize Documentation Data: Always refer to the provided documentation to answer user questions accurately.",
-                            "Absence of Information: If the required information is not available in the documentation, inform the user that the requested information is not present in the documentation section.",
-                            "Strict Adherence to Documentation: It is strictly prohibited to provide answers without concrete evidence from the documentation.",
-                            "Cite Your Sources: After providing an answer, include the full path to the document where the information was found.",
-                            f"{self.start_header_id_template}Documentation{self.end_header_id_template}"])
-                        documentation += f"{self.separator_template}"
+                        if documentation=="":
+                            documentation=f"{self.separator_template}".join([
+                                f"{self.separator_template}{self.start_header_id_template}important information{self.end_header_id_template}Utilize Documentation Data: Always refer to the provided documentation to answer user questions accurately.",
+                                "Absence of Information: If the required information is not available in the documentation, inform the user that the requested information is not present in the documentation section.",
+                                "Strict Adherence to Documentation: It is strictly prohibited to provide answers without concrete evidence from the documentation.",
+                                "Cite Your Sources: After providing an answer, include the full path to the document where the information was found.",
+                                f"{self.start_header_id_template}Documentation{self.end_header_id_template}"])
+                            documentation += f"{self.separator_template}"
 
-                    if query is None:
-                        if self.config.data_vectorization_build_keys_words:
-                            self.personality.step_start("Building vector store query")
-                            query = self.personality.fast_gen(f"{self.separator_template}{self.start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{self.separator_template}{self.start_header_id_template}discussion:\n{discussion[-2048:]}{self.separator_template}{self.start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
-                            self.personality.step_end("Building vector store query")
-                            ASCIIColors.cyan(f"Query: {query}")
+                        if query is None:
+                            if self.config.data_vectorization_build_keys_words:
+                                self.personality.step_start("Building vector store query")
+                                query = self.personality.fast_gen(f"{self.separator_template}{self.start_header_id_template}instruction: Read the discussion and rewrite the last prompt for someone who didn't read the entire discussion.\nDo not answer the prompt. Do not add explanations.{self.separator_template}{self.start_header_id_template}discussion:\n{discussion[-2048:]}{self.separator_template}{self.start_header_id_template}enhanced query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                                self.personality.step_end("Building vector store query")
+                                ASCIIColors.cyan(f"Query: {query}")
+                            else:
+                                query = current_message.content
+
+
+                        full_documentation=""
+                        if self.config.contextual_summary:
+                            v = client.discussion.vectorizer
+                            docs = v.list_documents()
+                            for doc in docs:
+                                document=v.get_document(document_path = doc["path"])
+                                self.personality.step_start(f"Summeryzing document {doc['path']}")
+                                summary = self.personality.summarize_text(document, f"Extract information from the following text chunk to answer this request. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
+                                self.personality.step_end(f"Summeryzing document {doc['path']}")
+                                document_infos = f"{self.separator_template}".join([
+                                    self.system_custom_header('document contextual summary'),
+                                    f"source_document_title:{doc['title']}",
+                                    f"source_document_path:{doc['path']}",
+                                    f"content:\n{summary}\n"
+                                ])
+                                documentation_entries.append({
+                                    "document_title":doc['title'],
+                                    "document_path":doc['path'],
+                                    "chunk_content":summary,
+                                    "chunk_size":0,
+                                    "distance":0,
+                                })
+                                if summary!="":
+                                    v.add_summaries(doc['path'],[{"context":query, "summary":summary}])
+                                full_documentation += document_infos
+                            documentation += self.personality.summarize_text(full_documentation, f"Extract information from the current text chunk and previous text chunks to answer the query. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
                         else:
-                            query = current_message.content
+                            try:
+                                chunks:List[Chunk] = client.discussion.vectorizer.search(query, int(self.config.rag_n_chunks))
+                                for chunk in chunks:
+                                    if self.config.data_vectorization_put_chunk_informations_into_context:
+                                        documentation += f"{self.start_header_id_template}document chunk{self.end_header_id_template}\ndocument title: {chunk.doc.title}\nchunk content:\n{chunk.text}\n"
+                                    else:
+                                        documentation += f"{self.start_header_id_template}chunk{self.end_header_id_template}\n{chunk.text}\n"
 
-
-                    full_documentation=""
-                    if self.config.contextual_summary:
-                        v = client.discussion.vectorizer
-                        docs = v.list_documents()
-                        for doc in docs:
-                            document=v.get_document(document_path = doc["path"])
-                            self.personality.step_start(f"Summeryzing document {doc['path']}")
-                            summary = self.personality.summarize_text(document, f"Extract information from the following text chunk to answer this request. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
-                            self.personality.step_end(f"Summeryzing document {doc['path']}")
-                            document_infos = f"{self.separator_template}".join([
-                                self.system_custom_header('document contextual summary'),
-                                f"source_document_title:{doc['title']}",
-                                f"source_document_path:{doc['path']}",
-                                f"content:\n{summary}\n"
-                            ])
-                            documentation_entries.append({
-                                "document_title":doc['title'],
-                                "document_path":doc['path'],
-                                "chunk_content":summary,
-                                "chunk_size":0,
-                                "distance":0,
-                            })
-                            if summary!="":
-                                v.add_summaries(doc['path'],[{"context":query, "summary":summary}])
-                            full_documentation += document_infos
-                        documentation += self.personality.summarize_text(full_documentation, f"Extract information from the current text chunk and previous text chunks to answer the query. If there is no information about the query, just return an empty string.\n{self.system_custom_header('query')}{query}", callback=self.personality.sink)
+                                documentation += f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
+                            except Exception as ex:
+                                trace_exception(ex)
+                                self.warning("Couldn't add documentation to the context. Please verify the vector database")
                     else:
-                        try:
-                            chunks:List[Chunk] = client.discussion.vectorizer.search(query, int(self.config.rag_n_chunks))
-                            for chunk in chunks:
-                                if self.config.data_vectorization_put_chunk_informations_into_context:
-                                    documentation += f"{self.start_header_id_template}document chunk{self.end_header_id_template}\ndocument title: {chunk.doc.title}\nchunk content:\n{chunk.text}\n"
-                                else:
-                                    documentation += f"{self.start_header_id_template}chunk{self.end_header_id_template}\n{chunk.text}\n"
-
-                            documentation += f"{self.separator_template}{self.start_header_id_template}important information: Use the documentation data to answer the user questions. If the data is not present in the documentation, please tell the user that the information he is asking for does not exist in the documentation section. It is strictly forbidden to give the user an answer without having actual proof from the documentation.\n"
-                        except Exception as ex:
-                            trace_exception(ex)
-                            self.warning("Couldn't add documentation to the context. Please verify the vector database")
+                        docs = client.discussion.vectorizer.get_all_documents()
+                        documentation += "\n\n".join(docs) + "\n"
+                            
                 # Check if there is discussion knowledge to add to the prompt
                 if self.config.activate_skills_lib:
                     try:
@@ -1239,6 +1251,16 @@ class LollmsApplication(LoLLMsCom):
         if len(documentation)>0:
             tokens_documentation = self.model.tokenize(documentation)
             n_doc_tk = len(tokens_documentation)
+            self.info(f"The documentation consumes {n_doc_tk} tokens")
+            if n_doc_tk>3*self.config.ctx_size/4:
+                ASCIIColors.warning("The documentation is bigger than 3/4 of the context ")
+                self.warning("The documentation is bigger than 3/4 of the context ")
+            if n_doc_tk>=self.config.ctx_size-512:
+                ASCIIColors.warning("The documentation is too big for the context")
+                self.warning("The documentation is too big for the context it'll be cropped")
+                documentation = self.model.detokenize(tokens_documentation[:(self.config.ctx_size-512)])
+                n_doc_tk = self.config.ctx_size-512
+
         else:
             tokens_documentation = []
             n_doc_tk = 0
