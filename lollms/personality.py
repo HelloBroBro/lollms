@@ -2739,7 +2739,6 @@ class APScript(StateMachine):
         sacrifice_id = 0
         if context_details["conditionning"] and "conditionning" not in suppress:
             full_context.append( self.separator_template.join([
-                self.system_full_header,
                 context_details["conditionning"]
             ]))
             sacrifice_id += 1
@@ -3175,25 +3174,90 @@ class APScript(StateMachine):
             f"{prompt}",
             f"{start_header_id_template}Extra conditions{end_header_id_template}",
             "- The code must be complete, not just snippets, and should be put inside a single python markdown code.",
-            "-Preceive each python codeblock with a line using this syntax:",
-            "$$file_name|the file path relative to the root folder of the project$$",
+            "- Preceive each python codeblock with a line using this syntax:",
             "```python",
+            "# FILENAME: the file path relative to the root folder of the project",
             "# Placeholder. Here you need to put the code for the file",
             "```",
             f"{start_header_id_template}Code Builder{end_header_id_template}"
         ])
         code = self.fast_gen(global_prompt, max_title_length)
         code_blocks = self.extract_code_blocks(code)
-        try:
-            back_quote_index = code.index("```")  # Remove trailing backticks
-            if back_quote_index>=0:
-                # Removing any extra text
-                code = code[:back_quote_index]
-        except:
-            pass
-        formatted_code = autopep8.fix_code(code)  # Fix indentation errors
-        return formatted_code
+        if len(code_blocks)>0:
+            return code_blocks[0]["content"]
+        else:
+            return None
 
+    @staticmethod
+    def update_code(original_code, query_string):
+        """
+        Updates the given code based on the provided query string.
+        The query string can contain two types of modifications:
+        1. FULL_REWRITE: Completely replaces the original code with the new code.
+        2. REPLACE: Replaces specific code snippets within the original code.
+
+        Args:
+            original_code (str): The original code to be updated.
+            query_string (str): The string containing the update instructions.
+
+        Returns:
+            dict: An object with the following properties:
+                - updatedCode: The updated code.
+                - modifications: A list of dicts representing the changes made, each with properties 'oldCode' and 'newCode'.
+                - hasQuery: A boolean indicating whether the queryString contained any valid queries.
+        """
+        queries = query_string.split('# REPLACE\n')
+        updated_code = original_code
+        modifications = []
+
+        # Check if there's a FULL_REWRITE first
+        full_rewrite_start = query_string.find('# FULL_REWRITE ')
+        if full_rewrite_start != -1:
+            new_code = query_string[full_rewrite_start + 14:].strip()
+            updated_code = new_code
+            modifications.append({
+                'oldCode': original_code,
+                'newCode': new_code
+            })
+            return {
+                'updatedCode': updated_code,
+                'modifications': modifications,
+                'hasQuery': True
+            }
+
+        if len(queries) == 1 and queries[0].strip() == '':
+            print("No queries detected")
+            return {
+                'updatedCode': updated_code,
+                'modifications': [],
+                'hasQuery': False
+            }
+
+        for query in queries:
+            if query.strip() == '':
+                continue
+
+            original_code_start = query.find('# ORIGINAL\n') + 11
+            original_code_end = query.find('\n# SET\n')
+            old_code = query[original_code_start:original_code_end]
+
+            new_code_start = query.find('# SET\n') + 6
+            new_code = query[new_code_start:]
+
+            modification = {
+                'oldCode': old_code.strip(),
+                'newCode': new_code.strip()
+            }
+            modifications.append(modification)
+
+            updated_code = updated_code.replace(old_code, new_code.strip())
+
+        print("New code", updated_code)
+        return {
+            'updatedCode': updated_code,
+            'modifications': modifications,
+            'hasQuery': True
+        }
 
     def make_title(self, prompt, max_title_length: int = 50):
         """
