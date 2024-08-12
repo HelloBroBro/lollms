@@ -683,6 +683,10 @@ class PersonalityInfos(BaseModel):
     category:str
     name:str
 
+class PersonalityRequest(BaseModel):
+    client_id:str
+    data:dict
+
 @router.post("/copy_to_custom_personas")
 async def copy_to_custom_personas(data: PersonalityInfos):
     """
@@ -706,12 +710,12 @@ async def copy_to_custom_personas(data: PersonalityInfos):
 
 # ------------------------------------------- Interaction with personas ------------------------------------------------
 @router.post("/post_to_personality")
-async def post_to_personality(request: Request):
+async def post_to_personality(request: PersonalityRequest):
     """Post data to a personality"""
-
+    client =check_access(lollmsElfServer, request.client_id)
     try:
         if hasattr(lollmsElfServer.personality.processor,'handle_request'):
-            return await lollmsElfServer.personality.processor.handle_request(request)
+            return await lollmsElfServer.personality.processor.handle_request(request.data, client)
         else:
             return {}
     except Exception as ex:

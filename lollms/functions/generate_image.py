@@ -7,6 +7,8 @@ if not PackageManager.check_package_installed("PyQt5"):
     PackageManager.install_package("PyQt5")
 from ascii_colors import trace_exception
 from functools import partial
+from lollms.functions.prompting.image_gen_prompts import get_image_gen_prompt, get_random_image_gen_prompt
+
 
 def build_negative_prompt(image_generation_prompt, llm):
     start_header_id_template    = llm.config.start_header_id_template
@@ -21,7 +23,7 @@ def build_negative_prompt(image_generation_prompt, llm):
                     f"{start_header_id_template}negative_prompt{end_header_id_template}",
                 ])    
 
-def build_image(prompt, negative_prompt, width, height, processor:APScript, client:Client):
+def build_image(prompt, negative_prompt, width, height, processor:APScript, client:Client, return_format="markdown"):
     try:
         if processor.personality.config.active_tti_service=="diffusers":
             if not processor.personality.app.tti:
@@ -89,10 +91,48 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
 
         file = str(file)
         escaped_url =  discussion_path_to_url(file)
-        return f'\nRespond with this link in markdown format:\n![]({escaped_url})'
+
+        if return_format == "markdown":
+            return f'\nRespond with this link in markdown format:\n![]({escaped_url})'
+        elif return_format == "url":
+            return escaped_url
+        elif return_format == "path":
+            return file
+        elif return_format == "url_and_path":
+            return {"url": escaped_url, "path": file}
+        else:
+            return f"Invalid return_format: {return_format}. Supported formats are 'markdown', 'url', 'path', and 'url_and_path'."
     except Exception as ex:
         trace_exception(ex)
         return f"Couldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"
+
+
+def build_image_from_simple_prompt(prompt, processor:APScript, client:Client, width=1024, height=1024, examples_extraction_mathod="random", number_of_examples_to_recover=3, production_type="artwork", max_generation_prompt_size=1024):
+    examples = ""
+    expmls = []
+    if examples_extraction_mathod=="random":
+        expmls = get_random_image_gen_prompt(number_of_examples_to_recover)
+    elif examples_extraction_mathod=="rag_based":
+        expmls = get_image_gen_prompt(prompt, number_of_examples_to_recover)
+        
+    for i,expml in enumerate(expmls):
+        examples += f"example {i}:"+expml+"\n"
+
+    prompt = processor.build_prompt([
+                    processor.system_full_header,
+                    f"Act as artbot, the art prompt generation AI.",
+                    "Use the discussion information to come up with an image generation prompt without referring to it.",
+                    f"Be precise and describe the style as well as the {production_type} description details.", #conditionning
+                    "Do not explain the prompt, just answer with the prompt in the right prompting style.",
+                    processor.system_custom_header("discussion"),
+                    processor.system_custom_header("Production type") + f"{production_type}",
+                    processor.system_custom_header("Instruction") + f"Use the following as examples and follow their format to build the special prompt." if examples!="" else "",
+                    processor.system_custom_header("Prompt examples") if examples!="" else "",
+                    processor.system_custom_header("Examples") + f"{examples}",
+                    processor.system_custom_header("Prompt"),
+    ],2)
+    positive_prompt = processor.generate(prompt, max_generation_prompt_size, callback=processor.sink).strip().replace("</s>","").replace("<s>","")
+    return build_image(positive_prompt, "", width, height, processor, client, "url_and_path")
 
 
 def build_image_function(processor, client):

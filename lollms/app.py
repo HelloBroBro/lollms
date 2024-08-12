@@ -30,6 +30,7 @@ import gc
 import yaml
 import time
 from lollms.utilities import PackageManager
+import socket
 
 class LollmsApplication(LoLLMsCom):
     def __init__(
@@ -68,7 +69,6 @@ class LollmsApplication(LoLLMsCom):
         self.tts                        = None
         self.session                    = Session(lollms_paths)
         self.skills_library             = SkillsLibrary(self.lollms_paths.personal_skills_path/(self.config.skills_lib_database_name+".db"))
-
         self.tasks_library              = TasksLibrary(self)
 
         self.handle_generate_msg: Callable[[str, Dict], None]               = None
@@ -94,29 +94,35 @@ class LollmsApplication(LoLLMsCom):
         self.ttv = None
         
         self.rt_com = None
+        self.is_internet_available = self.check_internet_connection()
+        
         if not free_mode:
             try:
-                if config.auto_update:
+                if config.auto_update and self.is_internet_available:
                     # Clone the repository to the target path
                     if self.lollms_paths.lollms_core_path.exists():
-                        ASCIIColors.info("Lollms_core found in the app space.\nPulling last lollms_core")
-                        subprocess.run(["git", "-C", self.lollms_paths.lollms_core_path, "pull"])            
-                    if self.lollms_paths.safe_store_path.exists():
-                        ASCIIColors.info("safe_store_path found in the app space.\nPulling last safe_store_path")
-                        subprocess.run(["git", "-C", self.lollms_paths.safe_store_path, "pull"])            
+                        def check_lollms_core():
+                            subprocess.run(["git", "-C", self.lollms_paths.lollms_core_path, "pull"]) 
+                        ASCIIColors.blue("Lollms_core found in the app space.")           
+                        ASCIIColors.execute_with_animation("Pulling last lollms_core", check_lollms_core)
+
+                    def check_lollms_bindings_zoo():
+                        subprocess.run(["git", "-C", self.lollms_paths.bindings_zoo_path, "pull"])
+                    ASCIIColors.blue("Bindings zoo found in your personal space.")
+                    ASCIIColors.execute_with_animation("Pulling last bindings zoo", check_lollms_bindings_zoo)
+
                     # Pull the repository if it already exists
-                    
-                    ASCIIColors.info("Bindings zoo found in your personal space.\nPulling last bindings zoo")
-                    subprocess.run(["git", "-C", self.lollms_paths.bindings_zoo_path, "pull"])            
+                    def check_lollms_personalities_zoo():
+                        subprocess.run(["git", "-C", self.lollms_paths.personalities_zoo_path, "pull"])            
+                    ASCIIColors.blue("Personalities zoo found in your personal space.")
+                    ASCIIColors.execute_with_animation("Pulling last personalities zoo", check_lollms_personalities_zoo)
+
                     # Pull the repository if it already exists
-                    ASCIIColors.info("Personalities zoo found in your personal space.\nPulling last personalities zoo")
-                    subprocess.run(["git", "-C", self.lollms_paths.personalities_zoo_path, "pull"])            
-                    # Pull the repository if it already exists
-                    ASCIIColors.info("Extensions zoo found in your personal space.\nPulling last Extensions zoo")
-                    subprocess.run(["git", "-C", self.lollms_paths.extensions_zoo_path, "pull"])            
-                    # Pull the repository if it already exists
-                    ASCIIColors.info("Models zoo found in your personal space.\nPulling last Models zoo")
-                    subprocess.run(["git", "-C", self.lollms_paths.models_zoo_path, "pull"])            
+                    def check_lollms_models_zoo():
+                        subprocess.run(["git", "-C", self.lollms_paths.models_zoo_path, "pull"])            
+                    ASCIIColors.blue("Models zoo found in your personal space.")
+                    ASCIIColors.execute_with_animation("Pulling last Models zoo", check_lollms_models_zoo)
+
             except Exception as ex:
                 ASCIIColors.error("Couldn't pull zoos. Please contact the main dev on our discord channel and report the problem.")
                 trace_exception(ex)
@@ -130,7 +136,7 @@ class LollmsApplication(LoLLMsCom):
                 if load_binding:
                     try:
                         ASCIIColors.info(f">Loading binding {self.config.binding_name}. Please wait ...")
-                        self.binding            = self.load_binding()
+                        self.binding = self.load_binding()
                     except Exception as ex:
                         ASCIIColors.error(f"Failed to load binding.\nReturned exception: {ex}")
                         trace_exception(ex)
@@ -165,6 +171,17 @@ class LollmsApplication(LoLLMsCom):
             except Exception as ex:
                 trace_exception(ex)
 
+    @staticmethod
+    def check_internet_connection():
+        global is_internet_available
+        try:
+            # Attempt to connect to a reliable server (in this case, Google's DNS)
+            socket.create_connection(("8.8.8.8", 53), timeout=3)
+            is_internet_available = True
+            return True
+        except OSError:
+            is_internet_available = False
+            return False
 
 
     def backup_trust_store(self):

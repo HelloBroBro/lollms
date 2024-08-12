@@ -24,10 +24,9 @@ import subprocess
 from lollms.config import TypedConfig, InstallOption
 from lollms.main_config import LOLLMSConfig
 from lollms.com import NotificationType, NotificationDisplayType, LoLLMsCom
-from lollms.security import sanitize_path
 from lollms.utilities import show_message_dialog
 from lollms.types import BindingType
-
+from lollms.client_session import Client
 import urllib
 import inspect
 from datetime import datetime
@@ -469,12 +468,13 @@ class LLMBinding:
         """
         pass
 
-    async def handle_request(self, request: Request) -> Dict[str, Any]:
+    async def handle_request(self, data: dict, client:Client=None) -> Dict[str, Any]:
         """
         Handle client requests.
 
         Args:
             data (dict): A dictionary containing the request data.
+            client (Client): A refertence to the client asking for this request.
 
         Returns:
             dict: A dictionary containing the response, including at least a "status" key.
@@ -484,8 +484,9 @@ class LLMBinding:
         Example usage:
         ```
         handler = YourHandlerClass()
+        client = checkaccess(lollmsServer, client_id)
         request_data = {"command": "some_command", "parameters": {...}}
-        response = handler.handle_request(request_data)
+        response = handler.handle_request(request_data, client)
         ```
         """        
         return {"status":True}

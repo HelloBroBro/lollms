@@ -17,6 +17,9 @@ import gc
 import json
 import shutil
 from lollms.tasks import TasksLibrary
+import json
+from typing import Dict, Any
+
 __author__ = "parisneo"
 __github__ = "https://github.com/ParisNeo/lollms-webui"
 __copyright__ = "Copyright 2023, "
@@ -37,7 +40,7 @@ class DiscussionsDB:
         self.discussion_db_file_path = self.discussion_db_path/"database.db"
 
     def create_tables(self):
-        db_version = 12
+        db_version = 13
         with sqlite3.connect(self.discussion_db_file_path) as conn:
             cursor = conn.cursor()
 
@@ -52,6 +55,7 @@ class DiscussionsDB:
                 CREATE TABLE IF NOT EXISTS discussion (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     title TEXT,
+                    metadata TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
@@ -98,6 +102,7 @@ class DiscussionsDB:
                 'discussion': [
                     'id',
                     'title',
+                    'metadata',
                     'created_at'
                 ],
                 'message': [
@@ -931,7 +936,7 @@ class Discussion:
         )
 
     def title(self):
-        """Renames the discussion
+        """Recovers the discussion title
 
         Args:
             new_title (str): The nex discussion name
@@ -940,6 +945,67 @@ class Discussion:
             f"Select title from discussion WHERE id={self.discussion_id}"
         )
         return rows[0][0]
+
+    def set_metadata(self, new_metadata: Dict[str, Any]) -> None:
+        """
+        Sets the metadata for the discussion.
+
+        Args:
+            new_metadata (Dict[str, Any]): The new metadata as a dictionary.
+        """
+        metadata_json = json.dumps(new_metadata)
+        self.discussions_db.update(
+            "UPDATE discussion SET metadata=? WHERE id=?",
+            (metadata_json, self.discussion_id)
+        )
+
+
+    def get_metadata(self) -> Dict[str, Any]:
+        """
+        Retrieves the discussion metadata.
+
+        Returns:
+            Dict[str, Any]: The metadata as a dictionary. Returns an empty dictionary if metadata is None or invalid JSON.
+        """
+        rows = self.discussions_db.select(
+            f"SELECT metadata FROM discussion WHERE id=?",
+            (self.discussion_id,)
+        )
+        
+        metadata_json = rows[0][0] if rows else None
+        
+        if metadata_json is None:
+            return {}
+        
+        try:
+            return json.loads(metadata_json)
+        except json.JSONDecodeError:
+            return {}
+
+
+    def update_metadata(self, key: str, value: Any) -> None:
+        """
+        Updates a specific key in the metadata.
+
+        Args:
+            key (str): The key to update or add.
+            value (Any): The value to set for the key.
+        """
+        current_metadata = self.get_metadata()
+        current_metadata[key] = value
+        self.set_metadata(current_metadata)
+
+    def delete_metadata_key(self, key: str) -> None:
+        """
+        Deletes a specific key from the metadata.
+
+        Args:
+            key (str): The key to delete.
+        """
+        current_metadata = self.get_metadata()
+        if key in current_metadata:
+            del current_metadata[key]
+            self.set_metadata(current_metadata)
 
     def delete_discussion(self):
         """Deletes the discussion
