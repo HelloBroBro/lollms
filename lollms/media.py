@@ -9,7 +9,7 @@ License: Apache 2.0
 from lollms.utilities import PackageManager
 from lollms.com import LoLLMsCom
 from lollms.utilities import trace_exception, run_async, install_conda_package
-from lollms.types import MSG_TYPE, SENDER_TYPES
+from lollms.types import MSG_OPERATION_TYPE, SENDER_TYPES
 from lollms.client_session import Session
 from ascii_colors import ASCIIColors
 import platform

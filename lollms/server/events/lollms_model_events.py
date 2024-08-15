@@ -16,7 +16,7 @@ from lollms.binding import BindingBuilder, InstallOption
 from lollms.security import sanitize_path
 
 from ascii_colors import ASCIIColors
-from lollms.personality import MSG_TYPE, AIPersonality
+from lollms.personality import AIPersonality
 from lollms.utilities import load_config, trace_exception, gc, terminate_thread, run_async
 from pathlib import Path
 from typing import List

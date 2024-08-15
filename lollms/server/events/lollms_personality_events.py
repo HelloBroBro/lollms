@@ -15,8 +15,9 @@ from lollms.types import SENDER_TYPES
 from fastapi.responses import FileResponse
 from lollms.binding import BindingBuilder, InstallOption
 from ascii_colors import ASCIIColors
-from lollms.personality import MSG_TYPE, AIPersonality
+from lollms.personality import AIPersonality
 from lollms.utilities import load_config, trace_exception, gc, terminate_thread, run_async
+from lollms.types import MSG_TYPE
 from pathlib import Path
 from typing import List
 import socketio
@@ -145,14 +146,15 @@ def add_events(sio:socketio):
                 ump = lollmsElfServer.config.discussion_prompt_separator + lollmsElfServer.config.user_name.strip() if lollmsElfServer.config.use_user_name_in_discussions else lollmsElfServer.personality.user_message_prefix
                 created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')                 
                 message = client.discussion.add_message(
-                    message_type    = MSG_TYPE.MSG_TYPE_FULL.value,
+                    message_type    = MSG_TYPE.MSG_TYPE_CONTENT.value,
                     sender_type     = SENDER_TYPES.SENDER_TYPES_USER.value,
                     sender          = ump.replace(lollmsElfServer.config.discussion_prompt_separator,"").replace(":",""),
-                    content="",
-                    metadata=None,
+                    content         = "",
+                    metadata        = None,
+                    steps           = [],
                     parent_message_id=lollmsElfServer.message_id,
-                    created_at=created_at,
-                    nb_tokens=None
+                    created_at      = created_at,
+                    nb_tokens       = None
                 )
                 lollmsElfServer.busy=True
                 command = data["command"]

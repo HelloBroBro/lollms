@@ -11,7 +11,7 @@ from fastapi import APIRouter, Request
 from lollms.server.elf_server import LOLLMSElfServer
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_OPERATION_TYPE
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception
 from lollms.security import sanitize_path, check_access
 from ascii_colors import ASCIIColors

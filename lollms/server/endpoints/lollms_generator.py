@@ -8,16 +8,17 @@ description:
 
 """
 
-from fastapi import APIRouter, Request, Body, Response
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from lollms.server.elf_server import LOLLMSElfServer
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_OPERATION_TYPE
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception
 from lollms.generation import RECEPTION_MANAGER, ROLE_CHANGE_DECISION, ROLE_CHANGE_OURTPUT
 from ascii_colors import ASCIIColors
 import time
+import re
 import threading
 from typing import List, Optional, Union
 import random
@@ -127,7 +128,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
             ASCIIColors.yellow(prompt)
         tokens = elf_server.model.tokenize(prompt)
         n_tokens = len(tokens)
-        ASCIIColors.yellow(f"Prompt input size {n_tokens}")        
+        ASCIIColors.info(f"Prompt input size {n_tokens}")        
         n_predict = min(min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict), request.n_predict) if request.n_predict>0 else min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict)
         stream = request.stream
         if elf_server.binding is not None:
@@ -136,7 +137,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
                 async def generate_chunks():
                     lk = threading.Lock()
 
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         if elf_server.cancel_gen:
                             return False
                         
@@ -189,7 +190,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
                     elf_server.cancel_gen = False         
                 return StreamingResponse(generate_chunks(), media_type="text/plain", headers=headers)
             else:
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     # Yield each chunk of data
                     if chunk is None:
                         return True
@@ -276,20 +277,35 @@ async def lollms_generate_with_images(request: LollmsGenerateRequest):
         stream = request.stream
         prompt_tokens = len(elf_server.binding.tokenize(prompt))
         if elf_server.binding is not None:
+            def add_padding(encoded_image):
+                missing_padding = len(encoded_image) % 4
+                if missing_padding:
+                    encoded_image += '=' * (4 - missing_padding)
+                return encoded_image
+            def sanitize_base64(encoded_image):
+                # Remove any characters that are not valid base64 characters
+                return re.sub(r'[^A-Za-z0-9+/=]', '', encoded_image)
             image_files = []
             images_path = elf_server.lollms_paths.personal_outputs_path / "tmp_images"
             images_path.mkdir(parents=True, exist_ok=True)
             for i, encoded_image in enumerate(encoded_images):
+                # Remove the data URL prefix
+                if encoded_image.startswith('data:image/png;base64,'):
+                    encoded_image = encoded_image.split(',')[1]  # Get the base64 part only
+
+                sanitized_image = sanitize_base64(encoded_image)
+                padded_image = add_padding(sanitized_image)
+
                 image_path = images_path/ f'image_{i}.png'
                 with open(image_path, 'wb') as image_file:
-                    image_file.write(base64.b64decode(encoded_image))
+                    image_file.write(base64.b64decode(padded_image))
                 image_files.append(image_path)            
             if stream:
                 new_output={"new_values":[]}
                 async def generate_chunks():
                     lk = threading.Lock()
 
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         if elf_server.cancel_gen:
                             return False
                         
@@ -343,7 +359,7 @@ async def lollms_generate_with_images(request: LollmsGenerateRequest):
                     elf_server.cancel_gen = False         
                 return StreamingResponse(generate_chunks(), media_type="text/plain", headers=headers)
             else:
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     # Yield each chunk of data
                     if chunk is None:
                         return True
@@ -373,7 +389,7 @@ async def lollms_generate_with_images(request: LollmsGenerateRequest):
     except Exception as ex:
         trace_exception(ex)
         elf_server.error(ex)
-        return {"status":False,"error":str(ex)}
+        raise HTTPException(400, f"Error : {ex}")
 
 
 # ----------------------- Open AI ----------------------------------------
@@ -493,7 +509,7 @@ async def v1_chat_completions(request: ChatGenerationRequest):
                 async def generate_chunks():
                     lk = threading.Lock()
 
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         if elf_server.cancel_gen:
                             return False
                         
@@ -551,7 +567,7 @@ async def v1_chat_completions(request: ChatGenerationRequest):
                     elf_server.cancel_gen = False         
                 return StreamingResponse(generate_chunks(), media_type="application/json")
             else:
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     # Yield each chunk of data
                     if chunk is None:
                         return True
@@ -580,7 +596,7 @@ async def v1_chat_completions(request: ChatGenerationRequest):
     except Exception as ex:
         trace_exception(ex)
         elf_server.error(ex)
-        return {"status":False,"error":str(ex)}
+        raise HTTPException(400, f"Error : {ex}")
 
 class OllamaModelResponse(BaseModel):
     id: str
@@ -635,7 +651,7 @@ async def ollama_chat_completion(request: ChatGenerationRequest):
                 async def generate_chunks():
                     lk = threading.Lock()
 
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         if elf_server.cancel_gen:
                             return False
                         
@@ -693,7 +709,7 @@ async def ollama_chat_completion(request: ChatGenerationRequest):
                     elf_server.cancel_gen = False         
                 return StreamingResponse(generate_chunks(), media_type="application/json")
             else:
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     # Yield each chunk of data
                     if chunk is None:
                         return True
@@ -789,7 +805,7 @@ async def ollama_generate(request: CompletionGenerationRequest):
             if stream:
                 output = {"text":""}
                 def generate_chunks():
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         # Yield each chunk of data
                         output["text"] += chunk
                         antiprompt = detect_antiprompt(output["text"], [start_header_id_template, end_header_id_template])
@@ -810,7 +826,7 @@ async def ollama_generate(request: CompletionGenerationRequest):
                 return StreamingResponse(generate_chunks())
             else:
                 output = {"text":""}
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     if chunk is None:
                         return
                     # Yield each chunk of data
@@ -875,7 +891,7 @@ async def ollama_completion(request: CompletionGenerationRequest):
                 async def generate_chunks():
                     lk = threading.Lock()
 
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         if elf_server.cancel_gen:
                             return False
                         
@@ -928,7 +944,7 @@ async def ollama_completion(request: CompletionGenerationRequest):
                     elf_server.cancel_gen = False         
                 return StreamingResponse(generate_chunks(), media_type="text/plain")
             else:
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     # Yield each chunk of data
                     if chunk is None:
                         return True
@@ -979,7 +995,7 @@ async def v1_completion(request: CompletionGenerationRequest):
             if stream:
                 output = {"text":""}
                 def generate_chunks():
-                    def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                    def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                         # Yield each chunk of data
                         output["text"] += chunk
                         antiprompt = detect_antiprompt(output["text"])
@@ -1000,7 +1016,7 @@ async def v1_completion(request: CompletionGenerationRequest):
                 return StreamingResponse(generate_chunks())
             else:
                 output = {"text":""}
-                def callback(chunk, chunk_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CHUNK):
+                def callback(chunk, chunk_type:MSG_OPERATION_TYPE=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK):
                     # Yield each chunk of data
                     output["text"] += chunk
                     antiprompt = detect_antiprompt(output["text"])

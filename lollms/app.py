@@ -8,7 +8,7 @@ from lollms.config import InstallOption
 from lollms.helpers import ASCIIColors, trace_exception
 from lollms.com import NotificationType, NotificationDisplayType, LoLLMsCom
 from lollms.terminal import MainMenu
-from lollms.types import MSG_TYPE, SENDER_TYPES
+from lollms.types import MSG_OPERATION_TYPE, SENDER_TYPES
 from lollms.utilities import PromptReshaper
 from lollms.client_session import Client, Session
 from lollms.databases.skills_database import SkillsLibrary
@@ -239,8 +239,8 @@ class LollmsApplication(LoLLMsCom):
         messages = client.discussion.get_messages()
 
         # Extract relevant information from messages
-        def cb(str, MSG_TYPE_=MSG_TYPE.MSG_TYPE_FULL, dict=None, list=None):
-            if MSG_TYPE_!=MSG_TYPE.MSG_TYPE_CHUNK:
+        def cb(str, MSG_TYPE_=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT, dict=None, list=None):
+            if MSG_TYPE_!=MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK:
                 self.ShowBlockingMessage(f"Learning\n{str}")
         bk_cb = self.tasks_library.callback
         self.tasks_library.callback = cb
@@ -334,117 +334,125 @@ class LollmsApplication(LoLLMsCom):
     def start_servers(self):
 
         ASCIIColors.yellow("* - * - * - Starting services - * - * - *")
+        tts_services = []
+        stt_services = []
+        def start_ttt(*args, **kwargs):
+            if self.config.enable_ollama_service:
+                try:
+                    from lollms.services.ollama.lollms_ollama import Service
+                    self.ollama = Service(self, base_url=self.config.ollama_base_url)
+                    tts_services.append("ollama")
 
-        ASCIIColors.blue("Loading local TTT services")
-        if self.config.enable_ollama_service:
-            try:
-                from lollms.services.ollama.lollms_ollama import Service
-                self.ollama = Service(self, base_url=self.config.ollama_base_url)
-            except Exception as ex:
-                trace_exception(ex)
-                self.warning(f"Couldn't load Ollama")
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load Ollama")
 
-        if self.config.enable_vllm_service:
-            try:
-                from lollms.services.vllm.lollms_vllm import Service
-                self.vllm = Service(self, base_url=self.config.vllm_url)
-            except Exception as ex:
-                trace_exception(ex)
-                self.warning(f"Couldn't load vllm")
-
-        ASCIIColors.blue("Loading loacal STT services")
-        if self.config.whisper_activate or self.config.active_stt_service == "whisper":
-            try:
+            if self.config.enable_vllm_service:
+                try:
+                    from lollms.services.vllm.lollms_vllm import Service
+                    self.vllm = Service(self, base_url=self.config.vllm_url)
+                    tts_services.append("vllm")
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load vllm")
+        ASCIIColors.execute_with_animation("Loading local TTT services", start_ttt,ASCIIColors.color_blue)
+        print("OK")
+        def start_stt(*args, **kwargs):
+            if self.config.whisper_activate or self.config.active_stt_service == "whisper":
+                try:
+                    from lollms.services.whisper.lollms_whisper import LollmsWhisper
+                    self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
+                    stt_services.append("whisper")
+                except Exception as ex:
+                    trace_exception(ex)
+            if self.config.active_stt_service == "openai_whisper":
+                from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
+                self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
+            elif self.config.active_stt_service == "whisper":
                 from lollms.services.whisper.lollms_whisper import LollmsWhisper
-                self.whisper = LollmsWhisper(self, self.config.whisper_model, self.lollms_paths.personal_outputs_path)
-            except Exception as ex:
-                trace_exception(ex)
+                self.stt = LollmsWhisper(self, self.config.whisper_model)
 
-        ASCIIColors.blue("Loading local TTS services")
-        if self.config.active_tts_service == "xtts":
-            ASCIIColors.yellow("Loading XTTS")
-            try:
-                from lollms.services.xtts.lollms_xtts import LollmsXTTS
-                voice=self.config.xtts_current_voice
-                if voice!="main_voice":
-                    voices_folder = self.lollms_paths.custom_voices_path
+        ASCIIColors.execute_with_animation("Loading loacal STT services", start_stt, ASCIIColors.color_blue)
+        print("OK")
+
+        def start_tts(*args, **kwargs):
+            if self.config.active_tts_service == "xtts":
+                ASCIIColors.yellow("Loading XTTS")
+                try:
+                    from lollms.services.xtts.lollms_xtts import LollmsXTTS
+                    voice=self.config.xtts_current_voice
+                    if voice!="main_voice":
+                        voices_folder = self.lollms_paths.custom_voices_path
+                    else:
+                        voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
+
+                    self.xtts = LollmsXTTS(
+                                            self,
+                                            voices_folders=[voices_folder, self.lollms_paths.custom_voices_path], 
+                                            freq=self.config.xtts_freq
+                                        )
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load XTTS")
+            if self.config.active_tts_service == "eleven_labs_tts":
+                from lollms.services.eleven_labs_tts.lollms_eleven_labs_tts import LollmsElevenLabsTTS
+                self.tts = LollmsElevenLabsTTS(self, self.config.elevenlabs_tts_model_id, self.config.elevenlabs_tts_voice_id,  self.config.elevenlabs_tts_key, stability=self.config.elevenlabs_tts_voice_stability, similarity_boost=self.config.elevenlabs_tts_voice_boost)
+            elif self.config.active_tts_service == "openai_tts":
+                from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
+                self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
+            elif self.config.active_tts_service == "xtts" and self.xtts:
+                self.tts = self.xtts
+
+        ASCIIColors.execute_with_animation("Loading loacal TTS services", start_tts, ASCIIColors.color_blue)
+        print("OK")
+
+        def start_tti(*args, **kwargs):
+            if self.config.enable_sd_service:
+                try:
+                    from lollms.services.sd.lollms_sd import LollmsSD
+                    self.sd = LollmsSD(self, auto_sd_base_url=self.config.sd_base_url)
+                except:
+                    self.warning(f"Couldn't load SD")
+
+            if self.config.enable_comfyui_service:
+                try:
+                    from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+                    self.comfyui = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
+                except:
+                    self.warning(f"Couldn't load SD")
+
+            if self.config.enable_motion_ctrl_service:
+                try:
+                    from lollms.services.motion_ctrl.lollms_motion_ctrl import Service
+                    self.motion_ctrl = Service(self, base_url=self.config.motion_ctrl_base_url)
+                except Exception as ex:
+                    trace_exception(ex)
+                    self.warning(f"Couldn't load Motion control")
+
+            if self.config.active_tti_service == "diffusers":
+                from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
+                self.tti = LollmsDiffusers(self)
+            elif self.config.active_tti_service == "autosd":
+                if self.sd:
+                    self.tti = self.sd
                 else:
-                    voices_folder = Path(__file__).parent.parent.parent/"services/xtts/voices"
+                    from lollms.services.sd.lollms_sd import LollmsSD
+                    self.tti = LollmsSD(self)
+            elif self.config.active_tti_service == "dall-e":
+                from lollms.services.dalle.lollms_dalle import LollmsDalle
+                self.tti = LollmsDalle(self, self.config.dall_e_key)
+            elif self.config.active_tti_service == "midjourney":
+                from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
+                self.tti = LollmsMidjourney(self, self.config.midjourney_key, self.config.midjourney_timeout, self.config.midjourney_retries)
+            elif self.config.active_tti_service == "comfyui" and (self.tti is None or self.tti.name!="comfyui"):
+                if self.comfyui:
+                    self.tti = self.comfyui
+                else:
+                    from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+                    self.tti = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
 
-                self.xtts = LollmsXTTS(
-                                        self,
-                                        voices_folders=[voices_folder, self.lollms_paths.custom_voices_path], 
-                                        freq=self.config.xtts_freq
-                                    )
-            except Exception as ex:
-                trace_exception(ex)
-                self.warning(f"Couldn't load XTTS")
-
-        ASCIIColors.blue("Loading local TTI services")
-        if self.config.enable_sd_service:
-            try:
-                from lollms.services.sd.lollms_sd import LollmsSD
-                self.sd = LollmsSD(self, auto_sd_base_url=self.config.sd_base_url)
-            except:
-                self.warning(f"Couldn't load SD")
-
-        if self.config.enable_comfyui_service:
-            try:
-                from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
-                self.comfyui = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
-            except:
-                self.warning(f"Couldn't load SD")
-
-        if self.config.enable_motion_ctrl_service:
-            try:
-                from lollms.services.motion_ctrl.lollms_motion_ctrl import Service
-                self.motion_ctrl = Service(self, base_url=self.config.motion_ctrl_base_url)
-            except Exception as ex:
-                trace_exception(ex)
-                self.warning(f"Couldn't load Motion control")
-
-        ASCIIColors.blue("Activating TTI service")
-        if self.config.active_tti_service == "diffusers":
-            from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
-            self.tti = LollmsDiffusers(self)
-        elif self.config.active_tti_service == "autosd":
-            if self.sd:
-                self.tti = self.sd
-            else:
-                from lollms.services.sd.lollms_sd import LollmsSD
-                self.tti = LollmsSD(self)
-        elif self.config.active_tti_service == "dall-e":
-            from lollms.services.dalle.lollms_dalle import LollmsDalle
-            self.tti = LollmsDalle(self, self.config.dall_e_key)
-        elif self.config.active_tti_service == "midjourney":
-            from lollms.services.midjourney.lollms_midjourney import LollmsMidjourney
-            self.tti = LollmsMidjourney(self, self.config.midjourney_key, self.config.midjourney_timeout, self.config.midjourney_retries)
-        elif self.config.active_tti_service == "comfyui" and (self.tti is None or self.tti.name!="comfyui"):
-            if self.comfyui:
-                self.tti = self.comfyui
-            else:
-                from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
-                self.tti = LollmsComfyUI(self, comfyui_base_url=self.config.comfyui_base_url)
-
-        ASCIIColors.blue("Activating TTS services")
-
-
-        if self.config.active_tts_service == "eleven_labs_tts":
-            from lollms.services.eleven_labs_tts.lollms_eleven_labs_tts import LollmsElevenLabsTTS
-            self.tts = LollmsElevenLabsTTS(self, self.config.elevenlabs_tts_model_id, self.config.elevenlabs_tts_voice_id,  self.config.elevenlabs_tts_key, stability=self.config.elevenlabs_tts_voice_stability, similarity_boost=self.config.elevenlabs_tts_voice_boost)
-        elif self.config.active_tts_service == "openai_tts":
-            from lollms.services.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
-            self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
-        elif self.config.active_tts_service == "xtts" and self.xtts:
-            self.tts = self.xtts
-
-        ASCIIColors.blue("Loading STT services")
-        if self.config.active_stt_service == "openai_whisper":
-            from lollms.services.openai_whisper.lollms_openai_whisper import LollmsOpenAIWhisper
-            self.stt = LollmsOpenAIWhisper(self, self.config.openai_whisper_model, self.config.openai_whisper_key)
-        elif self.config.active_stt_service == "whisper":
-            from lollms.services.whisper.lollms_whisper import LollmsWhisper
-            self.stt = LollmsWhisper(self, self.config.whisper_model)
+        ASCIIColors.execute_with_animation("Loading loacal TTI services", start_tti, ASCIIColors.color_blue)
+        print("OK")
 
 
     def verify_servers(self, reload_all=False):
@@ -1345,7 +1353,7 @@ class LollmsApplication(LoLLMsCom):
 
                 # Check if the message content is not empty and visible to the AI
                 if message.content != '' and (
-                        message.message_type <= MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_USER.value and message.message_type != MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_AI.value):
+                        message.message_type <= MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_USER.value and message.message_type != MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_AI.value):
 
                     # Tokenize the message content
                     if self.config.use_model_name_in_discussions:
@@ -1377,7 +1385,7 @@ class LollmsApplication(LoLLMsCom):
 
             # Check if the message content is not empty and visible to the AI
             if message.content != '' and (
-                    message.message_type <= MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_USER.value and message.message_type != MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_AI.value):
+                    message.message_type <= MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_USER.value and message.message_type != MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_AI.value):
 
                 if self.config.use_model_name_in_discussions:
                     if message.model:

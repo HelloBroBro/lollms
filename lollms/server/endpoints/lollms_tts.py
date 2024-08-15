@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_OPERATION_TYPE
 from lollms.main_config import BaseConfig
 from lollms.utilities import find_next_available_filename, output_file_path_to_url, detect_antiprompt, remove_text_from_string, trace_exception, find_first_available_file_index, add_period, PackageManager
 from lollms.security import sanitize_path, validate_path, check_access

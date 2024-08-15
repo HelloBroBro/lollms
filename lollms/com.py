@@ -1,8 +1,9 @@
 from ascii_colors import ASCIIColors
-from lollms.types import MSG_TYPE, SENDER_TYPES
+from lollms.types import MSG_OPERATION_TYPE, SENDER_TYPES, MSG_TYPE
 from typing import Callable
 import socketio
 from enum import Enum
+from lollms.types import MSG_OPERATION_TYPE
 class NotificationType(Enum):
     """Notification types."""
     
@@ -155,12 +156,12 @@ class LoLLMsCom:
                             parameters=None,
                             metadata=None,
                             ui=None,
-                            message_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_FULL, 
+                            message_type:MSG_TYPE=MSG_TYPE.MSG_TYPE_CONTENT, 
                             sender_type:SENDER_TYPES=SENDER_TYPES.SENDER_TYPES_AI,
                             open=False
                         ):
         pass
-    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def set_message_content(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end
 
         Args:

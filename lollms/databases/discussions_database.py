@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 from ascii_colors import ASCIIColors, trace_exception
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_OPERATION_TYPE
 from lollms.types import BindingType
 from lollms.utilities import PackageManager, discussion_path_to_url
 from lollms.paths import LollmsPaths
@@ -18,7 +18,7 @@ import json
 import shutil
 from lollms.tasks import TasksLibrary
 import json
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 __author__ = "parisneo"
 __github__ = "https://github.com/ParisNeo/lollms-webui"
@@ -40,7 +40,7 @@ class DiscussionsDB:
         self.discussion_db_file_path = self.discussion_db_path/"database.db"
 
     def create_tables(self):
-        db_version = 13
+        db_version = 14
         with sqlite3.connect(self.discussion_db_file_path) as conn:
             cursor = conn.cursor()
 
@@ -77,6 +77,7 @@ class DiscussionsDB:
                     finished_generating_at TIMESTAMP,
                     nb_tokens INT,                    
                     discussion_id INTEGER NOT NULL,
+                    steps TEXT,
                     metadata TEXT,
                     ui TEXT,
                     FOREIGN KEY (discussion_id) REFERENCES discussion(id),
@@ -119,6 +120,7 @@ class DiscussionsDB:
                     'created_at',
                     'metadata',
                     'ui',
+                    'steps',
                     'started_generating_at',
                     'finished_generating_at',
                     'nb_tokens',                    
@@ -137,6 +139,8 @@ class DiscussionsDB:
                         elif column.endswith('_at'):
                             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} TIMESTAMP")
                         elif column=='metadata':
+                            cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
+                        elif column=='steps':
                             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} TEXT")
                         elif column=='message_type':
                             cursor.execute(f"ALTER TABLE {table} RENAME COLUMN type TO {column}")
@@ -497,11 +501,12 @@ class Message:
     def __init__(
                     self,
                     discussion_id,
-                    discussions_db,
+                    discussions_db: DiscussionsDB,
                     message_type,
                     sender_type,
                     sender,
                     content,
+                    steps:list              = [],
                     metadata                = None,
                     ui                      = None,
                     rank                    = 0,
@@ -517,29 +522,33 @@ class Message:
                     insert_into_db          = False
                     ):
         
-        self.discussion_id = discussion_id
-        self.discussions_db = discussions_db
-        self.self = self
-        self.sender = sender
-        self.sender_type = sender_type
-        self.content = content
-        self.message_type = message_type
-        self.rank = rank
-        self.parent_message_id = parent_message_id
-        self.binding = binding
-        self.model = model
-        self.metadata = json.dumps(metadata, indent=4) if metadata is not None and type(metadata)== dict else metadata
-        self.ui = ui
-        self.personality = personality
-        self.created_at = created_at
-        self.started_generating_at = started_generating_at
+        self.discussion_id      = discussion_id
+        self.discussions_db     = discussions_db
+        self.self               = self
+        self.sender             = sender
+        self.sender_type        = sender_type
+        self.content            = content
+        try:
+            self.steps          = steps if type(steps)==list else json.loads(steps)
+        except:
+            self.steps          = []
+        self.message_type       = message_type
+        self.rank               = rank
+        self.parent_message_id  = parent_message_id
+        self.binding            = binding
+        self.model              = model
+        self.metadata           = json.dumps(metadata, indent=4) if metadata is not None and type(metadata)== dict else metadata
+        self.ui                 = ui
+        self.personality        = personality
+        self.created_at         = created_at
+        self.started_generating_at  = started_generating_at
         self.finished_generating_at = finished_generating_at
-        self.nb_tokens = nb_tokens
+        self.nb_tokens              = nb_tokens
 
         if insert_into_db:
             self.id = self.discussions_db.insert(
-                "INSERT INTO message (sender,  message_type,  sender_type,  sender,  content,  metadata, ui,  rank,  parent_message_id,  binding,  model,  personality,  created_at, started_generating_at,  finished_generating_at, nb_tokens,  discussion_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-                (sender, message_type, sender_type, sender, content, metadata, ui, rank, parent_message_id, binding, model, personality, created_at, started_generating_at, finished_generating_at, nb_tokens, discussion_id)
+                "INSERT INTO message (sender,  message_type,  sender_type,  sender,  content, steps,  metadata, ui,  rank,  parent_message_id,  binding,  model,  personality,  created_at, started_generating_at,  finished_generating_at, nb_tokens,  discussion_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                (sender, message_type, sender_type, sender, content, str(steps), metadata, ui, rank, parent_message_id, binding, model, personality, created_at, started_generating_at, finished_generating_at, nb_tokens, discussion_id)
             )
         else:
             self.id = id
@@ -554,6 +563,7 @@ class Message:
             "sender",
             "content",
             "metadata",
+            "steps",
             "ui",
             "rank",
             "parent_message_id",
@@ -607,7 +617,7 @@ class Message:
         params = [new_content]
         if new_metadata is not None:
             text+=", metadata = ?"
-            params.append(new_metadata)
+            params.append(new_metadata if type(new_metadata)==str else json.dumps(new_metadata) if type(new_metadata)==dict else None)
             self.metadata=new_metadata
         if new_ui is not None:
             text+=", ui = ?"
@@ -632,14 +642,105 @@ class Message:
             text, tuple(params)
         )        
 
+    def update_content(self, new_content, started_generating_at=None, nb_tokens=None, commit=True):
+        self.finished_generating_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        text = f"UPDATE message SET content = ?"
+        params = [new_content]
+
+        if started_generating_at is not None:
+            text+=", started_generating_at = ?"
+            params.append(started_generating_at)
+            self.started_generating_at=started_generating_at
+
+        if nb_tokens is not None:
+            text+=", nb_tokens = ?"
+            params.append(nb_tokens)
+            self.nb_tokens=nb_tokens
+
+
+        text +=", finished_generating_at = ? WHERE id = ?"
+        params.append(self.finished_generating_at)
+        params.append(self.id)
+        self.discussions_db.update(
+            text, tuple(params)
+        )  
+
+    def update_steps(self, steps:list, step_type:str, status:bool):
+        self.finished_generating_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        text = f"UPDATE message SET steps = ?"
+        self.steps = steps
+        params = [json.dumps(self.steps)]
+
+        text +=" WHERE id = ?"
+        params.append(self.id)
+        self.discussions_db.update(
+            text, tuple(params)
+        )        
+
+
+    def update_metadata(self, new_metadata):
+        self.finished_generating_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        text = f"UPDATE message SET metadata = ?"
+        params = [None if new_metadata is None else new_metadata if type(new_metadata)==str else json.dumps(new_metadata)]
+        text +=", finished_generating_at = ? WHERE id = ?"
+        params.append(self.finished_generating_at)
+        params.append(self.id)
+        self.discussions_db.update(
+            text, tuple(params)
+        )        
+
+    def update_ui(self, new_ui):
+        self.finished_generating_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        text = f"UPDATE message SET ui = ?"
+        params = [str(new_ui) if new_ui is not None else None]
+        text +=", finished_generating_at = ? WHERE id = ?"
+        params.append(self.finished_generating_at)
+        params.append(self.id)
+        self.discussions_db.update(
+            text, tuple(params)
+        )        
+
+    def add_step(self, step: str, step_type: str, status: bool, done: bool):
+        self.finished_generating_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Check if the step text already exists
+        for existing_step in self.steps:
+            if existing_step['text'] == step:
+                # Update the existing step
+                existing_step['step_type'] = step_type
+                existing_step['status'] = status
+                existing_step['done'] = done
+                break
+        else:
+            # If it doesn't exist, append a new step
+            self.steps.append({
+                "id": len(self.steps),
+                "text": step,
+                "step_type": step_type,
+                "status": status,
+                "done": done
+            })
+
+        # Prepare the SQL update statement
+        text = "UPDATE message SET steps = ? WHERE id = ?"
+        params = [json.dumps(self.steps), self.id]
+        
+        # Update the database
+        self.discussions_db.update(text, tuple(params))
+
+
     def to_json(self):
         attributes = Message.get_fields()
         msgJson = {}
         for attribute_name in attributes:
             attribute_value = getattr(self, attribute_name, None)
-            if attribute_name=="metadata":
+            if attribute_name in ["metadata","steps"]:
                 if type(attribute_value) == str:
-                    msgJson[attribute_name] = json.loads(attribute_value)
+                    try:
+                        msgJson[attribute_name] = json.loads(attribute_value.replace("'", '"'))                            
+                    except Exception as ex:
+                        trace_exception(ex)
+                        msgJson[attribute_name] = None
                 else:
                     msgJson[attribute_name] = attribute_value
             else:
@@ -647,7 +748,7 @@ class Message:
         return msgJson
 
 class Discussion:
-    def __init__(self, lollms:LoLLMsCom, discussion_id, discussions_db:DiscussionsDB):
+    def __init__(self, lollms:LoLLMsCom, discussion_id:int, discussions_db:DiscussionsDB):
         self.lollms = lollms
         self.current_message = None
         self.discussion_id = discussion_id
@@ -725,7 +826,7 @@ class Discussion:
                     try:
                         self.vectorizer.remove_document(fn)
                         if callback is not None:
-                            callback("File removed successfully",MSG_TYPE.MSG_TYPE_INFO)
+                            callback("File removed successfully",MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
                         return True
                     except ValueError as ve:
                         ASCIIColors.error(f"Couldn't remove the file")
@@ -778,7 +879,7 @@ class Discussion:
         if path.suffix in [".wav",".mp3"]:
             self.audio_files.append(path)
             if process:
-                self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
+                self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT)
                 if self.lollms.stt is None:
                     self.lollms.info("Please select an stt engine in the services settings first")
                 self.lollms.info(f"Transcribing ... ")
@@ -799,7 +900,7 @@ class Discussion:
                     pth = str(view_file).replace("\\","/").split('/')
                     if "discussion_databases" in pth:
                         pth = discussion_path_to_url(view_file)
-                        self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_TYPE.MSG_TYPE_FULL)
+                        self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT)
                         output = f'<img src="{pth}" width="800">\n\n'
                         self.lollms.full(output, client_id=client.client_id)
                         self.lollms.close_message(client.client_id if client is not None else 0)
@@ -827,7 +928,7 @@ class Discussion:
                     ASCIIColors.error("Couldn't create new message")
             ASCIIColors.info("Received image file")
             if callback is not None:
-                callback("Image file added successfully", MSG_TYPE.MSG_TYPE_INFO)
+                callback("Image file added successfully", MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
         else:
             try:
                 # self.ShowBlockingMessage("Adding file to vector store.\nPlease stand by")
@@ -845,7 +946,7 @@ class Discussion:
                     self.vectorizer.add_document(path.stem, data, path, True)
                     self.vectorizer.build_index()
                     if callback is not None:
-                        callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
+                        callback("File added successfully",MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
                     self.lollms.HideBlockingMessage(client.client_id)
                     return True
             except Exception as e:
@@ -866,15 +967,16 @@ class Discussion:
                     self, 
                     message_type,
                     sender_type,
-                    sender,
-                    content,
+                    sender:str,
+                    content:str,
+                    steps:list,
                     metadata=None,
-                    ui=None,
-                    rank=0, 
+                    ui:str|None=None,
+                    rank:int=0, 
                     parent_message_id=0, 
-                    binding="", 
-                    model ="", 
-                    personality="", 
+                    binding:str="", 
+                    model:str ="", 
+                    personality:str="", 
                     created_at=None, 
                     started_generating_at=None,
                     finished_generating_at=None,
@@ -908,6 +1010,7 @@ class Discussion:
             sender_type,
             sender,
             content,
+            steps,
             metadata,
             ui,
             rank,
@@ -1017,7 +1120,7 @@ class Discussion:
             f"DELETE FROM discussion WHERE id={self.discussion_id}"
         )
 
-    def get_messages(self):
+    def get_messages(self)->List[Message]:
         """Gets a list of messages information
 
         Returns:
@@ -1061,6 +1164,44 @@ class Discussion:
             new_content (str): The nex message content
         """
         self.current_message.update(new_content, new_metadata, new_ui, started_generating_at, nb_tokens)
+
+    def update_message_content(self, new_content, started_generating_at=None, nb_tokens=None):
+        """Updates the content of a message
+
+        Args:
+            message_id (int): The id of the message to be changed
+            new_content (str): The nex message content
+        """
+        self.current_message.update_content(new_content, started_generating_at, nb_tokens)
+
+    def update_message_steps(self, steps):
+        """Updates the content of a message
+
+        Args:
+            message_id (int): The id of the message to be changed
+            new_content (str): The nex message content
+        """
+        self.current_message.update_steps(new_content, started_generating_at, nb_tokens)
+    
+
+
+    def update_message_metadata(self, new_metadata):
+        """Updates the content of a message
+
+        Args:
+            message_id (int): The id of the message to be changed
+            new_content (str): The nex message content
+        """
+        self.current_message.update_metadata(new_metadata)
+
+    def update_message_ui(self, new_ui):
+        """Updates the content of a message
+
+        Args:
+            message_id (int): The id of the message to be changed
+            new_content (str): The nex message content
+        """
+        self.current_message.update_ui(new_ui)
 
     def edit_message(self, message_id, new_content, new_metadata=None, new_ui=None):
         """Edits the content of a message

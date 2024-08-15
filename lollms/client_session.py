@@ -4,7 +4,7 @@ from lollms.paths import LollmsPaths
 from threading import Thread
 
 class Client:
-    def __init__(self, lollms_paths:LollmsPaths, client_id, discussion:Discussion, db:DiscussionsDB):
+    def __init__(self, lollms_paths:LollmsPaths, client_id:str, discussion:Discussion, db:DiscussionsDB):
         self.client_id = client_id
         self.discussion = discussion
         self.lollms_paths = lollms_paths

@@ -8,17 +8,6 @@ description:
 """
 
 from fastapi import APIRouter, Request
-from fastapi import HTTPException
-from pydantic import BaseModel
-import pkg_resources
-from lollms.server.elf_server import LOLLMSElfServer
-from fastapi.responses import FileResponse
-from lollms.binding import BindingBuilder, InstallOption
-from ascii_colors import ASCIIColors
-from lollms.personality import MSG_TYPE, AIPersonality
-from lollms.types import MSG_TYPE, SENDER_TYPES
-from lollms.utilities import load_config, trace_exception, gc
-from lollms.utilities import find_first_available_file_index, convert_language_name, run_async
 from lollms_webui import LOLLMSWebUI
 from pathlib import Path
 from typing import List

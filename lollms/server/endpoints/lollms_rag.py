@@ -27,7 +27,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Header
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
-from lollms.types import MSG_TYPE
+from lollms.types import MSG_OPERATION_TYPE
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception
 from lollms.security import sanitize_path, check_access
 from ascii_colors import ASCIIColors

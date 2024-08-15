@@ -14,7 +14,7 @@ from lollms.server.elf_server import LOLLMSElfServer
 from fastapi.responses import FileResponse
 from lollms.binding import BindingBuilder, InstallOption
 from ascii_colors import ASCIIColors
-from lollms.personality import MSG_TYPE, AIPersonality
+from lollms.personality import  AIPersonality
 from lollms.types import SENDER_TYPES
 from lollms.utilities import load_config, trace_exception, gc, terminate_thread, run_async
 from pathlib import Path
@@ -95,11 +95,11 @@ def add_events(sio:socketio):
                     # Raw text generation
                     lollmsElfServer.answer = {"full_text":""}
                     def callback(text, message_type: MSG_TYPE, metadata:dict={}):
-                        if message_type == MSG_TYPE.MSG_TYPE_CHUNK:
+                        if message_type == MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK:
                             ASCIIColors.success(f"generated: {len(lollmsElfServer.answer['full_text'].split())} words", end='\r')
                             if text is not None:
                                 lollmsElfServer.answer["full_text"] = lollmsElfServer.answer["full_text"] + text
-                                run_async(partial(lollmsElfServer.sio.emit,'text_chunk', {'chunk': text, 'type':MSG_TYPE.MSG_TYPE_CHUNK.value}, to=client_id))
+                                run_async(partial(lollmsElfServer.sio.emit,'text_chunk', {'chunk': text, 'type':MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK.value}, to=client_id))
                         if client_id in lollmsElfServer.session.clients.keys():# Client disconnected                      
                             if client.requested_stop:
                                 return False
@@ -169,7 +169,7 @@ def add_events(sio:socketio):
                         full_discussion = personality.personality_conditioning + ''.join(full_discussion_blocks)
 
                         def callback(text, message_type: MSG_TYPE, metadata:dict={}):
-                            if message_type == MSG_TYPE.MSG_TYPE_CHUNK:
+                            if message_type == MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK:
                                 lollmsElfServer.answer["full_text"] = lollmsElfServer.answer["full_text"] + text
                                 run_async(partial(lollmsElfServer.sio.emit,'text_chunk', {'chunk': text}, to=client_id))
                             try:
@@ -256,7 +256,7 @@ def add_events(sio:socketio):
                 nb_tokens = None
             created_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')            
             message = lollmsElfServer.session.get_client(client_id).discussion.add_message(
-                message_type    = MSG_TYPE.MSG_TYPE_FULL.value,
+                message_type    = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT.value,
                 sender_type     = SENDER_TYPES.SENDER_TYPES_USER.value,
                 sender          = ump.replace(lollmsElfServer.config.discussion_prompt_separator,"").replace(":",""),
                 content=prompt,

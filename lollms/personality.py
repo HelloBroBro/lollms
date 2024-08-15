@@ -33,7 +33,7 @@ import subprocess
 import yaml
 from ascii_colors import ASCIIColors
 import time
-from lollms.types import MSG_TYPE, SUMMARY_MODE
+from lollms.types import MSG_OPERATION_TYPE, SUMMARY_MODE
 import json
 from typing import Any, List, Optional, Type, Callable, Dict, Any, Union
 import json
@@ -118,7 +118,7 @@ class AIPersonality:
                     ignore_discussion_documents_rag=False,
                     is_relative_path=True,
                     installation_option:InstallOption=InstallOption.INSTALL_IF_NECESSARY,
-                    callback: Callable[[str, MSG_TYPE, dict, list], bool]=None
+                    callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None
                 ):
         """
         Initialize an AIPersonality instance.
@@ -298,7 +298,7 @@ class AIPersonality:
 
 
 
-    def new_message(self, message_text:str, message_type:MSG_TYPE= MSG_TYPE.MSG_TYPE_FULL, metadata=[], callback: Callable[[str, int, dict, list, Any], bool]=None):
+    def new_message(self, message_text:str, message_type:MSG_OPERATION_TYPE= MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT, metadata=[], callback: Callable[[str, int, dict, list, Any], bool]=None):
         """This sends step rogress to front end
 
         Args:
@@ -309,9 +309,9 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(message_text, MSG_TYPE.MSG_TYPE_NEW_MESSAGE, parameters={'type':message_type.value,'metadata':metadata}, personality=self)
+            callback(message_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_NEW_MESSAGE, parameters={'type':message_type.value,'metadata':metadata}, personality=self)
 
-    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def set_message_content(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end
 
         Args:
@@ -322,9 +322,9 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_FULL)
+            callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT)
 
-    def ui(self, ui_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def ui(self, ui_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends ui text to front end
 
         Args:
@@ -335,10 +335,10 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(ui_text, MSG_TYPE.MSG_TYPE_UI)
+            callback(ui_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_UI)
 
 
-    def full_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def set_message_content_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end (INVISIBLE to AI)
 
         Args:
@@ -349,9 +349,9 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_AI)
+            callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_AI)
 
-    def full_invisible_to_user(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def set_message_content_invisible_to_user(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end (INVISIBLE to user)
 
         Args:
@@ -362,7 +362,7 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_USER)
+            callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_USER)
 
 
     def build_prompt(self, prompt_parts:List[str], sacrifice_id:int=-1, context_size:int=None, minimum_spare_context_size:int=None):
@@ -533,7 +533,7 @@ class AIPersonality:
             ASCIIColors.red("Model failed to rank inputs")
             return None
 
-    def step_start(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def step_start(self, step_text, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This triggers a step start
 
         Args:
@@ -544,7 +544,7 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_START)
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_START)
 
     def step_end(self, step_text, status=True, callback: Callable[[str, int, dict, list], bool]=None):
         """This triggers a step end
@@ -557,9 +557,9 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_END, {'status':status})
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_END_SUCCESS)
 
-    def step(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def step(self, step_text, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This triggers a step information
 
         Args:
@@ -575,7 +575,7 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP)
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP)
 
     def print_prompt(self, title, prompt):
         ASCIIColors.red("*-*-*-*-*-*-*-* ", end="")
@@ -696,14 +696,14 @@ class AIPersonality:
 
 
 
-    def process(self, text:str, message_type:MSG_TYPE, callback=None, show_progress=False):
+    def process(self, text:str, message_type:MSG_OPERATION_TYPE, callback=None, show_progress=False):
         if callback is None:
             callback = self.callback
         if text is None:
             return True
-        if message_type==MSG_TYPE.MSG_TYPE_CHUNK:
+        if message_type==MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK:
             bot_says = self.bot_says + text
-        elif  message_type==MSG_TYPE.MSG_TYPE_FULL:
+        elif  message_type==MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT:
             bot_says = text
 
         if show_progress:
@@ -773,7 +773,7 @@ class AIPersonality:
         
         return self.bot_says
 
-    def setCallback(self, callback: Callable[[str, MSG_TYPE, dict, list], bool]):
+    def setCallback(self, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]):
         self.callback = callback
         if self._processor:
             self._processor.callback = callback
@@ -967,7 +967,7 @@ class AIPersonality:
                     try:
                         self.vectorizer.remove_document(fn)
                         if callback is not None:
-                            callback("File removed successfully",MSG_TYPE.MSG_TYPE_INFO)
+                            callback("File removed successfully",MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
                         return True
                     except ValueError as ve:
                         ASCIIColors.error(f"Couldn't remove the file")
@@ -1018,7 +1018,7 @@ class AIPersonality:
                     f.write(text)
 
                 self.info(f"File saved to {transcription_fn}")
-                self.full(text)
+                self.set_message_content(text)
         elif path.suffix in [".png",".jpg",".jpeg",".gif",".bmp",".svg",".webp"]:
             self.image_files.append(path)
             if process:
@@ -1027,9 +1027,9 @@ class AIPersonality:
                         pth = str(path).replace("\\","/").split('/')
                         if "discussion_databases" in pth:
                             pth = discussion_path_to_url(path)
-                            self.new_message("",MSG_TYPE.MSG_TYPE_FULL)
+                            self.new_message("",MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT)
                             output = f'<img src="{pth}" width="800">\n\n'
-                            self.full(output)
+                            self.set_message_content(output)
                             self.app.close_message(client.client_id if client is not None else 0)
 
                         if self.model.binding_type not in [BindingType.TEXT_IMAGE, BindingType.TEXT_IMAGE_VIDEO]:
@@ -1040,7 +1040,7 @@ class AIPersonality:
                             img = img.convert("RGB")
                             output += "## image description :\n"+ self.model.interrogate_blip([img])[0]
                             # output += "## image description :\n"+ self.model.qna_blip([img],"q:Describe this photo with as much details as possible.\na:")[0]
-                            self.full(output)
+                            self.set_message_content(output)
                             self.app.close_message(client.client_id if client is not None else 0)
                             self.HideBlockingMessage("Understanding image (please wait)")
                             if self.config.debug:
@@ -1055,7 +1055,7 @@ class AIPersonality:
                         ASCIIColors.error("Couldn't create new message")
             ASCIIColors.info("Received image file")
             if callback is not None:
-                callback("Image file added successfully", MSG_TYPE.MSG_TYPE_INFO)
+                callback("Image file added successfully", MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
         else:
             try:
                 # self.ShowBlockingMessage("Adding file to vector store.\nPlease stand by")
@@ -1075,7 +1075,7 @@ class AIPersonality:
                     self.vectorizer.add_document(path.stem, data, path, True)
                     self.vectorizer.build_index()
                     if callback is not None:
-                        callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
+                        callback("File added successfully",MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
                     self.HideBlockingMessage(client.client_id)
                     return True
             except Exception as e:
@@ -2030,7 +2030,7 @@ class StateMachine:
 
 
 
-    def process_state(self, command, full_context, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, context_state:dict=None, client:Client=None):
+    def process_state(self, command, full_context, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None, context_state:dict=None, client:Client=None):
         """
         Process the given command based on the current state.
 
@@ -2253,7 +2253,7 @@ class APScript(StateMachine):
 
         """
         try:
-            self.process_state(command, "", self.callback, client)
+            self.process_state(command, "", self.callback, context_state=None, client= client)
         except Exception as ex:
             trace_exception(ex)
             self.warning(f"Couldn't execute command {command}")
@@ -2322,7 +2322,7 @@ class APScript(StateMachine):
     def add_file(self, path, client:Client, callback=None, process=True):
         self.personality.add_file(path, client=client,callback=callback, process=process)
         if callback is not None:
-            callback("File added successfully",MSG_TYPE.MSG_TYPE_INFO)
+            callback("File added successfully",MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_INFO)
         return True
 
     def remove_file(self, path):
@@ -2385,7 +2385,7 @@ class APScript(StateMachine):
         return self.personality.generate(prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
 
 
-    def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, context_details:dict=None, client:Client=None):
+    def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None, context_details:dict=None, client:Client=None):
         """
         This function generates code based on the given parameters.
 
@@ -2865,29 +2865,29 @@ class APScript(StateMachine):
             prompt_parts[sacrifice_id] = sacrifice_text
             return self.separator_template.join([s for s in prompt_parts if s!=""])
     # ================================================= Sending commands to ui ===========================================
-    def add_collapsible_entry(self, title, content, subtitle=""):
-        return "\n".join(
-            [
-                f'<details class="flex w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 mb-3.5 max-w-full svelte-1escu1z" open="">',
-                f'    <summary class="grid w-full select-none grid-cols-[40px,1fr] items-center gap-2.5 p-2 svelte-1escu1z">',
-                f'        <dl class="leading-4">',
-                f'          <dd class="text-sm"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right">',
-                f'          <line x1="5" y1="12" x2="19" y2="12"></line>',
-                f'          <polyline points="12 5 19 12 12 19"></polyline>',
-                f'          </svg>',
-                f'          </dd>',
-                f'        </dl>',
-                f'        <dl class="leading-4">',
-                f'        <dd class="text-sm"><h3>{title}</h3></dd>',
-                f'        <dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">{subtitle}</dt>',
-                f'        </dl>',
-                f'    </summary>',
-                f' <div class="content px-5 pb-5 pt-4">',
-                content,
-                f' </div>',
-                f' </details>\n'
-            ]
-        )
+    def add_collapsible_entry(self, title, content, subtitle="", open_by_default=False):
+        open_attr = 'open' if open_by_default else ''
+        return "\n".join([
+            f'<details class="w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 mb-4 transition-all duration-300 ease-in-out hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400" {open_attr}>',
+            f'    <summary class="flex items-center justify-between p-4 cursor-pointer select-none transition-all duration-300 ease-in-out">',
+            f'        <div class="flex items-center space-x-3">',
+            f'            <div class="flex-shrink-0">',
+            f'                <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-300 transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">',
+            f'                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />',
+            f'                </svg>',
+            f'            </div>',
+            f'            <div>',
+            f'                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>',
+            f'                <p class="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>',
+            f'            </div>',
+            f'        </div>',
+            f'    </summary>',
+            f'    <div class="px-4 pb-4 pt-2 text-gray-700 dark:text-gray-300 transition-all duration-300 ease-in-out max-h-0 overflow-hidden group-open:max-h-40">',
+            f'      <p>{content}</p>',
+            f'    </div>',
+            f'</details>\n'
+        ])
+
 
 
     def internet_search_with_vectorization(self, query, quick_search:bool=False ):
@@ -2918,7 +2918,7 @@ class APScript(StateMachine):
         return chunks
 
 
-    def step_start(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def step_start(self, step_text, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This triggers a step start
 
         Args:
@@ -2929,7 +2929,7 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_START)
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_START)
 
     def step_end(self, step_text, status=True, callback: Callable[[str, int, dict, list], bool]=None):
         """This triggers a step end
@@ -2942,9 +2942,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_END, {'status':status})
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_END_SUCCESS if status else MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_END_FAILURE)
 
-    def step(self, step_text, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def step(self, step_text, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This triggers a step information
 
         Args:
@@ -2960,9 +2960,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP)
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP)
 
-    def exception(self, ex, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def exception(self, ex, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends exception to the client
 
         Args:
@@ -2978,9 +2978,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(str(ex), MSG_TYPE.MSG_TYPE_EXCEPTION)
+            callback(str(ex), MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_EXCEPTION)
 
-    def warning(self, warning:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def warning(self, warning:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends exception to the client
 
         Args:
@@ -2996,7 +2996,7 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(warning, MSG_TYPE.MSG_TYPE_EXCEPTION)
+            callback(warning, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_EXCEPTION)
 
 
     def json(self, title:str, json_infos:dict, callback: Callable[[str, int, dict, list], bool]=None, indent=4):
@@ -3015,9 +3015,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback("", MSG_TYPE.MSG_TYPE_JSON_INFOS, metadata = [{"title":title, "content":json.dumps(json_infos, indent=indent)}])
+            callback("", MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_JSON_INFOS, metadata = [{"title":title, "content":json.dumps(json_infos, indent=indent)}])
 
-    def ui(self, html_ui:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def ui(self, html_ui:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends ui elements to front end
 
         Args:
@@ -3033,10 +3033,10 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(html_ui, MSG_TYPE.MSG_TYPE_UI)
+            callback(html_ui, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_UI)
 
 
-    def ui_in_iframe(self, html_ui:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def ui_in_iframe(self, html_ui:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends ui elements to front end inside an iframe
 
         Args:
@@ -3053,13 +3053,13 @@ class APScript(StateMachine):
 
         if callback:
             iframe_html = f'<iframe class="w-full" srcdoc="{html_ui}" style="width:100%; height:100%; border:none;"></iframe>'
-            callback(iframe_html, MSG_TYPE.MSG_TYPE_UI)
+            callback(iframe_html, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_UI)
 
 
 
 
 
-    def code(self, code:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def code(self, code:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends code to front end
 
         Args:
@@ -3075,9 +3075,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(code, MSG_TYPE.MSG_TYPE_CODE)
+            callback(code, MSG_OPERATION_TYPE.MSG_TYPE_CODE)
 
-    def chunk(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def chunk(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end
 
         Args:
@@ -3088,10 +3088,10 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_CHUNK)
+            callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK)
 
 
-    def full(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None, msg_type:MSG_TYPE = MSG_TYPE.MSG_TYPE_FULL):
+    def set_message_content(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None, msg_type:MSG_OPERATION_TYPE = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT):
         """This sends full text to front end
 
         Args:
@@ -3104,7 +3104,7 @@ class APScript(StateMachine):
         if callback:
             callback(full_text, msg_type)
 
-    def full_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def set_message_content_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end (INVISIBLE to AI)
 
         Args:
@@ -3115,9 +3115,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_AI)
+            callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_AI)
 
-    def full_invisible_to_user(self, full_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def set_message_content_invisible_to_user(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends full text to front end (INVISIBLE to user)
 
         Args:
@@ -3128,7 +3128,7 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(full_text, MSG_TYPE.MSG_TYPE_FULL_INVISIBLE_TO_USER)
+            callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_USER)
 
 
 
@@ -3752,7 +3752,7 @@ class APScript(StateMachine):
                 verbose=verbose
             )
 
-    def info(self, info_text:str, callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def info(self, info_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends info text to front end
 
         Args:
@@ -3763,9 +3763,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(info_text, MSG_TYPE.MSG_TYPE_FULL)
+            callback(info_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT)
 
-    def step_progress(self, step_text:str, progress:float, callback: Callable[[str, MSG_TYPE, dict, list, AIPersonality], bool]=None):
+    def step_progress(self, step_text:str, progress:float, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list, AIPersonality], bool]=None):
         """This sends step rogress to front end
 
         Args:
@@ -3776,9 +3776,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(step_text, MSG_TYPE.MSG_TYPE_STEP_PROGRESS, {'progress':progress})
+            callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_PROGRESS, {'progress':progress})
 
-    def new_message(self, message_text:str, message_type:MSG_TYPE= MSG_TYPE.MSG_TYPE_FULL, metadata=[], callback: Callable[[str, int, dict, list, AIPersonality], bool]=None):
+    def new_message(self, message_text:str, message_type:MSG_OPERATION_TYPE= MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT, metadata=[], callback: Callable[[str, int, dict, list, AIPersonality], bool]=None):
         """This sends step rogress to front end
 
         Args:
@@ -3789,9 +3789,9 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(message_text, MSG_TYPE.MSG_TYPE_NEW_MESSAGE, parameters={'type':message_type.value,'metadata':metadata},personality = self.personality)
+            callback(message_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_NEW_MESSAGE, metadata , personality = self.personality)
 
-    def finished_message(self, message_text:str="", callback: Callable[[str, MSG_TYPE, dict, list], bool]=None):
+    def finished_message(self, message_text:str="", callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
         """This sends step rogress to front end
 
         Args:
@@ -3802,7 +3802,7 @@ class APScript(StateMachine):
             callback = self.callback
 
         if callback:
-            callback(message_text, MSG_TYPE.MSG_TYPE_FINISHED_MESSAGE)
+            callback(message_text, MSG_OPERATION_TYPE.MSG_TYPE_FINISHED_MESSAGE)
 
     def print_prompt(self, title, prompt):
         ASCIIColors.red("*-*-*-*-*-*-*-* ", end="")
@@ -3921,7 +3921,7 @@ class APScript(StateMachine):
         if context_details["is_continue"]:
             out = context_details["previous_chunk"] + out
         if send_full:
-            self.full(out)
+            self.set_message_content(out)
         return out
     
     def generate_with_function_calls(self, context_details: dict, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
@@ -4179,7 +4179,7 @@ class APScript(StateMachine):
             nested_function_calls += 1
             self.chunk("\n") 
             if hide_function_call:
-                self.full("") #Hide function 
+                self.set_message_content("") #Hide function 
 
             if self.config.debug:
                 self.print_prompt("Function calls", json.dumps(function_calls, indent=4))
@@ -4189,7 +4189,7 @@ class APScript(StateMachine):
             out +=  f"{self.separator_template}"+ self.system_custom_header('function calls results') + final_output + "\n"
             if prompt_after_execution:
                 if separate_output:
-                    self.full(final_output)
+                    self.set_message_content(final_output)
                     self.new_message("")
                 context_details["discussion_messages"] +=out
                 if len(self.personality.image_files)>0:
