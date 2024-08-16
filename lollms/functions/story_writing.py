@@ -118,7 +118,7 @@ def start_writing_story(
         )
         plan_response = llm.fast_gen(plan_prompt).strip()
         llm.step_end("Building the story architecture")
-        llm.chunk("\n")
+        llm.add_chunk_to_message_content("\n")
         # Extract JSON code block from the response
         code_blocks = llm.extract_code_blocks(plan_response)
         if not code_blocks:

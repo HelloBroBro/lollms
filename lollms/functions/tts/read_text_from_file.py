@@ -32,7 +32,7 @@ def read_text_from_file(file_path: Union[Path, str], tts_module:LollmsTTS, llm:A
         
         # Generate audio from the text
         audio_file_path = tts_module.tts_audio(text,use_threading=True)
-        llm.full(text)
+        llm.set_message_content(text)
         
         # Return the path to the generated audio file
         return str(audio_file_path)

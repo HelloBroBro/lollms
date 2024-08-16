@@ -36,13 +36,13 @@ def add_events(sio:socketio):
         try:
             if not lollmsElfServer.personality.processor is None:
                 file.save(save_path)
-                lollmsElfServer.personality.processor.add_file(save_path, partial(lollmsElfServer.process_chunk, client_id = sid))
+                lollmsElfServer.personality.processor.add_file(save_path, partial(lollmsElfServer.process_data, client_id = sid))
                 # File saved successfully
                 run_async(partial(sio.emit,'progress', {'status':True, 'progress': 100}))
 
             else:
                 file.save(save_path)
-                lollmsElfServer.personality.add_file(save_path, partial(lollmsElfServer.process_chunk, client_id = sid))
+                lollmsElfServer.personality.add_file(save_path, partial(lollmsElfServer.process_data, client_id = sid))
                 # File saved successfully
                 run_async(partial(sio.emit,'progress', {'status':True, 'progress': 100}))
         except Exception as e:

@@ -902,7 +902,7 @@ class Discussion:
                         pth = discussion_path_to_url(view_file)
                         self.lollms.new_message(client.client_id if client is not None else 0, content = "", message_type = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT)
                         output = f'<img src="{pth}" width="800">\n\n'
-                        self.lollms.full(output, client_id=client.client_id)
+                        self.lollms.set_message_content(output, client_id=client.client_id)
                         self.lollms.close_message(client.client_id if client is not None else 0)
 
                     if self.lollms.model.binding_type not in [BindingType.TEXT_IMAGE, BindingType.TEXT_IMAGE_VIDEO]:
@@ -913,7 +913,7 @@ class Discussion:
                         img = img.convert("RGB")
                         output += "## image description :\n"+ self.lollms.model.interrogate_blip([img])[0]
                         # output += "## image description :\n"+ self.lollms.model.qna_blip([img],"q:Describe this photo with as much details as possible.\na:")[0]
-                        self.lollms.full(output)
+                        self.lollms.set_message_content(output)
                         self.lollms.close_message(client.client_id if client is not None else 0)
                         self.lollms.HideBlockingMessage("Understanding image (please wait)")
                         if self.lollms.config.debug:

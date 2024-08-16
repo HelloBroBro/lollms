@@ -25,7 +25,7 @@ def read_text(text: str, tts_module:LollmsTTS, llm:APScript) -> str:
     try:        
         # Generate audio from the text
         audio_file_path = tts_module.tts_audio(text)
-        llm.chunk(text)
+        llm.add_chunk_to_message_content(text)
         llm.new_message("")
         
         # Return the path to the generated audio file

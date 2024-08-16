@@ -1,6 +1,6 @@
 
 import sys
-from typing import Callable, List, Dict, Any, Optional
+from typing import Callable, Any, List, Dict, Any, Optional
 from functools import partial
 from datetime import datetime
 from ascii_colors import ASCIIColors
@@ -13,7 +13,7 @@ from lollmsvectordb.directory_binding import DirectoryBinding
 import hashlib
 import json
 class TasksLibrary:
-    def __init__(self, lollms:LoLLMsCom, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None) -> None:
+    def __init__(self, lollms:LoLLMsCom, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None) -> None:
         self.lollms = lollms
         self.config = lollms.config
         self.callback = callback
@@ -226,7 +226,7 @@ class TasksLibrary:
         return gen    
     
     # Communications with the user
-    def step_start(self, step_text, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def step_start(self, step_text, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This triggers a step start
 
         Args:
@@ -252,7 +252,7 @@ class TasksLibrary:
         if callback:
             callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_END_SUCCESS if status else MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_END_FAILURE)
 
-    def step(self, step_text, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def step(self, step_text, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This triggers a step information
 
         Args:
@@ -270,7 +270,7 @@ class TasksLibrary:
         if callback:
             callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP)
 
-    def exception(self, ex, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def exception(self, ex, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends exception to the client
 
         Args:
@@ -288,7 +288,7 @@ class TasksLibrary:
         if callback:
             callback(str(ex), MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_EXCEPTION)
 
-    def warning(self, warning:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def warning(self, warning:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends exception to the client
 
         Args:
@@ -306,7 +306,7 @@ class TasksLibrary:
         if callback:
             callback(warning, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_EXCEPTION)
 
-    def info(self, info:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def info(self, info:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends exception to the client
 
         Args:
@@ -342,7 +342,7 @@ class TasksLibrary:
         if callback:
             callback("", MSG_OPERATION_TYPE.MSG_TYPE_JSON_INFOS, metadata = [{"title":title, "content":json.dumps(json_infos, indent=indent)}])
 
-    def ui(self, html_ui:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def ui(self, html_ui:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends ui elements to front end
 
         Args:
@@ -360,7 +360,7 @@ class TasksLibrary:
         if callback:
             callback(html_ui, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_UI)
 
-    def code(self, code:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def code(self, code:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends code to front end
 
         Args:
@@ -378,7 +378,7 @@ class TasksLibrary:
         if callback:
             callback(code, MSG_OPERATION_TYPE.MSG_TYPE_CODE)
 
-    def chunk(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def add_chunk_to_message_content(self, full_text:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends full text to front end
 
         Args:
@@ -392,7 +392,7 @@ class TasksLibrary:
             callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK)
 
 
-    def set_message_content(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None, msg_type:MSG_OPERATION_TYPE = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT):
+    def set_message_content(self, full_text:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None, msg_type:MSG_OPERATION_TYPE = MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT):
         """This sends full text to front end
 
         Args:
@@ -405,7 +405,7 @@ class TasksLibrary:
         if callback:
             callback(full_text, msg_type)
 
-    def set_message_content_invisible_to_ai(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def set_message_content_invisible_to_ai(self, full_text:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends full text to front end (INVISIBLE to AI)
 
         Args:
@@ -418,7 +418,7 @@ class TasksLibrary:
         if callback:
             callback(full_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT_INVISIBLE_TO_AI)
 
-    def set_message_content_invisible_to_user(self, full_text:str, callback: Callable[[str, MSG_OPERATION_TYPE, dict, list], bool]=None):
+    def set_message_content_invisible_to_user(self, full_text:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends full text to front end (INVISIBLE to user)
 
         Args:

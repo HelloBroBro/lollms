@@ -9,7 +9,7 @@
 from fastapi import Request
 from typing import Dict, Any
 from pathlib import Path
-from typing import Callable
+from typing import Callable, Any
 from lollms.paths import LollmsPaths
 from ascii_colors import ASCIIColors
 from urllib import request

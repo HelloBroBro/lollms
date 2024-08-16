@@ -1,7 +1,7 @@
 from pathlib import Path
 from lollms.personality import APScript
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
-from safe_store.text_vectorizer import TextVectorizer
+from lollmsvectordb import VectorDatabase
 import json
 import re
 def remove_indexing_from_markdown(markdown_text):
@@ -34,7 +34,7 @@ def find_available_file(folder_path):
         i += 1
 
 
-def buildKnowledgeDB(llm:APScript, data_store:TextVectorizer, data_folder_path:str, output_folder:str, questions_gen_size:int, answer_gen_size:int):
+def buildKnowledgeDB(llm:APScript, data_store:VectorDatabase, data_folder_path:str, output_folder:str, questions_gen_size:int, answer_gen_size:int):
     output_folder = Path(output_folder)
     output_folder.mkdir(parents=True, exist_ok=True)
     # Verify if the data_folder_path exists
@@ -46,26 +46,27 @@ def buildKnowledgeDB(llm:APScript, data_store:TextVectorizer, data_folder_path:s
     for file_path in document_files:
         if file_path.suffix in ['.pdf',".txt",".c",".cpp",".h",".py",".msg",".docx",".pptx",".md"]:
             print(file_path)
-            document_text = GenericDataLoader.read_file(file_path)
+            document_text = TextDocumentsLoader.read_file(file_path)
             data_store.add_document(file_path, document_text, chunk_size=512, overlap_size=128)
     llm.step_end(f"Loading files")
     # Index the vector store
     llm.step_start(f"Indexing files")
-    data_store.index()
+    data_store.build_index()
     llm.step_end(f"Indexing files")
     
     db_name = find_available_file(output_folder)
     output = "### Building questions:\n"
-    llm.full(output)
+    llm.set_message_content(output)
     # Iterate over all documents in data_folder_path
     processed_chunks = 0
     # Iterate over all chunks and extract text
     questions_vector = []
-    total_chunks = len(data_store.chunks.items())
-    for chunk_name, chunk in data_store.chunks.items():
-        chunk_text = chunk["chunk_text"]
+    chunks = data_store.get_all_chunks()
+    total_chunks = len(chunks)
+    for chunk in chunks:
+        chunk_text = chunk.text
         processed_chunks += 1
-        llm.step_start(f"Processing chunk {chunk_name}: {processed_chunks}/{total_chunks}")
+        llm.step_start(f"Processing chunk {chunk.chunk_id}: {processed_chunks}/{total_chunks}")
         # Build the prompt text with placeholders
         prompt_text = f"{llm.config.start_header_id_template}instruction: Generate questions or tasks that delve into the specific details and information presented in the text chunks. Please do not ask questions about the form of the text, and do not mention the text itllm in your questions. Make sure you format the output using Markdown with each question or task placed in a separate paragraph starting with __P__.\n{llm.config.separator_template}{llm.config.start_header_id_template}chunk {{chunk_name}}: {{chunk}}{llm.config.separator_template}{llm.config.start_header_id_template}Here are some questions and tasks to further explore the contents of the given text chunks:\n__P__"
         # Ask AI to generate questions
@@ -75,9 +76,9 @@ def buildKnowledgeDB(llm:APScript, data_store:TextVectorizer, data_folder_path:s
         generated_lines = [q.replace("__P__","") for q in generated_lines]
         generated_lines = [remove_indexing_from_markdown(q) for q in generated_lines]
         questions_vector.extend(generated_lines)
-        llm.step_end(f"Processing chunk {chunk_name}: {processed_chunks}/{total_chunks}")
-        output += "\n<".join(generated_lines) + "\n"
-        llm.full(output)
+        llm.step_end(f"Processing chunk {chunk.chunk_id}: {processed_chunks}/{total_chunks}")
+        output += "\n".join(generated_lines) + "\n"
+        llm.set_message_content(output)
     
     llm.step_start(f"Saving questions for future use")
     with open(output_folder/f"{db_name.split('.')[0]}_q.json", 'w') as file:
@@ -85,11 +86,11 @@ def buildKnowledgeDB(llm:APScript, data_store:TextVectorizer, data_folder_path:s
     llm.step_end(f"Saving questions for future use")
     
     output += "### Building answers:\n"
-    llm.full(output)
+    llm.set_message_content(output)
     qna_list=[]
     # Perform further processing with questions_vector
     for index, question in enumerate(questions_vector):
-        docs, sorted_similarities, document_ids = data_store.recover_text(question, top_k=int(llm.personality_config.data_vectorization_nb_chunks)) 
+        docs, sorted_similarities, document_ids = data_store.search(question, n_results=int(llm.personality_config.data_vectorization_nb_chunks)) 
         if llm.personality_config.use_enhanced_mode:
             llm.step_start(f"Verifying RAG data_{index}")
             prompt_text = """{llm.config.start_header_id_template}chunk: {{chunk}}
@@ -127,7 +128,7 @@ Be precise and helpful.
             "id":0
         })
         output += f"q:{question}\na:{answer}\n"
-        llm.full(output)
+        llm.set_message_content(output)
         llm.step_end(f"Asking question {index}/{len(questions_vector)}")
         with open(output_folder/db_name, 'w') as file:
             json.dump(qna_list, file)

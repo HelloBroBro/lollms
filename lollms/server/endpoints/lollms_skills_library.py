@@ -18,7 +18,6 @@ from lollms.databases.discussions_database import DiscussionsDB, Discussion
 from lollms.security import check_access
 from typing import List
 
-from safe_store.text_vectorizer import TextVectorizer, VectorizationMethod, VisualizationMethod
 import tqdm
 from pathlib import Path
 # ----------------------- Defining router and main class ------------------------------

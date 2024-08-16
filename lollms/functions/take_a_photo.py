@@ -115,7 +115,7 @@ def take_photo(processor, client, use_ui=False, use_a_single_photo_at_a_time=Tru
     client.discussion.image_files.append(fn)
     if use_a_single_photo_at_a_time:
         client.discussion.image_files = [client.discussion.image_files[-1]]
-    processor.full(f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>')
+    processor.set_message_content(f'<img src="{discussion_path_to_url(fn_view)}" width="80%"></img>')
     processor.new_message("")
     return "Image shot successful"
 

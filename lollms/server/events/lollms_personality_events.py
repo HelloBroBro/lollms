@@ -42,7 +42,7 @@ def add_events(sio:socketio):
         client.cancel_generation    = False
 
         try:
-            lollmsElfServer.personality.setCallback(partial(lollmsElfServer.process_chunk,client_id = client_id))
+            lollmsElfServer.personality.setCallback(partial(lollmsElfServer.process_data,client_id = client_id))
         except Exception as ex:
             trace_exception(ex)
 
@@ -109,9 +109,9 @@ def add_events(sio:socketio):
             lollmsElfServer.ShowBlockingMessage(f"File received {file_path.name}.\nVectorizing the data ...")
 
             if lollmsElfServer.personality.processor:
-                result = client.discussion.add_file(file_path, client, lollmsElfServer.tasks_library, partial(lollmsElfServer.process_chunk, client_id=client_id))
+                result = client.discussion.add_file(file_path, client, lollmsElfServer.tasks_library, partial(lollmsElfServer.process_data, client_id=client_id))
             else:
-                result = client.discussion.add_file(file_path, client, lollmsElfServer.tasks_library, partial(lollmsElfServer.process_chunk, client_id=client_id))
+                result = client.discussion.add_file(file_path, client, lollmsElfServer.tasks_library, partial(lollmsElfServer.process_data, client_id=client_id))
 
             ASCIIColors.success('File processed successfully')
             run_async(partial(sio.emit,'file_received', {'status': True, 'filename': filename}))
@@ -162,7 +162,7 @@ def add_events(sio:socketio):
                 lollmsElfServer.prepare_reception(client_id)
                 if lollmsElfServer.personality.processor is not None:
                     lollmsElfServer.start_time = datetime.now()
-                    lollmsElfServer.personality.processor.callback = partial(lollmsElfServer.process_chunk, client_id=client_id)
+                    lollmsElfServer.personality.processor.callback = partial(lollmsElfServer.process_data, client_id=client_id)
                     lollmsElfServer.personality.vectorizer = client.discussion.vectorizer
                     lollmsElfServer.personality.text_files = client.discussion.text_files
                     lollmsElfServer.personality.image_files = client.discussion.image_files

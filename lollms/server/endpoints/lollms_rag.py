@@ -128,6 +128,8 @@ async def add_document(doc: IndexDocument, user: str = Depends(get_current_user)
 async def remove_document(document_id: int, user: str = Depends(get_current_user)):
     user_id = get_user_id(user)
     vectorizer = get_user_vectorizer(user_id, user)
+    doc_hash = vectorizer.get_document_hash(document_id)
+    vectorizer.remove_document(doc_hash)
     # Logic to remove the document by ID
     return DocumentResponse(success=True, message="Document removed successfully.")
 

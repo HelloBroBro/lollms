@@ -106,6 +106,7 @@ async def edit_title(discussion_edit_title: DiscussionEditTitle):
         return {"status":False,"error":str(ex)}
 
 class DiscussionTitle(BaseModel):
+    client_id: str
     id: int
     
 @router.post("/make_title")
@@ -114,7 +115,7 @@ async def make_title(discussion_title: DiscussionTitle):
         ASCIIColors.info("Making title")
         discussion_id = discussion_title.id
         discussion = Discussion(lollmsElfServer, discussion_id, lollmsElfServer.db)
-        title = lollmsElfServer.make_discussion_title(discussion)
+        title = lollmsElfServer.make_discussion_title(discussion, discussion_title.client_id)
         discussion.rename(title)
         return {'status':True, 'title':title}
     except Exception as ex:

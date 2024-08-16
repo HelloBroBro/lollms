@@ -16,7 +16,7 @@ from lollms.tasks import TasksLibrary
 
 from lollmsvectordb.database_elements.chunk import Chunk
 from lollmsvectordb.vector_database import VectorDatabase
-from typing import Callable
+from typing import Callable, Any
 from pathlib import Path
 from datetime import datetime
 from functools import partial
@@ -576,7 +576,7 @@ class LollmsApplication(LoLLMsCom):
             
 
     
-    def process_chunk(
+    def process_data(
                         self, 
                         chunk:str, 
                         message_type,
@@ -900,7 +900,7 @@ class LollmsApplication(LoLLMsCom):
         system_message_template     = self.config.system_message_template
 
         if self.personality.callback is None:
-            self.personality.callback = partial(self.process_chunk, client_id=client_id)
+            self.personality.callback = partial(self.process_data, client_id=client_id)
         # Get the list of messages
         client = self.session.get_client(client_id)
         discussion = client.discussion
