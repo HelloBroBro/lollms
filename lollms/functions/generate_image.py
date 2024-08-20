@@ -61,7 +61,7 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
                 processor.personality.app.dalle = processor.personality.app.tti
                 processor.step_end("Loading dalle service")
             processor.step_start("Painting")
-            file = processor.personality.app.tti.paint(
+            file, infos = processor.personality.app.tti.paint(
                             prompt,
                             negative_prompt,
                             width = width,
@@ -80,7 +80,7 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
                 processor.personality.app.dalle = processor.personality.app.tti
                 processor.step_end("Loading comfyui service")
             processor.step_start("Painting")
-            file = processor.personality.app.tti.paint(
+            file, infos = processor.personality.app.tti.paint(
                             prompt,
                             negative_prompt,
                             width = width,
@@ -121,15 +121,16 @@ def build_image_from_simple_prompt(prompt, processor:APScript, client:Client, wi
     prompt = processor.build_prompt([
                     processor.system_full_header,
                     f"Act as artbot, the art prompt generation AI.",
-                    "Use the discussion information to come up with an image generation prompt without referring to it.",
+                    "Use the user prompt to come up with an image generation prompt without referring to it.",
                     f"Be precise and describe the style as well as the {production_type} description details.", #conditionning
                     "Do not explain the prompt, just answer with the prompt in the right prompting style.",
-                    processor.system_custom_header("discussion"),
+                    processor.system_custom_header("user prompt"),
+                    prompt,
                     processor.system_custom_header("Production type") + f"{production_type}",
                     processor.system_custom_header("Instruction") + f"Use the following as examples and follow their format to build the special prompt." if examples!="" else "",
                     processor.system_custom_header("Prompt examples") if examples!="" else "",
                     processor.system_custom_header("Examples") + f"{examples}",
-                    processor.system_custom_header("Prompt"),
+                    processor.system_custom_header("Prompt"),                    
     ],2)
     positive_prompt = processor.generate(prompt, max_generation_prompt_size, callback=processor.sink).strip().replace("</s>","").replace("<s>","")
     return build_image(positive_prompt, "", width, height, processor, client, "url_and_path")
