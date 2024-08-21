@@ -8,7 +8,7 @@ description:
 """
 from fastapi import APIRouter, Request
 from lollms.server.elf_server import LOLLMSElfServer
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_OPERATION_TYPE
 from lollms.main_config import BaseConfig
@@ -27,6 +27,8 @@ lollmsElfServer:LOLLMSElfServer = LOLLMSElfServer.get_instance()
 class Identification(BaseModel):
     client_id: str
 class ModelPost(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     client_id: str
     model_url: str
 # ----------------------- voice ------------------------------

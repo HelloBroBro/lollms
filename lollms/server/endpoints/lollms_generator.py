@@ -11,7 +11,7 @@ description:
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 from lollms.server.elf_server import LOLLMSElfServer
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from starlette.responses import StreamingResponse
 from lollms.types import MSG_OPERATION_TYPE
 from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception
@@ -80,6 +80,8 @@ async def lollms_detokenize(request: LollmsDeTokenizeRequest):
         return {"status":False,"error":str(ex)}
 
 class LollmsGenerateRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     prompt: str
     model_name: Optional[str] = None
     personality: Optional[int] = -1
@@ -223,6 +225,7 @@ async def lollms_generate(request: LollmsGenerateRequest):
 
 
 class LollmsGenerateRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())    
     prompt: str
     images: List[str]
     model_name: Optional[str] = None

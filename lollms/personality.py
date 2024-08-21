@@ -3916,11 +3916,11 @@ class APScript(StateMachine):
 
         return rounds_info
 
-    def answer(self, context_details, callback=None, send_full=True):
+    def answer(self, context_details, callback=None, send_full=True, custom_entries = ""):
         if context_details["is_continue"]:
-            full_prompt = self.build_prompt_from_context_details(context_details, suppress= ["ai_prefix"])
+            full_prompt = self.build_prompt_from_context_details(context_details, custom_entries=custom_entries, suppress= ["ai_prefix"])
         else:
-            full_prompt = self.build_prompt_from_context_details(context_details)
+            full_prompt = self.build_prompt_from_context_details(context_details, custom_entries=custom_entries)
 
         out = self.fast_gen(full_prompt)
         nb_tokens = len(self.personality.model.tokenize(out))
