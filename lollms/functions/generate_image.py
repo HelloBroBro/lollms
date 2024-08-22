@@ -104,7 +104,16 @@ def build_image(prompt, negative_prompt, width, height, processor:APScript, clie
             return f"Invalid return_format: {return_format}. Supported formats are 'markdown', 'url', 'path', and 'url_and_path'."
     except Exception as ex:
         trace_exception(ex)
-        return f"Couldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"
+        if return_format == "markdown":
+            return f"\nCouldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"
+        elif return_format == "url":
+            return None
+        elif return_format == "path":
+            return None
+        elif return_format == "url_and_path":
+            return {"url": None, "path": None, "error":ex}
+        else:
+            return f"Couldn't generate image. Make sure {processor.personality.config.active_tti_service} service is installed"
 
 
 def build_image_from_simple_prompt(prompt, processor:APScript, client:Client, width=1024, height=1024, examples_extraction_mathod="random", number_of_examples_to_recover=3, production_type="artwork", max_generation_prompt_size=1024):
