@@ -297,7 +297,6 @@ class AIPersonality:
         ASCIIColors.white(content)
 
 
-
     def new_message(self, message_text:str, message_type:MSG_OPERATION_TYPE= MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT, metadata=[], callback: Callable[[str, int, dict, list, Any], bool]=None):
         """This sends step rogress to front end
 
@@ -2535,7 +2534,7 @@ class APScript(StateMachine):
 
     def summarize_text(
                         self,
-                        text,
+                        text:str,
                         summary_instruction="summarize",
                         doc_name="chunk",
                         answer_start="",
@@ -3786,6 +3785,59 @@ class APScript(StateMachine):
         if callback:
             callback(step_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_STEP_PROGRESS, {'progress':progress})
 
+    def ask_user(self, question):
+        import tkinter as tk
+        from tkinter import simpledialog
+        root = tk.Tk()
+        root.withdraw()  # Hide the main window
+        
+        answer = simpledialog.askstring("Input", question, parent=root)
+        
+        root.destroy()  # Ensure the hidden root window is properly closed
+        
+        return answer        
+
+    def ask_user_yes_no(self, question):
+        import tkinter as tk
+        from tkinter import messagebox
+        root = tk.Tk()
+        root.withdraw()  # Hide the main window
+        
+        response = messagebox.askyesno("Question", question)
+        
+        root.destroy()  # Ensure the hidden root window is properly closed
+        
+        return response
+    def ask_user_multichoice_question(self, question, choices, default=None):
+        import tkinter as tk
+        from tkinter import ttk
+        def on_ok():
+            nonlocal result
+            result = var.get()
+            root.quit()
+
+        root = tk.Tk()
+        root.title("Question")
+        
+        frame = ttk.Frame(root, padding="10")
+        frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        
+        ttk.Label(frame, text=question).grid(column=0, row=0, sticky=tk.W, pady=5)
+        
+        var = tk.StringVar(value=default if default in choices else choices[0])
+        
+        for i, choice in enumerate(choices):
+            ttk.Radiobutton(frame, text=choice, variable=var, value=choice).grid(column=0, row=i+1, sticky=tk.W, padx=20)
+        
+        ttk.Button(frame, text="OK", command=on_ok).grid(column=0, row=len(choices)+1, pady=10)
+        
+        root.protocol("WM_DELETE_WINDOW", on_ok)  # Handle window close
+        
+        result = None
+        root.mainloop()
+        
+        return result   
+
     def new_message(self, message_text:str, message_type:MSG_OPERATION_TYPE= MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_SET_CONTENT, metadata=[], callback: Callable[[str, int, dict, list, AIPersonality], bool]=None):
         """This sends step rogress to front end
 
@@ -4221,20 +4273,20 @@ class APScript(StateMachine):
     def build_a_document_block(self, title="Title", link="", content="content"):
         if link != "":
             return f'''
-<div class="card">
-    <h3 class="text-gradient-title">
-        <a href="{link}" target="_blank" class="link">{title}</a>
+<div class="container mx-auto p-4 bg-white rounded-lg shadow-md">
+    <h3 class="text-2xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500">
+        <a href="{link}" target="_blank" class="hover:underline">{title}</a>
     </h3>
-    <pre class="text-subtitle">{content}</pre>
+    <div class="text-sm text-gray-700 whitespace-pre-wrap">{content}</div>
 </div>
 '''
         else:
             return f'''
-<div class="card">
-    <h3 class="text-gradient-title">
-        <p class="text-subtitle">{title}</p>
+<div class="container mx-auto p-4 bg-white rounded-lg shadow-md">
+    <h3 class="mb-2">
+        <p class="text-xl font-semibold bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-purple-500">{title}</p>
     </h3>
-    <pre class="text-subtitle">{content}</pre>
+    <div class="text-sm text-gray-700 whitespace-pre-wrap mt-2">{content}</div>
 </div>
 '''
 

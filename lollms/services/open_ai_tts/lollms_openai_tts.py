@@ -33,6 +33,9 @@ import shutil
 from tqdm import tqdm
 import threading
 from io import BytesIO
+import pipmaster as pm
+if not pm.is_installed("openai"):
+    pm.install("openai")
 from openai import OpenAI
 
 if not PackageManager.check_package_installed("sounddevice"):

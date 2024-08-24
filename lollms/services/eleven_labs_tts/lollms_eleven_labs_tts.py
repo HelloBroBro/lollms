@@ -5,35 +5,16 @@
 # 
 
 from pathlib import Path
-import sys
 from lollms.app import LollmsApplication
 from lollms.paths import LollmsPaths
-from lollms.config import TypedConfig, ConfigTemplate, BaseConfig
-import time
-import io
 import sys
 import requests
-import os
-import base64
-import subprocess
-import time
-import json
-import platform
-from dataclasses import dataclass
-from PIL import Image, PngImagePlugin
-from enum import Enum
 from typing import List, Dict, Any
 
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
 from lollms.utilities import PackageManager, find_next_available_filename
 from lollms.tts import LollmsTTS
-import subprocess
-import shutil
-from tqdm import tqdm
-import threading
-from io import BytesIO
-from openai import OpenAI
 
 if not PackageManager.check_package_installed("sounddevice"):
     PackageManager.install_package("sounddevice")
