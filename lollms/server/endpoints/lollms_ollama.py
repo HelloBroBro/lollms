@@ -41,7 +41,7 @@ def install_ollama(request: ClientAuthentication):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Installing ollama server\nPlease stand by")
-        from lollms.services.ollama.lollms_ollama import install_ollama
+        from lollms.services.ttt.ollama.lollms_ollama import install_ollama
         if install_ollama(lollmsElfServer):
             lollmsElfServer.HideBlockingMessage()
             return {"status":True}
@@ -61,7 +61,7 @@ def start_ollama(request: ClientAuthentication):
 
         if not hasattr(lollmsElfServer,"vllm") or lollmsElfServer.vllm is None:
             lollmsElfServer.ShowBlockingMessage("Loading vllm server\nPlease stand by")
-            from lollms.services.vllm.lollms_vllm import get_vllm
+            from lollms.services.ttt.vllm.lollms_vllm import get_vllm
             server = get_vllm(lollmsElfServer)
 
             if server:

@@ -349,7 +349,7 @@ class LollmsSD(LollmsTTI):
             ASCIIColors.success("lollms_sd found.")
             ASCIIColors.success("Loading source file...",end="")
             # use importlib to load the module from the file path
-            from lollms.services.sd.lollms_sd import LollmsSD
+            from lollms.services.tti.sd.lollms_sd import LollmsSD
             ASCIIColors.success("ok")
             return LollmsSD
 

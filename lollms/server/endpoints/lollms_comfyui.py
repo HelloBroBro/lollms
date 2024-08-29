@@ -42,7 +42,7 @@ def install_comfyui(request: ClientAuthentication):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Installing  comfyui server\nPlease stand by")
-        from lollms.services.comfyui.lollms_comfyui import install_comfyui
+        from lollms.services.tti.comfyui.lollms_comfyui import install_comfyui
         install_comfyui(lollmsElfServer)
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
@@ -63,7 +63,7 @@ def upgrade_comfyui(request: ClientAuthentication):
             return {"status":False,"error":"Service upgrade is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Upgrading comfyui server\nPlease stand by")
-        from lollms.services.comfyui.lollms_comfyui import upgrade_comfyui
+        from lollms.services.tti.comfyui.lollms_comfyui import upgrade_comfyui
         upgrade_comfyui(lollmsElfServer)
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
@@ -88,7 +88,7 @@ def start_comfyui(request: ClientAuthentication):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Starting Comfyui\nPlease stand by")
-        from lollms.services.comfyui.lollms_comfyui import get_comfyui
+        from lollms.services.tti.comfyui.lollms_comfyui import get_comfyui
         lollmsElfServer.comfyui = get_comfyui(lollmsElfServer.lollms_paths)(lollmsElfServer, lollmsElfServer.personality.name if lollmsElfServer.personality is not None else "Artbot")
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
@@ -108,5 +108,5 @@ def show_comfyui(request: ClientAuthentication):
 
 @router.get("/list_comfyui_models")
 def list_comfyui_models():
-    from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+    from lollms.services.tti.comfyui.lollms_comfyui import LollmsComfyUI
     return {"status":True, "models":LollmsComfyUI.get_models_list(lollmsElfServer)}

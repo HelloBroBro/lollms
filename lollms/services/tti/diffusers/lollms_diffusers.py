@@ -193,7 +193,7 @@ class LollmsDiffusers(LollmsTTI):
             ASCIIColors.success("lollms_diffusers found.")
             ASCIIColors.success("Loading source file...",end="")
             # use importlib to load the module from the file path
-            from lollms.services.diffusers.lollms_diffusers import LollmsDiffusers
+            from lollms.services.tti.diffusers.lollms_diffusers import LollmsDiffusers
             ASCIIColors.success("ok")
             return LollmsDiffusers
 

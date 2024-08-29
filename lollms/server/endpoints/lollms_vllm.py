@@ -42,7 +42,7 @@ def install_vllm(request: ClientAuthentication):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Installing vllm server\nPlease stand by")
-        from lollms.services.vllm.lollms_vllm import install_vllm
+        from lollms.services.ttt.vllm.lollms_vllm import install_vllm
         if install_vllm(lollmsElfServer):
             lollmsElfServer.HideBlockingMessage()
             return {"status":True}
@@ -62,7 +62,7 @@ def start_vllm(request: ClientAuthentication):
 
         if not hasattr(lollmsElfServer,"vllm") or lollmsElfServer.vllm is None:
             lollmsElfServer.ShowBlockingMessage("Loading vllm server\nPlease stand by")
-            from lollms.services.vllm.lollms_vllm import get_vllm
+            from lollms.services.ttt.vllm.lollms_vllm import get_vllm
             server = get_vllm(lollmsElfServer)
 
             if server:

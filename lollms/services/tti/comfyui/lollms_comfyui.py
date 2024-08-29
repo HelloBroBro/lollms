@@ -148,7 +148,7 @@ def get_comfyui(lollms_paths:LollmsPaths):
         ASCIIColors.success("comfyui found.")
         ASCIIColors.success("Loading source file...",end="")
         # use importlib to load the module from the file path
-        from lollms.services.comfyui.lollms_comfyui import LollmsComfyUI
+        from lollms.services.tti.comfyui.lollms_comfyui import LollmsComfyUI
         ASCIIColors.success("ok")
         return LollmsComfyUI
 

@@ -48,7 +48,7 @@ def install_sd(data: Identification):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Installing SD api server\nPlease stand by")
-        from lollms.services.sd.lollms_sd import install_sd
+        from lollms.services.tti.sd.lollms_sd import install_sd
         install_sd(lollmsElfServer)
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
@@ -70,7 +70,7 @@ def upgrade_sd(data: Identification):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Installing SD api server\nPlease stand by")
-        from lollms.services.sd.lollms_sd import upgrade_sd
+        from lollms.services.tti.sd.lollms_sd import upgrade_sd
         upgrade_sd(lollmsElfServer)
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
@@ -94,7 +94,7 @@ def start_sd(data: Identification):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Starting SD api server\nPlease stand by")
-        from lollms.services.sd.lollms_sd import LollmsSD
+        from lollms.services.tti.sd.lollms_sd import LollmsSD
         lollmsElfServer.sd = LollmsSD.get(lollmsElfServer)(lollmsElfServer, lollmsElfServer.personality.name if lollmsElfServer.personality is not None else "Artbot")
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()

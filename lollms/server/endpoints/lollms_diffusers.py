@@ -47,7 +47,7 @@ def install_diffusers(data: Identification):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Installing Diffusers library\nPlease stand by")
-        from lollms.services.diffusers.lollms_diffusers import install_diffusers
+        from lollms.services.tti.diffusers.lollms_diffusers import install_diffusers
         install_diffusers(lollmsElfServer)
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
@@ -69,7 +69,7 @@ def upgrade_sd(data: Identification):
             return {"status":False,"error":"Service installation is blocked when the server is exposed outside for very obvious reasons!"}
 
         lollmsElfServer.ShowBlockingMessage("Upgrading Diffusers library\nPlease stand by")
-        from lollms.services.diffusers.lollms_diffusers import upgrade_diffusers
+        from lollms.services.tti.diffusers.lollms_diffusers import upgrade_diffusers
         upgrade_diffusers(lollmsElfServer)
         ASCIIColors.success("Done")
         lollmsElfServer.HideBlockingMessage()
