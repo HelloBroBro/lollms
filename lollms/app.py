@@ -424,6 +424,9 @@ class LollmsApplication(LoLLMsCom):
             if self.config.active_tti_service == "diffusers":
                 from lollms.services.tti.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
+            elif self.config.active_tti_service == "diffusers_client":
+                from lollms.services.tti.diffusers_client.lollms_diffusers_client import LollmsDiffusersClient
+                self.tti = LollmsDiffusersClient(self)
             elif self.config.active_tti_service == "autosd":
                 if self.sd:
                     self.tti = self.sd
@@ -513,19 +516,13 @@ class LollmsApplication(LoLLMsCom):
                 except:
                     self.warning(f"Couldn't load Comfyui")
 
-            if self.config.enable_motion_ctrl_service and self.motion_ctrl is None:
-                try:
-                    from lollms.services.motion_ctrl.lollms_motion_ctrl import Service
-                    self.motion_ctrl = Service(self, base_url=self.config.motion_ctrl_base_url)
-                except Exception as ex:
-                    trace_exception(ex)
-                    self.warning(f"Couldn't load Motion control")
-
-
             ASCIIColors.blue("Activating TTI service")
             if self.config.active_tti_service == "diffusers" and (self.tti is None or self.tti.name!="diffusers"):
                 from lollms.services.tti.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
+            elif self.config.active_tti_service == "diffusers_client" and (self.tti.base_url!=self.config.diffusers_client_base_url or self.tti.name!="diffusers_client"):
+                from lollms.services.tti.diffusers_client.lollms_diffusers_client import LollmsDiffusersClient
+                self.tti = LollmsDiffusersClient(self, base_url=self.config.diffusers_client_base_url)
             elif self.config.active_tti_service == "autosd" and (self.tti is None or self.tti.name!="stable_diffusion"):
                 if self.sd:
                     self.tti = self.sd
