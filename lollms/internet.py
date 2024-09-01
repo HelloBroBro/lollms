@@ -317,7 +317,7 @@ def internet_search(query, internet_nb_search_pages, chromedriver_path=None, qui
 
     return search_results
 
-def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorizer = "bert", vectorize=True, asses_using_llm=True, yes_no=None):
+def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorizer = "semantic", vectorize=True, asses_using_llm=True, yes_no=None):
     """
     """
 
@@ -328,15 +328,15 @@ def internet_search_with_vectorization(query, chromedriver_path=None, internet_n
     from lollmsvectordb.text_document_loader import TextDocumentsLoader
     from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
-    if vectorizer == "bert":
-        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-        v = BERTVectorizer()
+    if vectorizer == "semantic":
+        from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+        v = SemanticVectorizer()
     elif vectorizer == "tfidf":
         from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
         v = TFIDFVectorizer()
-    elif vectorizer == "word2vec":
-        from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
-        v = Word2VecVectorizer()
+    elif vectorizer == "openai":
+        from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+        v = OpenAIVectorizer()
 
     vectorizer = VectorDatabase("", v, TikTokenTokenizer(), internet_vectorization_chunk_size, internet_vectorization_overlap_size)
 

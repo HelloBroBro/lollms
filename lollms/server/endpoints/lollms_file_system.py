@@ -128,21 +128,21 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
                     if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.6.0"):
                         PackageManager.install_or_update("lollmsvectordb")
                     
-                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+                    from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
                     from lollmsvectordb import VectorDatabase
                     from lollmsvectordb.text_document_loader import TextDocumentsLoader
                     from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
 
-                    if lollmsElfServer.config.rag_vectorizer == "bert":
-                        lollmsElfServer.backup_trust_store()
-                        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-                        v = BERTVectorizer()
-                        lollmsElfServer.restore_trust_store()
-                        
+                    if lollmsElfServer.config.rag_vectorizer == "semantic":
+                        from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                        v = SemanticVectorizer(lollmsElfServer.config.rag_vectorizer_model)
                     elif lollmsElfServer.config.rag_vectorizer == "tfidf":
                         from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                         v = TFIDFVectorizer()
+                    elif lollmsElfServer.config.rag_vectorizer == "openai":
+                        from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                        v = OpenAIVectorizer(lollmsElfServer.config.rag_vectorizer_openai_key)
 
                     vdb = VectorDatabase(Path(folder_path)/f"{db_name}.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer())
                     # Get all files in the folder
@@ -269,14 +269,16 @@ def toggle_mount_rag_database(database_infos: MountDatabase):
                 from lollmsvectordb.text_document_loader import TextDocumentsLoader
                 from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
-                if lollmsElfServer.config.rag_vectorizer == "bert":
-                    lollmsElfServer.backup_trust_store()
-                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-                    v = BERTVectorizer()
-                    lollmsElfServer.restore_trust_store()
+                if lollmsElfServer.config.rag_vectorizer == "semantic":
+                    from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                    v = SemanticVectorizer(lollmsElfServer.config.rag_vectorizer_model)
                 elif lollmsElfServer.config.rag_vectorizer == "tfidf":
                     from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                     v = TFIDFVectorizer()
+                elif lollmsElfServer.config.rag_vectorizer == "openai":
+                    from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                    v = OpenAIVectorizer(lollmsElfServer.config.rag_vectorizer_openai_key)
+
 
                 vdb = VectorDatabase(Path(path)/f"{database_infos.database_name}.sqlite", v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer(), chunk_size=lollmsElfServer.config.rag_chunk_size, clean_chunks=lollmsElfServer.config.rag_clean_chunks, n_neighbors=lollmsElfServer.config.rag_n_chunks)       
                 lollmsElfServer.active_rag_dbs.append({"name":database_infos.database_name,"path":path,"vectorizer":vdb})
@@ -328,21 +330,22 @@ async def vectorize_folder(database_infos: FolderInfos):
                 if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.6.0"):
                     PackageManager.install_or_update("lollmsvectordb")
                 
-                from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+                from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
                 from lollmsvectordb import VectorDatabase
                 from lollmsvectordb.text_document_loader import TextDocumentsLoader
                 from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
 
-                if lollmsElfServer.config.rag_vectorizer == "bert":
-                    lollmsElfServer.backup_trust_store()
-                    from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-                    v = BERTVectorizer()
-                    lollmsElfServer.restore_trust_store()
-                    
+                if lollmsElfServer.config.rag_vectorizer == "semantic":
+                    from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                    v = SemanticVectorizer(lollmsElfServer.config.rag_vectorizer_model)
                 elif lollmsElfServer.config.rag_vectorizer == "tfidf":
                     from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                     v = TFIDFVectorizer()
+                elif lollmsElfServer.config.rag_vectorizer == "openai":
+                    from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                    v = OpenAIVectorizer(lollmsElfServer.config.rag_vectorizer_openai_key)
+
                 vector_db_path = Path(folder_path)/f"{db_name}.sqlite"
 
                 vdb = VectorDatabase(vector_db_path, v, lollmsElfServer.model if lollmsElfServer.model else TikTokenTokenizer(), reset=True)

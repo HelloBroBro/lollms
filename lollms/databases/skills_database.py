@@ -1,14 +1,14 @@
 import sqlite3
-from lollmsvectordb import VectorDatabase, BERTVectorizer
+from lollmsvectordb import VectorDatabase, SemanticVectorizer
 from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 import numpy as np
 from ascii_colors import ASCIIColors
 class SkillsLibrary:
         
-    def __init__(self, db_path, model_name: str = 'bert-base-nli-mean-tokens', chunk_size:int=512, overlap:int=0, n_neighbors:int=5):
+    def __init__(self, db_path, model_name: str = 'sentence-transformers/bert-base-nli-mean-tokens', chunk_size:int=512, overlap:int=0, n_neighbors:int=5):
         self.db_path =db_path
         self._initialize_db()
-        self.vectorizer = VectorDatabase("", BERTVectorizer(), TikTokenTokenizer(),chunk_size, overlap, n_neighbors)
+        self.vectorizer = VectorDatabase(db_path, SemanticVectorizer(model_name), TikTokenTokenizer(),chunk_size, overlap, n_neighbors)
         ASCIIColors.green("Vecorizer ready")
        
 

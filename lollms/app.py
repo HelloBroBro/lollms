@@ -68,7 +68,7 @@ class LollmsApplication(LoLLMsCom):
 
         self.tts                        = None
         self.session                    = Session(lollms_paths)
-        self.skills_library             = SkillsLibrary(self.lollms_paths.personal_skills_path/(self.config.skills_lib_database_name+".db"))
+        self.skills_library             = SkillsLibrary(self.lollms_paths.personal_skills_path/(self.config.skills_lib_database_name+".sqlite"))
         self.tasks_library              = TasksLibrary(self)
 
         self.handle_generate_msg: Callable[[str, Dict], None]               = None
@@ -314,19 +314,17 @@ class LollmsApplication(LoLLMsCom):
                     from lollmsvectordb import VectorDatabase
                     from lollmsvectordb.text_document_loader import TextDocumentsLoader
                     from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
-                    if self.config.rag_vectorizer == "bert":
-                        self.backup_trust_store()
-                        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-                        v = BERTVectorizer()
-                        self.restore_trust_store()
-                    elif self.config.rag_vectorizer == "tfidf":
+                    if self.lollms.config.rag_vectorizer=="semantic":
+                        from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                        vectorizer = SemanticVectorizer(self.lollms.config.rag_vectorizer_model)
+                    elif self.lollms.config.rag_vectorizer=="tfidf":
                         from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
-                        v = TFIDFVectorizer()
-                    elif self.config.rag_vectorizer == "word2vec":
-                        from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
-                        v = Word2VecVectorizer()
+                        vectorizer = TFIDFVectorizer()
+                    elif self.lollms.config.rag_vectorizer=="openai":
+                        from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                        vectorizer = OpenAIVectorizer(self.lollms.config.rag_vectorizer_model, self.lollms.config.rag_vectorizer_openai_key)
 
-                    vdb = VectorDatabase(Path(parts[1])/f"{db_name}.sqlite", v, self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
+                    vdb = VectorDatabase(Path(parts[1])/f"{db_name}.sqlite", vectorizer, None if self.lollms.config.rag_vectorizer=="semantic" else self.model if self.model else TikTokenTokenizer(), n_neighbors=self.config.rag_n_chunks)       
                     self.active_rag_dbs.append({"name":parts[0],"path":parts[1],"vectorizer":vdb})
                 except:
                     ASCIIColors.error(f"Couldn't load "+str(Path(parts[1])/f"{db_name}.sqlite")+" consider revectorizing it")
@@ -355,7 +353,7 @@ class LollmsApplication(LoLLMsCom):
                 except Exception as ex:
                     trace_exception(ex)
                     self.warning(f"Couldn't load vllm")
-        ASCIIColors.execute_with_animation("Loading local TTT services", start_ttt,ASCIIColors.color_blue)
+        ASCIIColors.execute_with_animation("Loading TTT services", start_ttt,ASCIIColors.color_blue)
         print("OK")
         def start_stt(*args, **kwargs):
             if self.config.whisper_activate or self.config.active_stt_service == "whisper":
@@ -372,7 +370,7 @@ class LollmsApplication(LoLLMsCom):
                 from lollms.services.stt.whisper.lollms_whisper import LollmsWhisper
                 self.stt = LollmsWhisper(self, self.config.whisper_model)
 
-        ASCIIColors.execute_with_animation("Loading loacal STT services", start_stt, ASCIIColors.color_blue)
+        ASCIIColors.execute_with_animation("Loading STT services", start_stt, ASCIIColors.color_blue)
         print("OK")
 
         def start_tts(*args, **kwargs):
@@ -403,7 +401,7 @@ class LollmsApplication(LoLLMsCom):
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
-        ASCIIColors.execute_with_animation("Loading loacal TTS services", start_tts, ASCIIColors.color_blue)
+        ASCIIColors.execute_with_animation("Loading TTS services", start_tts, ASCIIColors.color_blue)
         print("OK")
 
         def start_tti(*args, **kwargs):

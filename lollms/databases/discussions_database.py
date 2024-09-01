@@ -10,8 +10,6 @@ from lollms.paths import LollmsPaths
 from lollms.com import LoLLMsCom
 
 from lollmsvectordb.vector_database import VectorDatabase
-from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
 import gc
 import json
@@ -776,9 +774,19 @@ class Discussion:
         self.update_file_lists()
 
         if len(self.text_files)>0:
+            if self.lollms.config.rag_vectorizer=="semantic":
+                from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                vectorizer = SemanticVectorizer(self.lollms.config.rag_vectorizer_model)
+            elif self.lollms.config.rag_vectorizer=="tfidf":
+                from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                vectorizer = TFIDFVectorizer()
+            elif self.lollms.config.rag_vectorizer=="openai":
+                from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                vectorizer = OpenAIVectorizer(self.lollms.config.rag_vectorizer_model, self.lollms.config.rag_vectorizer_openai_key)
+
             self.vectorizer = VectorDatabase(
                                         self.discussion_rag_folder/"db.sqli",
-                                        BERTVectorizer(self.lollms.config.rag_vectorizer_model) if self.lollms.config.rag_vectorizer=="bert" else TFIDFVectorizer(),
+                                        vectorizer,
                                         self.lollms.model,
                                         chunk_size=self.lollms.config.rag_chunk_size,
                                         overlap=self.lollms.config.rag_overlap
@@ -795,17 +803,17 @@ class Discussion:
                     except Exception as ex:
                         trace_exception(ex)
                 try:
-                    self.vectorizer.index()
+                    self.vectorizer.build_index()
                 except Exception as ex:
                     trace_exception(ex)
         else:
             self.vectorizer = None
 
     def update_file_lists(self):
-        self.text_files = [Path(file) for file in self.discussion_text_folder.glob('*')]
-        self.image_files = [Path(file) for file in self.discussion_images_folder.glob('*')]
-        self.audio_files = [Path(file) for file in self.discussion_audio_folder.glob('*')]
-        self.rag_db = [Path(file) for file in self.discussion_rag_folder.glob('*')]
+        self.text_files = [Path(file) for file in self.discussion_text_folder.glob('*') if not file.is_dir()]
+        self.image_files = [Path(file) for file in self.discussion_images_folder.glob('*') if not file.is_dir()]
+        self.audio_files = [Path(file) for file in self.discussion_audio_folder.glob('*') if not file.is_dir()]
+        self.rag_db = [Path(file) for file in self.discussion_rag_folder.glob('*') if not file.is_dir()]
 
 
     def remove_file(self, file_name, callback=None):
@@ -937,9 +945,18 @@ class Discussion:
                 self.lollms.ShowBlockingMessage("Processing file\nPlease wait ...")
                 if process:
                     if self.vectorizer is None:
+                        if self.lollms.config.rag_vectorizer == "semantic":
+                            from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                            v = SemanticVectorizer(self.lollms.config.rag_vectorizer_model)
+                        elif self.lollms.config.rag_vectorizer == "tfidf":
+                            from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                            v = TFIDFVectorizer()
+                        elif self.lollms.config.rag_vectorizer == "openai":
+                            from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                            v = OpenAIVectorizer(self.lollms.config.rag_vectorizer_openai_key)
                         self.vectorizer = VectorDatabase(
                                     self.discussion_rag_folder/"db.sqli",
-                                    BERTVectorizer(self.lollms.config.rag_vectorizer_model) if self.lollms.config.rag_vectorizer=="bert" else TFIDFVectorizer(),
+                                    v,
                                     self.lollms.model,
                                     )
                     data = TextDocumentsLoader.read_file(path)

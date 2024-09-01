@@ -32,7 +32,7 @@ import shutil
 from tqdm import tqdm
 import threading
 from io import BytesIO
-
+import os
 
 
 class LollmsDalle(LollmsTTI):
@@ -44,7 +44,7 @@ class LollmsDalle(LollmsTTI):
                     output_path=None
                     ):
         super().__init__(generation_engine,app)
-        self.key = key 
+        self.key = key or os.getenv('OPENAI_API_KEY')
         self.generation_engine = generation_engine
         self.output_path = output_path
 

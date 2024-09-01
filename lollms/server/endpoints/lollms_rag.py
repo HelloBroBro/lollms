@@ -13,7 +13,7 @@ from typing import List, Optional, Union
 from pathlib import Path
 from lollmsvectordb.database_elements.chunk import Chunk
 from lollmsvectordb.vector_database import VectorDatabase
-from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
 from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
 import sqlite3
 import secrets
@@ -67,9 +67,20 @@ def get_user_vectorizer(user_key: str):
     small_key = hashlib.md5(user_key.encode()).hexdigest()[:8]
     user_folder = lollmsElfServer.lollms_paths.personal_outputs_path / str(user_key)
     user_folder.mkdir(parents=True, exist_ok=True)
+    from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+    if lollmsElfServer.config.rag_vectorizer == "semantic":
+        from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+        v = SemanticVectorizer(lollmsElfServer.config.rag_vectorizer_model)
+    elif lollmsElfServer.config.rag_vectorizer == "tfidf":
+        from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+        v = TFIDFVectorizer()
+    elif lollmsElfServer.config.rag_vectorizer == "openai":
+        from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+        v = OpenAIVectorizer(lollmsElfServer.config.rag_vectorizer_openai_key)
+
     return VectorDatabase(
         str(user_folder / f"rag_db_{small_key}.sqlite"),
-        BERTVectorizer(lollmsElfServer.config.rag_vectorizer_model) if lollmsElfServer.config.rag_vectorizer == "bert" else TFIDFVectorizer(),
+        v, TikTokenTokenizer(),
         lollmsElfServer.model,
         chunk_size=lollmsElfServer.config.rag_chunk_size,
         overlap=lollmsElfServer.config.rag_overlap

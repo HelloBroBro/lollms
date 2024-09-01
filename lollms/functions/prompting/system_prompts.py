@@ -134,9 +134,9 @@ def get_system_prompt(agent_name, number_of_entries=5) -> Tuple[str, str]:
     """
     try:
         from lollmsvectordb.vector_database import VectorDatabase
-        from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+        from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
         from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
-        db = VectorDatabase("", BERTVectorizer(), TikTokenTokenizer(), number_of_entries)
+        db = VectorDatabase("", SemanticVectorizer(), TikTokenTokenizer(), number_of_entries)
 
         system_prompts = get_prompts()
         

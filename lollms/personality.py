@@ -17,7 +17,7 @@ from lollms.utilities import PromptReshaper, PackageManager, discussion_path_to_
 from lollms.com import NotificationType, NotificationDisplayType
 from lollms.client_session import Session, Client
 from lollmsvectordb.vector_database import VectorDatabase
-from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
+from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
 from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
 from lollmsvectordb.database_elements.document import Document
@@ -898,16 +898,16 @@ class AIPersonality:
         if self.data_path.exists():
             self.database_path = self.data_path / "db.sqlite"
             from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
-            vectorizer = self.config.rag_vectorizer
-            if vectorizer == "bert":
-                from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-                v = BERTVectorizer()
+
+            if vectorizer == "semantic":
+                from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                v = SemanticVectorizer()
             elif vectorizer == "tfidf":
                 from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                 v = TFIDFVectorizer()
-            elif vectorizer == "word2vec":
-                from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
-                v = Word2VecVectorizer()
+            elif vectorizer == "openai":
+                from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                v = OpenAIVectorizer()
 
             self.persona_data_vectorizer = VectorDatabase(self.database_path, v, TikTokenTokenizer(), self.config.rag_chunk_size, self.config.rag_overlap)
 
@@ -1063,9 +1063,19 @@ class AIPersonality:
                 self.ShowBlockingMessage("Processing file\nPlease wait ...")
                 if process:
                     if self.vectorizer is None:
+                        if self.config.rag_vectorizer == "semantic":
+                            from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                            v = SemanticVectorizer(self.config.rag_vectorizer_model)
+                        elif self.config.rag_vectorizer == "tfidf":
+                            from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                            v = TFIDFVectorizer()
+                        elif self.config.rag_vectorizer == "openai":
+                            from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                            v = OpenAIVectorizer()
+
                         self.vectorizer = VectorDatabase(
                                     client.discussion.discussion_rag_folder/"db.sqli",
-                                    BERTVectorizer(self.config.rag_vectorizer_model) if self.config.rag_vectorizer=="bert" else TFIDFVectorizer(),
+                                    v,
                                     self.model,
                                     chunk_size=self.config.rag_chunk_size,
                                     overlap=self.config.rag_overlap
@@ -2900,15 +2910,15 @@ class APScript(StateMachine):
         
         from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
         vectorizer = self.config.rag_vectorizer
-        if vectorizer == "bert":
-            from lollmsvectordb.lollms_vectorizers.bert_vectorizer import BERTVectorizer
-            v = BERTVectorizer()
+        if vectorizer == "semantic":
+            from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+            v = SemanticVectorizer(self.config.rag_vectorizer_model)
         elif vectorizer == "tfidf":
             from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
             v = TFIDFVectorizer()
-        elif vectorizer == "word2vec":
-            from lollmsvectordb.lollms_vectorizers.word2vec_vectorizer import Word2VecVectorizer
-            v = Word2VecVectorizer()
+        elif vectorizer == "openai":
+            from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+            v = OpenAIVectorizer()
 
         vectorizer = VectorDatabase("", v, TikTokenTokenizer(), self.config.rag_chunk_size, self.config.rag_overlap)
         vectorizer.add_document(title, text, url)
