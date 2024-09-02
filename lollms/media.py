@@ -468,16 +468,14 @@ class RTCom:
             voices = self.lc.tts.get_voices()  # Assuming the response is in JSON format
             return voices
         return []
-
 from pathlib import Path
-import os
 import sounddevice as sd
 import threading
 import datetime
 import wave
 
 class AudioNinja:
-    def __init__(self, lc:LollmsApplication, logs_folder='logs', device=None):
+    def __init__(self, lc, logs_folder='logs', device=None):
         """
         Initialize the AudioNinja with a LollmsApplication object,
         a log folder, and an optional recording device.
@@ -493,8 +491,11 @@ class AudioNinja:
         self.recording_thread = None
         self.is_recording = False
         self.frames = []
-        if not self.logs_folder.exists():
-            self.logs_folder.mkdir(parents=True, exist_ok=True)
+        self.sample_rate = 44100  # Default sample rate
+        self.channels = 1  # Default to mono recording
+
+        # Ensure the logs folder exists
+        self.logs_folder.mkdir(parents=True, exist_ok=True)
         self.lc.info(f"AudioNinja is ready to strike from the shadows! Logging to '{self.logs_folder}' with device '{self.device}'")
 
     def _record_audio(self):
@@ -505,7 +506,7 @@ class AudioNinja:
             if self.is_recording:
                 self.frames.append(indata.copy())
     
-        with sd.InputStream(callback=callback, device=self.device):
+        with sd.InputStream(callback=callback, device=self.device, channels=self.channels, samplerate=self.sample_rate):
             while self.is_recording:
                 sd.sleep(1000)
 
@@ -538,9 +539,9 @@ class AudioNinja:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = self.logs_folder / f"recording_{timestamp}.wav"
         with wave.open(filename, 'wb') as wf:
-            wf.setnchannels(1)
+            wf.setnchannels(self.channels)
             wf.setsampwidth(sd.default.dtype[0].itemsize)
-            wf.setframerate(44100)
+            wf.setframerate(self.sample_rate)
             wf.writeframes(b''.join(self.frames))
         self.lc.info(f"Ninja stored the audio file at '{filename}'! 🥷📂")
         return filename

@@ -654,16 +654,6 @@ class LollmsApplication(LoLLMsCom):
         return model
 
 
-    def mount_extension(self, id:int, callback=None):
-        try:
-            extension = ExtensionBuilder().build_extension(self.config["extensions"][id], self.lollms_paths, self)
-            self.mounted_extensions.append(extension)
-            return extension
-        except Exception as ex:
-            ASCIIColors.error(f"Couldn't load extension. Please verify your configuration file at {self.lollms_paths.personal_configuration_path} or use the next menu to select a valid personality")
-            trace_exception(ex)
-        return None
-
 
     def mount_personality(self, id:int, callback=None):
         try:
