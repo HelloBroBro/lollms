@@ -736,6 +736,9 @@ class AIPersonality:
         if debug:
             self.print_prompt("gen",prompt)
 
+        if max_size is None:
+            max_size = min(self.config.max_n_predict, self.config.ctx_size-len(self.model.tokenize(prompt)))
+
         self.model.generate_with_images(
                                 prompt,
                                 images,
@@ -899,15 +902,15 @@ class AIPersonality:
             self.database_path = self.data_path / "db.sqlite"
             from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 
-            if vectorizer == "semantic":
+            if self.config.rag_vectorizer == "semantic":
                 from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
                 v = SemanticVectorizer()
-            elif vectorizer == "tfidf":
+            elif self.config.rag_vectorizer == "tfidf":
                 from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                 v = TFIDFVectorizer()
-            elif vectorizer == "openai":
+            elif self.config.rag_vectorizer == "openai":
                 from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
-                v = OpenAIVectorizer()
+                v = OpenAIVectorizer(api_key=self.config.rag_vectorizer_openai_key)
 
             self.persona_data_vectorizer = VectorDatabase(self.database_path, v, TikTokenTokenizer(), self.config.rag_chunk_size, self.config.rag_overlap)
 
@@ -2394,6 +2397,33 @@ class APScript(StateMachine):
         return self.personality.generate(prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
 
 
+    def generate_codes(self, prompt, max_size = None, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
+        if len(self.personality.image_files)>0:
+            response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\n" + self.separator_template + prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        else:
+            response = self.personality.generate(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\n" + self.separator_template + prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        codes = self.extract_code_blocks(response)
+        return codes
+    
+    def generate_code(self, prompt, max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
+        if len(self.personality.image_files)>0:
+            response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        else:
+            response = self.personality.generate(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        codes = self.extract_code_blocks(response)
+        if len(codes)>0:
+            code = codes[-1]["content"].split("\n")[:-1]
+            while not codes[-1]["is_complete"]:
+                response = self.personality.generate(prompt+code+self.user_full_header+"continue"+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+                codes = self.extract_code_blocks(response)
+                if len(codes)==0:
+                    break
+                else:
+                    code +="\n"+ codes[-1]["content"].split("\n")[:-1]
+            return code
+        else:
+            return None
+            
     def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, AIPersonality| None], bool]=None, context_details:dict=None, client:Client=None):
         """
         This function generates code based on the given parameters.
