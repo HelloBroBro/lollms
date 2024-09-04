@@ -97,7 +97,7 @@ def install_package(package_name):
 
 def fix_json(json_text):
     try:
-        json_text.replace("}\n{","},\n{")
+        json_text = json_text.replace("}\n{","},\n{")
         # Try to load the JSON string
         json_obj = json.loads(json_text)
         return json_obj
@@ -2405,21 +2405,30 @@ class APScript(StateMachine):
         codes = self.extract_code_blocks(response)
         return codes
     
-    def generate_code(self, prompt, max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
+    def generate_code(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
         if len(self.personality.image_files)>0:
             response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        elif  len(images)>0:
+            response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, images, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         else:
             response = self.personality.generate(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         codes = self.extract_code_blocks(response)
         if len(codes)>0:
-            code = codes[-1]["content"].split("\n")[:-1]
-            while not codes[-1]["is_complete"]:
-                response = self.personality.generate(prompt+code+self.user_full_header+"continue"+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
-                codes = self.extract_code_blocks(response)
-                if len(codes)==0:
-                    break
-                else:
-                    code +="\n"+ codes[-1]["content"].split("\n")[:-1]
+            if not codes[-1]["is_complete"]:
+                code = "\n".join(codes[-1]["content"].split("\n")[:-1])
+                while not codes[-1]["is_complete"]:
+                    response = self.personality.generate(prompt+code+self.user_full_header+"continue the code. Rewrite last line and continue the code."+self.separator_template+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+                    codes = self.extract_code_blocks(response)
+                    if len(codes)==0:
+                        break
+                    else:
+                        if not codes[-1]["is_complete"]:
+                            code +="\n"+ "\n".join(codes[-1]["content"].split("\n")[:-1])
+                        else:
+                            code +="\n"+ "\n".join(codes[-1]["content"].split("\n"))
+            else:
+                code = "\n".join(codes[-1]["content"].split("\n"))
+
             return code
         else:
             return None
@@ -3321,7 +3330,12 @@ class APScript(StateMachine):
         return title
 
 
-    def plan_with_images(self, request: str, images:list, actions_list:list=[LoLLMsAction], context:str = "", max_answer_length: int = 512) -> List[LoLLMsAction]:
+    def plan(self, 
+                         request: str, 
+                         images:list=[], 
+                         actions_list:list=[LoLLMsAction], 
+                         context:str = "", 
+                         max_answer_length: int = 512) -> List[LoLLMsAction]:
         """
         creates a plan out of a request and a context
 
@@ -3332,23 +3346,20 @@ class APScript(StateMachine):
         Returns:
             int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
         """
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
-
-        template = "\n".join([
-            f"{start_header_id_template}{system_message_template}{end_header_id_template}",
+        
+        prompt = "\n".join([
+            self.system_full_header,
             "Act as plan builder, a tool capable of making plans to perform the user requested operation."
         ])
-
+        
         if len(actions_list)>0:
-            template += "\n".join([
+            prompt += "\n".join([
                 "The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.",
-                f"{start_header_id_template}list of action types information{end_header_id_template}",
-                "[",
-                "{actions_list}",
-                "]",
+                self.system_custom_header("list of action types information"),                
+                f"{[str(a) for a in actions_list]}",
+                "Remember, you can only use one of these actions in the list",
                 "The AI should respond in this format using data from actions_list:",
+                "```json",
                 "{",
                 '    "actions": [',
                 '    {',
@@ -3366,109 +3377,25 @@ class APScript(StateMachine):
                 '    ...',
                 '    ]',
                 "}"
+                "```",
+                ""
             ])
         if context != "":
-            template += "\n".join([
-                f"{start_header_id_template}context{end_header_id_template}",
-                "{context}Ok"
+            
+            prompt += "\n".join([
+                self.system_custom_header("context"),
+                f"{context}"
             ])
 
-        template += "\n".join([
-            f"{start_header_id_template}request{end_header_id_template}{{request}}",
-            f"{start_header_id_template}plan{end_header_id_template}To achieve the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"
+        prompt += "\n".join([
+            self.system_custom_header("request"),
+            f"{request}",
+            self.ai_custom_header("plan"),
         ])
-        pr  = PromptReshaper(template)
-        prompt = pr.build({
-                "context":context,
-                "request":request,
-                "actions_list":",\n".join([f"{action}" for action in actions_list])
-                },
-                self.personality.model.tokenize,
-                self.personality.model.detokenize,
-                self.personality.model.config.ctx_size,
-                ["previous_discussion"]
-                )
-        gen = self.generate_with_images(prompt, images, max_answer_length).strip().replace("</s>","").replace("<s>","")
-        gen = self.remove_backticks(gen)
-        self.print_prompt("full",prompt+gen)
-        gen = fix_json(gen)
-        return generate_actions(actions_list, gen)
-
-    def plan(self, request: str, actions_list:list=[LoLLMsAction], context:str = "", max_answer_length: int = 512) -> List[LoLLMsAction]:
-        """
-        creates a plan out of a request and a context
-
-        Args:
-            request (str): The request posed by the user.
-            max_answer_length (int, optional): Maximum string length allowed while interpreting the users' responses. Defaults to 50.
-
-        Returns:
-            int: Index of the selected option within the possible_ansers list. Or -1 if there was not match found among any of them.
-        """
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
-
-        template = "\n".join([
-            f"{start_header_id_template}instruction:",
-            "Act as plan builder, a tool capable of making plans to perform the user requested operation."
-        ])
-
-        if len(actions_list) > 0:
-            template += "\n".join([
-                "The plan builder is an AI that responds in json format. It should plan a succession of actions in order to reach the objective.",
-                f"{start_header_id_template}list of action types information{end_header_id_template}",
-                "[",
-                "{actions_list}",
-                "]",
-                "The AI should respond in this format using data from actions_list:",
-                "{",
-                '    "actions": [',
-                '    {',
-                '        "name": name of the action 1,',
-                '        "parameters":[',
-                '            parameter name: parameter value',
-                '        ]',
-                '    },',
-                '    {',
-                '        "name": name of the action 2,',
-                '        "parameters":[',
-                '            parameter name: parameter value',
-                '        ]',
-                '    }',
-                '    ...',
-                '    ]',
-                "}"
-            ])
-
-        if context != "":
-            template += "\n".join([
-                f"{start_header_id_template}context{end_header_id_template}",
-                "{context}Ok"
-            ])
-
-        template += "\n".join([
-            f"{start_header_id_template}request{end_header_id_template}{{request}}",
-            f"{start_header_id_template}plan{end_header_id_template}To achieve the requested objective, this is the list of actions to follow, formatted as requested in json format:\n```json\n"
-        ])
-        pr  = PromptReshaper(template)
-        prompt = pr.build({
-                "context":context,
-                "request":request,
-                "actions_list":",\n".join([f"{action}" for action in actions_list])
-                },
-                self.personality.model.tokenize,
-                self.personality.model.detokenize,
-                self.personality.model.config.ctx_size,
-                ["previous_discussion"]
-                )
-        gen = self.generate(prompt, max_answer_length).strip().replace("</s>","").replace("<s>","")
-        gen = self.remove_backticks(gen).strip()
-        if gen[-1]!="}":
-            gen+="}"
-        self.print_prompt("full",prompt+gen)
-        gen = fix_json(gen)
-        return generate_actions(actions_list, gen)
+        self.print_prompt("prompt",prompt)
+        code = self.generate_code(prompt, images, max_answer_length).strip().replace("</s>","").replace("<s>","")
+        code = fix_json(code)
+        return generate_actions(actions_list, code), code
 
 
     def parse_directory_structure(self, structure):
