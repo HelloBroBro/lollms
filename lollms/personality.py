@@ -749,7 +749,7 @@ class AIPersonality:
                                 top_p=self.model_top_p if top_p is None else top_p,
                                 repeat_penalty=self.model_repeat_penalty if repeat_penalty is None else repeat_penalty,
                                 repeat_last_n = self.model_repeat_last_n if repeat_last_n is None else repeat_last_n
-                                ).strip()
+                                )
         return self.bot_says
 
     def generate(self, prompt, max_size = None, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, show_progress=False ):
@@ -769,7 +769,7 @@ class AIPersonality:
                                 top_p=self.model_top_p if top_p is None else top_p,
                                 repeat_penalty=self.model_repeat_penalty if repeat_penalty is None else repeat_penalty,
                                 repeat_last_n = self.model_repeat_last_n if repeat_last_n is None else repeat_last_n,
-                                ).strip()
+                                )
         if debug:
             self.print_prompt("prompt", prompt+self.bot_says)
         
@@ -3935,7 +3935,7 @@ class APScript(StateMachine):
 
         return rounds_info
 
-    def answer(self, context_details, callback=None, send_full=True, custom_entries = ""):
+    def answer(self, context_details, custom_entries = "", send_full=True, callback=None):
         if context_details["is_continue"]:
             full_prompt = self.build_prompt_from_context_details(context_details, custom_entries=custom_entries, suppress= ["ai_prefix"])
         else:
