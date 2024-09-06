@@ -729,7 +729,7 @@ class AIPersonality:
             self.bot_says = bot_says
             return True
 
-    def generate_with_images(self, prompt, images, max_size, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, show_progress=False ):
+    def generate_with_images(self, prompt, images, max_size=None, temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, show_progress=False ):
         ASCIIColors.info("Text generation started: Warming up")
         self.nb_received_tokens = 0
         self.bot_says = ""
@@ -2417,7 +2417,7 @@ class APScript(StateMachine):
             if not codes[-1]["is_complete"]:
                 code = "\n".join(codes[-1]["content"].split("\n")[:-1])
                 while not codes[-1]["is_complete"]:
-                    response = self.personality.generate(prompt+code+self.user_full_header+"continue the code. Rewrite last line and continue the code."+self.separator_template+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+                    response = self.personality.generate(prompt+code+self.user_full_header+"continue the code. Start from last line and continue the code. Put the code inside a markdown code tag."+self.separator_template+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
                     codes = self.extract_code_blocks(response)
                     if len(codes)==0:
                         break
@@ -2427,7 +2427,7 @@ class APScript(StateMachine):
                         else:
                             code +="\n"+ "\n".join(codes[-1]["content"].split("\n"))
             else:
-                code = "\n".join(codes[-1]["content"].split("\n"))
+                code = codes[-1]["content"]
 
             return code
         else:
