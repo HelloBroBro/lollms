@@ -213,11 +213,13 @@ def get_relevant_text_block(
     vectorizer:VectorDatabase,
     title=None,
 ):
-    sm = ScrapeMaster(url)
-    result = sm.scrape_all()
-    if len(result["texts"])>0:
-        vectorizer.add_document(title if title else url, "\n".join(result["texts"]), url)
-        
+    try:
+        sm = ScrapeMaster(url)
+        result = sm.scrape_all()
+        if len(result["texts"])>0:
+            vectorizer.add_document(title if title else url, "\n".join(result["texts"]), url)
+    except Exception as ex:
+        trace_exception(ex)        
 
 
 def extract_results(url, max_num, driver=None, wait_step_delay=0.5):
