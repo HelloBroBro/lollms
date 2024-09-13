@@ -30,17 +30,17 @@ def get_Whisper(lollms_paths:LollmsPaths):
 class LollmsElevenLabsTTS(LollmsTTS):
     def __init__(
                     self, 
-                    app:LollmsApplication,
-                    model_id: str = "eleven_monolingual_v2",
-                    voice_id: str = "EXAVITQu4vr4xnSDxMaL",
+                    app: LollmsApplication,
+                    model_id: str = "eleven_turbo_v2_5",
+                    voice_name: str = "Sarah",
                     api_key: str = "",
                     output_path: Path | str = None,
                     stability: float = 0.5,
                     similarity_boost: float = 0.5,
                     streaming: bool = False
                     ):
-        super().__init__("elevenlabs_tts", app, model_id, voice_id, api_key, output_path)
-        self.voice_id = voice_id
+        super().__init__("elevenlabs_tts", app, model_id, voice_name, api_key, output_path)
+        self.voice_name = voice_name
         self.model_id = model_id
         self.api_key = api_key
         self.output_path = output_path
@@ -48,13 +48,54 @@ class LollmsElevenLabsTTS(LollmsTTS):
         self.similarity_boost = similarity_boost
         self.streaming = streaming
         self.ready = True
+        
+        self.voices = []
+        self.voice_id_map = {}
+        try:
+            self._fetch_voices()
+            self.voice_id = self._get_voice_id(voice_name)
+        except:
+            pass
+    def _fetch_voices(self):
+        url = "https://api.elevenlabs.io/v1/voices"
+        headers = {"xi-api-key": self.api_key}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            for voice in data.get("voices", []):
+                name = voice.get("name")
+                voice_id = voice.get("voice_id")
+                if name and voice_id:
+                    self.voices.append(name)
+                    self.voice_id_map[name] = voice_id
+        except requests.RequestException as e:
+            print(f"Error fetching voices: {e}")
+            # Fallback to default voice
+            self.voices = ["Sarah"]
+            self.voice_id_map = {"Sarah": "EXAVITQu4vr4xnSDxMaL"}
+
+    def _get_voice_id(self, voice_name: str) -> str:
+        return self.voice_id_map.get(voice_name, "EXAVITQu4vr4xnSDxMaL")  # Default to Sarah if not found
+
+    def set_voice(self, voice_name: str):
+        if voice_name in self.voices:
+            self.voice_name = voice_name
+            self.voice_id = self._get_voice_id(voice_name)
+        else:
+            raise ValueError(f"Voice '{voice_name}' not found. Available voices: {', '.join(self.voices)}")
+
+
 
     def tts_file(self, text, file_name_or_path: Path | str = None, speaker=None, language="en", use_threading=False):
         speech_file_path = file_name_or_path
         payload = {
             "text": text,
+            "language_code": language,
             "model_id": self.model_id,
-            "voice_settings": {
+                "voice_settings": {
                 "stability": self.stability,
                 "similarity_boost": self.similarity_boost
             }
@@ -71,6 +112,10 @@ class LollmsElevenLabsTTS(LollmsTTS):
         else:
             url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}"
             response = requests.post(url, json=payload, headers=headers)
+            if response.status_code==400:
+                del payload["language_code"]
+                url = f"https://api.elevenlabs.io/v1/text-to-speech/{self.voice_id}"
+                response = requests.post(url, json=payload, headers=headers)
             with open(speech_file_path, 'wb') as f:
                 f.write(response.content)
 
@@ -80,6 +125,7 @@ class LollmsElevenLabsTTS(LollmsTTS):
         speech_file_path = file_name_or_path
         payload = {
             "text": text,
+            "language_code": language,
             "model_id": self.model_id,
             "voice_settings": {
                 "stability": self.stability,

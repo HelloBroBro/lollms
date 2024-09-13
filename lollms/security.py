@@ -9,6 +9,8 @@ import re
 import platform
 import string
 from lollms.utilities import PackageManager
+from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
 
 if not PackageManager.check_package_installed("lxml"):
     PackageManager.install_package("lxml")
@@ -334,3 +336,11 @@ if __name__=="__main__":
             print(f"Original: {path}, Sanitized: {sanitized}")
         except HTTPException as e:
             print(f"Original: {path}, Exception: {e.detail}")
+
+class MultipartBoundaryCheck(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.headers.get("content-type", "").startswith("multipart/form-data"):
+            boundary = request.headers.get("content-type").split("boundary=")[-1]
+            if len(boundary) > 70:  # Adjust this limit as needed
+                return JSONResponse(status_code=400, content={"detail": "Invalid boundary length"})
+        return await call_next(request)

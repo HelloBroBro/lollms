@@ -473,6 +473,7 @@ import sounddevice as sd
 import threading
 import datetime
 import wave
+import numpy as np
 
 class AudioNinja:
     def __init__(self, lc, logs_folder='logs', device=None):
@@ -503,12 +504,14 @@ class AudioNinja:
         Internal method to handle audio recording callback.
         """
         def callback(indata, frames, time, status):
+            if status:
+                self.lc.warning(f"Status: {status}")
             if self.is_recording:
                 self.frames.append(indata.copy())
     
         with sd.InputStream(callback=callback, device=self.device, channels=self.channels, samplerate=self.sample_rate):
             while self.is_recording:
-                sd.sleep(1000)
+                sd.sleep(100)
 
     def start_recording(self):
         """
@@ -538,13 +541,24 @@ class AudioNinja:
         """
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = self.logs_folder / f"recording_{timestamp}.wav"
-        with wave.open(filename, 'wb') as wf:
+        
+        audio_data = np.concatenate(self.frames, axis=0)
+        
+        # Normalize float32 data to the range [-1, 1]
+        audio_data = np.clip(audio_data, -1, 1)
+        
+        # Convert to int16
+        audio_data = (audio_data * 32767).astype(np.int16)
+
+        with wave.open(str(filename), 'wb') as wf:
             wf.setnchannels(self.channels)
-            wf.setsampwidth(sd.default.dtype[0].itemsize)
+            wf.setsampwidth(2)  # 2 bytes for int16
             wf.setframerate(self.sample_rate)
-            wf.writeframes(b''.join(self.frames))
+            wf.writeframes(audio_data.tobytes())
+        
         self.lc.info(f"Ninja stored the audio file at '{filename}'! 🥷📂")
         return filename
+
 
 
 class WebcamImageSender:
