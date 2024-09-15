@@ -34,6 +34,7 @@ import simpleaudio as sa
 import time
 from queue import Queue
 import re
+import pipmaster as pm
 
 # List of common sampling rates
 common_sampling_rates = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 96000, 192000]
@@ -41,6 +42,9 @@ common_sampling_rates = [8000, 11025, 16000, 22050, 32000, 44100, 48000, 96000, 
 # Function to find the closest sampling rate
 def closest_sampling_rate(freq, common_rates):
     return min(common_rates, key=lambda x: abs(x - freq))
+
+def xtts_install():
+    pm.install_or_update("tts", force_reinstall=True)
 
 class LollmsXTTS(LollmsTTS):
     def __init__(self, app: LollmsApplication, voices_folders: List[str|Path], freq = 22050):

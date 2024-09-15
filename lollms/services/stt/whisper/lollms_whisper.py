@@ -17,17 +17,22 @@ from typing import List, Dict, Any
 from ascii_colors import ASCIIColors, trace_exception
 from lollms.paths import LollmsPaths
 import subprocess
-
+import pipmaster as pm
 try:
-    if not PackageManager.check_package_installed("whisper"):
-        PackageManager.install_package("openai-whisper")
+    if not pm.is_installed("openai-whisper"):
+        pm.install("openai-whisper")
         try:
             install_conda_package("conda-forge::ffmpeg")
         except Exception as ex:
             trace_exception(ex)
             ASCIIColors.red("Couldn't install ffmpeg")
 except:
-        PackageManager.install_package("git+https://github.com/openai/whisper.git")
+        try:
+            install_conda_package("conda-forge::ffmpeg")
+        except Exception as ex:
+            trace_exception(ex)
+            ASCIIColors.red("Couldn't install ffmpeg")
+        pm.install("git+https://github.com/openai/whisper.git")
 
 
 import whisper
@@ -41,12 +46,20 @@ class LollmsWhisper(LollmsSTT):
                     output_path=None
                     ):
         super().__init__("whisper",app, model, output_path)
-        self.whisper = whisper.load_model(model)
+        try:
+            self.whisper = whisper.load_model(model)
+        except:
+            ASCIIColors.red("Couldn't load whisper model!\nWhisper will be disabled")
+            self.whisper = None
         self.ready = True
 
     def transcribe(
                 self,
                 wave_path: str|Path
                 )->str:
-        result = self.whisper.transcribe(str(wave_path))
-        return result["text"]
+        if self.whisper:
+            result = self.whisper.transcribe(str(wave_path))
+            return result["text"]
+        else:
+            ASCIIColors.error("Whisper is broken")
+            return ""

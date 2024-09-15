@@ -244,7 +244,7 @@ async def upload_voice_file(file: UploadFile = File(...)):
 
     # Save the file to disk or process it further
     contents = await file.read()
-    safe_filename = f"voice_{file_path.name}"
+    safe_filename = f"{file_path.name}"
     safe_file_path = lollmsElfServer.lollms_paths.custom_voices_path/safe_filename
     with safe_file_path.open("wb") as f:
         f.write(contents)
