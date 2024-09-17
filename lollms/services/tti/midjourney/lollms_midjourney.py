@@ -30,11 +30,39 @@ from lollms.tti import LollmsTTI
 import subprocess
 import shutil
 from tqdm import tqdm
-import threading
-from io import BytesIO
+
+import os
+import requests
+from PIL import Image
+
 
 MIDJOURNEY_API_URL = "https://api.mymidjourney.ai/api/v1/midjourney"
 
+
+
+def split_image(file_path, folder_path, i):
+    with Image.open(file_path) as img:
+        width, height = img.size
+        
+        # Calculate the size of each quadrant
+        quad_width = width // 2
+        quad_height = height // 2
+        
+        quadrants = [
+            (0, 0, quad_width, quad_height),
+            (quad_width, 0, width, quad_height),
+            (0, quad_height, quad_width, height),
+            (quad_width, quad_height, width, height)
+        ]
+        
+        split_paths = []
+        for index, box in enumerate(quadrants):
+            quadrant = img.crop(box)
+            split_path = os.path.join(folder_path, f"midjourney_{i}_{index+1}.png")
+            quadrant.save(split_path)
+            split_paths.append(split_path)
+        
+        return split_paths
 
 class LollmsMidjourney(LollmsTTI):
     def __init__(
@@ -160,7 +188,8 @@ class LollmsMidjourney(LollmsTTI):
         return {"error": "Timeout while waiting for image generation"}
 
 
-    def download_image(self, uri, folder_path):
+
+    def download_image(self, uri, folder_path, split=False):
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
         
@@ -176,10 +205,15 @@ class LollmsMidjourney(LollmsTTI):
             with open(file_path, 'wb') as file:
                 file.write(response.content)
             print(f"Image downloaded and saved as {file_path}")
-            return file_path
+            
+            if split:
+                return split_image(file_path, folder_path, i)
+            else:
+                return [file_path]
         else:
             print(f"Failed to download image. Status code: {response.status_code}")
             return None
+
     def get_nearest_aspect_ratio(self, width: int, height: int) -> str:
         # Define the available aspect ratios
         aspect_ratios = {
@@ -236,9 +270,9 @@ class LollmsMidjourney(LollmsTTI):
                 raise ValueError(progress_response["error"])
             
             if width<=1024:
-                file_name = self.download_image(progress_response["uri"], output_path)
+                file_names = self.download_image(progress_response["uri"], output_path, True)
                 
-                return file_name, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
+                return file_names[0], {"prompt":positive_prompt, "negative_prompt":negative_prompt}
 
             # Upscale the generated image
             upscale_response = self.upscale_image(message_id, "U1")

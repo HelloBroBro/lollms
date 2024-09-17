@@ -582,7 +582,8 @@ class AIPersonality:
         ASCIIColors.red(" *-*-*-*-*-*-*-*")
         ASCIIColors.yellow(prompt)
         ASCIIColors.red(" *-*-*-*-*-*-*-*")
-
+        ASCIIColors.red(f"Weight : {len(self.model.tokenize(prompt))} tokens")
+        ASCIIColors.red(" *-*-*-*-*-*-*-*")
 
 
     def fast_gen_with_images(self, prompt: str, images:list, max_generation_size: int=None, placeholders: dict = {}, sacrifice: list = ["previous_discussion"], debug: bool  = False, callback=None, show_progress=False) -> str:
