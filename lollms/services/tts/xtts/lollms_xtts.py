@@ -55,6 +55,7 @@ class LollmsXTTS(LollmsTTS):
         self.stop_event = threading.Event()
 
         # Show a cool LOGO using ASCIIColors
+        ASCIIColors.red("")
         ASCIIColors.red("   __    ___  __    __          __     __  ___   _        ")
         ASCIIColors.red("  / /   /___\/ /   / /   /\/\  / _\    \ \/ / |_| |_ ___  ")
         ASCIIColors.red(" / /   //  // /   / /   /    \ \ \ _____\  /| __| __/ __| ")

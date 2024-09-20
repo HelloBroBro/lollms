@@ -398,6 +398,9 @@ class LollmsApplication(LoLLMsCom):
             elif self.config.active_tts_service == "openai_tts":
                 from lollms.services.tts.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
+            elif self.config.active_tts_service == "fish_tts":
+                from lollms.services.tts.fish.lollms_fish_tts import LollmsFishAudioTTS
+                self.tts = LollmsFishAudioTTS(self, self.config.fish_tts_voice,  self.config.fish_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
@@ -547,6 +550,9 @@ class LollmsApplication(LoLLMsCom):
             elif self.config.active_tts_service == "openai_tts" and (self.tts is None or self.tts.name!="openai_tts"):
                 from lollms.services.tts.open_ai_tts.lollms_openai_tts import LollmsOpenAITTS
                 self.tts = LollmsOpenAITTS(self, self.config.openai_tts_model, self.config.openai_tts_voice,  self.config.openai_tts_key)
+            elif self.config.active_tts_service == "fish_tts":
+                from lollms.services.tts.fish.lollms_fish_tts import LollmsFishAudioTTS
+                self.tts = LollmsFishAudioTTS(self, self.config.fish_tts_voice,  self.config.fish_tts_key)
             elif self.config.active_tts_service == "xtts" and self.xtts:
                 self.tts = self.xtts
 
