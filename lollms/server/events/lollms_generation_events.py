@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from lollms.binding import BindingBuilder, InstallOption
 from ascii_colors import ASCIIColors
 from lollms.personality import  AIPersonality
-from lollms.types import SENDER_TYPES
+from lollms.types import SENDER_TYPES, MSG_OPERATION_TYPE
 from lollms.utilities import load_config, trace_exception, gc, terminate_thread, run_async
 from pathlib import Path
 from typing import List
@@ -94,7 +94,7 @@ def add_events(sio:socketio):
                 if personality_id==-1:
                     # Raw text generation
                     lollmsElfServer.answer = {"full_text":""}
-                    def callback(text, message_type: MSG_TYPE, metadata:dict={}):
+                    def callback(text, message_type: MSG_OPERATION_TYPE, metadata:dict={}):
                         if message_type == MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK:
                             ASCIIColors.success(f"generated: {len(lollmsElfServer.answer['full_text'].split())} words", end='\r')
                             if text is not None:
