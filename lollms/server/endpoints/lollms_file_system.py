@@ -128,7 +128,6 @@ def select_rag_database(client) -> Optional[Dict[str, Path]]:
                     if not PackageManager.check_package_installed_with_version("lollmsvectordb","0.6.0"):
                         PackageManager.install_or_update("lollmsvectordb")
                     
-                    from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
                     from lollmsvectordb import VectorDatabase
                     from lollmsvectordb.text_document_loader import TextDocumentsLoader
                     from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer

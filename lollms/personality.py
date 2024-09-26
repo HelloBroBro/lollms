@@ -17,8 +17,6 @@ from lollms.utilities import PromptReshaper, PackageManager, discussion_path_to_
 from lollms.com import NotificationType, NotificationDisplayType
 from lollms.client_session import Session, Client
 from lollmsvectordb.vector_database import VectorDatabase
-from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
-from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
 from lollmsvectordb.database_elements.document import Document
 import pkg_resources

@@ -13,8 +13,6 @@ from typing import List, Optional, Union
 from pathlib import Path
 from lollmsvectordb.database_elements.chunk import Chunk
 from lollmsvectordb.vector_database import VectorDatabase
-from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
-from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
 import sqlite3
 import secrets
 import time

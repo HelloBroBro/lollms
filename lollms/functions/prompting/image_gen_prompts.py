@@ -337,9 +337,9 @@ def get_image_gen_prompt(agent_name, number_of_entries=5) -> Tuple[str, str]:
     """
     try:
         from lollmsvectordb.vector_database import VectorDatabase
-        from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+        from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
         from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
-        db = VectorDatabase("", SemanticVectorizer(), TikTokenTokenizer(), number_of_entries)
+        db = VectorDatabase("", TFIDFVectorizer(), TikTokenTokenizer(), number_of_entries)
 
         image_gen_prompts = get_prompts_list()
         for entry in image_gen_prompts:
