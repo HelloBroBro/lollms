@@ -73,7 +73,14 @@ try:
             ]
         }
 except:
+    from functools import partial
+
     def generate_music(processor, client, generation_prompt: str, duration: int, model_name: str = "facebook/musicgen-melody", device: str="cuda:0") -> str:
         pass
     def generate_music_function(processor, client):
-        pass
+        return {
+            "function_name": "generate music is not available",  # The function name in string
+            "function": partial(generate_music,processor, client),  # The function to be called with preset parameters
+            "function_description": "This function is not availabe.",  # Description of the function
+            "function_parameters":[]
+        }
