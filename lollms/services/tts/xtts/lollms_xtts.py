@@ -15,6 +15,11 @@ from lollms.tts import LollmsTTS
 from lollms.utilities import run_pip_in_env
 from typing import List
 import threading
+from packaging import version
+import pipmaster as pm
+if version.parse(str(pm.get_installed_version("numpy"))) > version.parse(str("1.26.9")):
+    pm.install_version("numpy", "1.26.4")
+
 import numpy as np
 
 

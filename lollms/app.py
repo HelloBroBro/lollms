@@ -67,9 +67,6 @@ class LollmsApplication(LoLLMsCom):
         self.long_term_memory           = None
 
         self.tts                        = None
-        self.session                    = Session(lollms_paths)
-        self.skills_library             = SkillsLibrary(self.lollms_paths.personal_skills_path/(self.config.skills_lib_database_name+".sqlite"))
-        self.tasks_library              = TasksLibrary(self)
 
         self.handle_generate_msg: Callable[[str, Dict], None]               = None
         self.generate_msg_with_internet: Callable[[str, Dict], None]        = None
@@ -170,6 +167,11 @@ class LollmsApplication(LoLLMsCom):
                 self.load_rag_dbs()
             except Exception as ex:
                 trace_exception(ex)
+                
+                
+        self.session                    = Session(lollms_paths)
+        self.skills_library             = SkillsLibrary(self.lollms_paths.personal_skills_path/(self.config.skills_lib_database_name+".sqlite"))
+        self.tasks_library              = TasksLibrary(self)
 
     @staticmethod
     def check_internet_connection():

@@ -238,15 +238,36 @@ class LollmsDiffusers(LollmsTTI):
                 self.model.scheduler = sc
         width = adjust_dimensions(int(width))
         height = adjust_dimensions(int(height))
+        
+        
+        def process_output_path(output_path, self_output_dir):
+            if output_path is None:
+                output_path = Path(self_output_dir)
+                fn = find_next_available_filename(output_path, "diff_img_")
+            else:
+                output_path = Path(output_path)
+                if output_path.is_file():
+                    fn = output_path
+                elif output_path.is_dir():
+                    fn = find_next_available_filename(output_path, "diff_img_")
+                else:
+                    # If the path doesn't exist, assume it's intended to be a file
+                    fn = output_path
+
+            return fn
+        
+        
+        # Usage in the original context
         if output_path is None:
             output_path = self.output_dir
+
+        fn = process_output_path(output_path, self.output_dir)
+        
         if seed!=-1:
             generator = torch.Generator("cuda").manual_seed(seed)
             image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
         else:
             image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
-        output_path = Path(output_path)
-        fn = find_next_available_filename(output_path,"diff_img_")
         # Save the image
         image.save(fn)
         return fn, {"prompt":positive_prompt, "negative_prompt":negative_prompt}

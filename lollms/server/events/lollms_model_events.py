@@ -42,7 +42,12 @@ def add_events(sio:socketio):
 
     @sio.on('uninstall_model')
     def uninstall_model(sid, data):
-        sanitize_path(data['path'])
+        path:str = data['path']
+        if path.startswith("http://"):
+            path = path[7:]
+        if path.startswith("https://"):
+            path = path[8:]
+        sanitize_path(path)
 
         model_path = os.path.realpath(data['path'])
         model_type:str=data.get("type","gguf")

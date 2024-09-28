@@ -103,5 +103,6 @@ def build_image(prompt, negative_prompt, width, height, return_format="markdown"
             return None  # Handle other return formats if needed
     except Exception as ex:
         # Log the exception
+        trace_exception(ex)
         print(f"Error in build_image: {str(ex)}")
         return None

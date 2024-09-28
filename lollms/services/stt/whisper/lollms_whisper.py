@@ -34,9 +34,10 @@ except:
             ASCIIColors.red("Couldn't install ffmpeg")
         pm.install("git+https://github.com/openai/whisper.git")
 
-
-import whisper
-
+try:
+    import whisper
+except:
+    pm.install("openai-whisper")
 
 class LollmsWhisper(LollmsSTT):
     def __init__(
