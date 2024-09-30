@@ -478,7 +478,7 @@ def run_async(func):
             asyncio.run(func()) 
         except:
             func()
-
+    asyncio.sleep(0)
 
 def terminate_thread(thread):
     """ 
