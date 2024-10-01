@@ -2,7 +2,7 @@ import requests
 from typing import Optional, Dict
 from lollms.ttv import LollmsTTV
 
-class LumaLabsVideo(LollmsTTV):
+class LollmsLumaLabs(LollmsTTV):
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.lumalabs.ai/dream-machine/v1/generations"

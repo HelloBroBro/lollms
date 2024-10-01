@@ -451,6 +451,18 @@ class LollmsApplication(LoLLMsCom):
 
         ASCIIColors.execute_with_animation("Loading loacal TTI services", start_tti, ASCIIColors.color_blue)
         print("OK")
+        def start_ttv(*args, **kwargs):
+            if self.config.active_ttv_service == "lumalabs" and (self.ttv is None or self.tti.name!="lumalabs"):
+                try:
+                    from lollms.services.ttv.lumalabs.lollms_lumalabs import LollmsLumaLabs
+                    self.sd = LollmsLumaLabs(self.config.lumalabs_key)
+                except:
+                    self.warning(f"Couldn't load SD")
+
+
+        ASCIIColors.execute_with_animation("Loading loacal TTV services", start_ttv, ASCIIColors.color_blue)
+        print("OK")
+
 
 
     def verify_servers(self, reload_all=False):
@@ -565,6 +577,14 @@ class LollmsApplication(LoLLMsCom):
             elif self.config.active_stt_service == "whisper" and (self.tts is None or  self.tts.name!="whisper") :
                 from lollms.services.stt.whisper.lollms_whisper import LollmsWhisper
                 self.stt = LollmsWhisper(self, self.config.whisper_model)
+
+
+            if self.config.active_ttv_service == "lumalabs" and (self.ttv is None or self.tti.name!="lumalabs"):
+                try:
+                    from lollms.services.ttv.lumalabs.lollms_lumalabs import LollmsLumaLabs
+                    self.sd = LollmsLumaLabs(self.config.lumalabs_key)
+                except:
+                    self.warning(f"Couldn't load SD")
 
         except Exception as ex:
             trace_exception(ex)
