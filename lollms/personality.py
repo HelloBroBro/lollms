@@ -128,9 +128,6 @@ class AIPersonality:
         ValueError: If the provided path is not a folder or does not contain a config.yaml file.
         """
         self.config = config
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
 
         self.bot_says = ""
 
@@ -2404,19 +2401,22 @@ class APScript(StateMachine):
         codes = self.extract_code_blocks(response)
         return codes
     
-    def generate_code(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False ):
+    def generate_code(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, return_full_generated_code=False ):
+        response_full = ""
         if len(self.personality.image_files)>0:
             response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         elif  len(images)>0:
             response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, images, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         else:
             response = self.personality.generate(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        response_full += response
         codes = self.extract_code_blocks(response)
         if len(codes)>0:
             if not codes[-1]["is_complete"]:
                 code = "\n".join(codes[-1]["content"].split("\n")[:-1])
                 while not codes[-1]["is_complete"]:
                     response = self.personality.generate(prompt+code+self.user_full_header+"continue the code. Start from last line and continue the code. Put the code inside a markdown code tag."+self.separator_template+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+                    response_full += response
                     codes = self.extract_code_blocks(response)
                     if len(codes)==0:
                         break
@@ -2427,8 +2427,11 @@ class APScript(StateMachine):
                             code +="\n"+ "\n".join(codes[-1]["content"].split("\n"))
             else:
                 code = codes[-1]["content"]
-
-            return code
+            
+            if return_full_generated_code:
+                return code, response_full
+            else:
+                return code
         else:
             return None
             
