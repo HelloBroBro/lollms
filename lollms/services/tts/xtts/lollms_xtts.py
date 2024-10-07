@@ -20,6 +20,9 @@ import pipmaster as pm
 if version.parse(str(pm.get_installed_version("numpy"))) > version.parse(str("1.26.9")):
     pm.install_version("numpy", "1.26.4")
 
+if not pm.is_installed("pydub"):
+    pm.install("pydub")
+
 import numpy as np
 
 
@@ -32,6 +35,11 @@ if not PackageManager.check_package_installed("simpleaudio"):
 
 if not PackageManager.check_package_installed("wave"):
     PackageManager.install_or_update("wave")
+
+import re
+from pathlib import Path
+from pydub import AudioSegment
+
 
 import wave
 from TTS.api import TTS
@@ -112,6 +120,7 @@ class LollmsXTTS(LollmsTTS):
                 return potential_speaker_wav
         
         raise FileNotFoundError(f"Speaker file '{speaker}.wav' not found in any of the specified folders.")
+
     def tts_file(self, text, file_name_or_path, speaker=None, language="en") -> str:
         speaker_wav = None
         
@@ -120,8 +129,52 @@ class LollmsXTTS(LollmsTTS):
         else:
             speaker_wav = self.get_speaker_wav("main_voice")
         
-        self.tts.tts_to_file(text=text, file_path=file_name_or_path, speaker_wav=speaker_wav, language=language)
+        # Split the text into sentences
+        sentences = re.split('(?<=[.!?])\s+', text)
+        
+        # Initialize an empty list to store audio segments
+        audio_segments = []
+        
+        # Process sentences in chunks of less than 400 tokens
+        chunk = []
+        chunk_tokens = 0
+        output_path = Path(file_name_or_path)
+        
+        for i, sentence in enumerate(sentences):
+            sentence_tokens = len(sentence.split())
+            if chunk_tokens + sentence_tokens > 400:
+                # Process the current chunk
+                chunk_text = " ".join(chunk)
+                temp_file = output_path.with_suffix(f".temp{i}.wav")
+                self.tts.tts_to_file(text=chunk_text, file_path=str(temp_file), speaker_wav=speaker_wav, language=language)
+                audio_segments.append(AudioSegment.from_wav(str(temp_file)))
+                
+                # Reset the chunk
+                chunk = [sentence]
+                chunk_tokens = sentence_tokens
+            else:
+                chunk.append(sentence)
+                chunk_tokens += sentence_tokens
+        
+        # Process the last chunk if it's not empty
+        if chunk:
+            chunk_text = " ".join(chunk)
+            temp_file = output_path.with_suffix(f".temp{len(sentences)}.wav")
+            self.tts.tts_to_file(text=chunk_text, file_path=str(temp_file), speaker_wav=speaker_wav, language=language)
+            audio_segments.append(AudioSegment.from_wav(str(temp_file)))
+        
+        # Combine all audio segments
+        combined_audio = sum(audio_segments)
+        
+        # Export the combined audio to the final file
+        combined_audio.export(file_name_or_path, format="wav")
+        
+        # Clean up temporary files
+        for temp_file in output_path.parent.glob(f"{output_path.stem}.temp*.wav"):
+            temp_file.unlink()
+        
         return file_name_or_path
+
     
     def tts_audio(self, text, speaker=None, file_name_or_path: Path | str | None = None, language="en", use_threading=False):
         # Split text into sentences

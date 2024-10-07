@@ -46,6 +46,12 @@ from lollms.com import LoLLMsCom
 from lollms.helpers import trace_exception
 from lollms.utilities import PackageManager
 
+import pipmaster as pm
+
+if not pm.is_installed("inspect"):
+    pm.install("inspect")
+import inspect
+
 from lollms.code_parser import compress_js, compress_python, compress_html
 
 
@@ -2057,11 +2063,18 @@ class StateMachine:
 
         for cmd, func in commands.items():
             if cmd == command[0:len(cmd)]:
-                try:
-                    func(command, full_context, callback, context_state, client)
-                except:# retrocompatibility
-                    func(command, full_context, client)
-                return
+                # Get the number of parameters the function expects
+                param_count = len(inspect.signature(func).parameters)
+
+                if param_count == 3:
+                    # Old version of the function
+                    return func(command, full_context, client)
+                elif param_count == 5:
+                    # New version of the function
+                    return func(command, full_context, callback, context_state, client)
+                else:
+                    raise ValueError(f"Unexpected number of parameters for function {func.__name__}. Expected 3 or 5, got {param_count}")
+
 
         default_func = current_state.get("default")
         if default_func is not None:
