@@ -47,9 +47,6 @@ from lollms.helpers import trace_exception
 from lollms.utilities import PackageManager
 
 import pipmaster as pm
-
-if not pm.is_installed("inspect"):
-    pm.install("inspect")
 import inspect
 
 from lollms.code_parser import compress_js, compress_python, compress_html

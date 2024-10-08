@@ -136,6 +136,7 @@ async def search(query: RAGQuery):
 @router.delete("/wipe_database", response_model=DocumentResponse)
 async def wipe_database(key: str):
     await validate_key(key)
+    key = sanitize_path(key)
     user_folder = lollmsElfServer.lollms_paths / str(key)
     shutil.rmtree(user_folder, ignore_errors=True)
     return DocumentResponse(success=True, message="Database wiped successfully.")
