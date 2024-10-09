@@ -1,15 +1,7 @@
-from lollms.utilities import PackageManager, find_first_available_file_index, discussion_path_to_url
+from lollms.utilities import find_first_available_file_index, discussion_path_to_url
 from lollms.client_session import Client
 from lollms.personality import APScript
-if not PackageManager.check_package_installed("pyautogui"):
-    PackageManager.install_package("pyautogui")
-if not PackageManager.check_package_installed("PyQt5"):
-    PackageManager.install_package("PyQt5")
 from ascii_colors import trace_exception
-import cv2
-import time
-from PyQt5 import QtWidgets, QtGui, QtCore
-import sys
 from functools import partial
 from lollms.personality import AIPersonality
 from typing import List

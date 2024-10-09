@@ -19,17 +19,11 @@ from lollms.utilities import PackageManager
 from ascii_colors import trace_exception
 
 # Here is an example of how we install a non installed library using PackageManager
-if not PackageManager.check_package_installed("PyQt5"):
-    PackageManager.install_package("PyQt5")
-if not PackageManager.check_package_installed("pyautogui"):
-    PackageManager.install_package("pyautogui")
-
+import pipmaster as pm
 # now we can import the libraries
 import threading
 import time
 import sys
-from PyQt5.QtWidgets import QApplication, QMessageBox
-import pyautogui
 
 # here is the core of the function to be built
 def set_timer_with_alert(duration: int, message: str) -> str:
@@ -43,6 +37,10 @@ def set_timer_with_alert(duration: int, message: str) -> str:
     Returns:
     str: A success message indicating the timer has been set.
     """
+    if not pm.is_installed("pyautogui"):
+        pm.install("pyautogui")
+    import pyautogui
+
     def timer_callback():
         try:
             time.sleep(duration)

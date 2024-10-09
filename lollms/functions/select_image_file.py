@@ -1,20 +1,20 @@
 from lollms.utilities import PackageManager, find_first_available_file_index, discussion_path_to_url
 from lollms.client_session import Client
-if not PackageManager.check_package_installed("pyautogui"):
-    PackageManager.install_package("pyautogui")
-if not PackageManager.check_package_installed("PyQt5"):
-    PackageManager.install_package("PyQt5")
 
-if not PackageManager.check_package_installed("cv2"):
-    PackageManager.install_package("opencv-python")
-import cv2
+
+
 import time
-from PyQt5 import QtWidgets, QtGui, QtCore
 import sys
 from functools import partial
-
+import pipmaster as pm
 
 def select_image_file(processor, client):
+    if not pm.is_installed("PyQt5"):
+        pm.install("PyQt5")
+    if not pm.is_installed("cv2"):
+        pm.install("opencv-python")
+    import cv2    
+    from PyQt5 import QtWidgets
     app = QtWidgets.QApplication(sys.argv)
     options = QtWidgets.QFileDialog.Options()
     options |= QtWidgets.QFileDialog.ReadOnly

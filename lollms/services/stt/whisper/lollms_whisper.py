@@ -5,9 +5,6 @@
 
 from pathlib import Path
 from lollms.app import LollmsApplication
-from lollms.paths import LollmsPaths
-from lollms.config import TypedConfig, ConfigTemplate, BaseConfig
-from lollms.utilities import PackageManager, install_conda_package
 from lollms.stt import LollmsSTT
 from dataclasses import dataclass
 from PIL import Image, PngImagePlugin
@@ -22,13 +19,13 @@ try:
     if not pm.is_installed("openai-whisper"):
         pm.install("openai-whisper")
         try:
-            install_conda_package("conda-forge::ffmpeg")
+            pass#install_conda_package("conda-forge::ffmpeg")
         except Exception as ex:
             trace_exception(ex)
             ASCIIColors.red("Couldn't install ffmpeg")
 except:
         try:
-            install_conda_package("conda-forge::ffmpeg")
+            pass#install_conda_package("conda-forge::ffmpeg")
         except Exception as ex:
             trace_exception(ex)
             ASCIIColors.red("Couldn't install ffmpeg")

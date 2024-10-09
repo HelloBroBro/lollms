@@ -1,55 +1,56 @@
-from lollms.utilities import PackageManager, find_first_available_file_index, discussion_path_to_url
+from lollms.utilities import find_first_available_file_index, discussion_path_to_url
 from lollms.client_session import Client
-if not PackageManager.check_package_installed("pyautogui"):
-    PackageManager.install_package("pyautogui")
-if not PackageManager.check_package_installed("PyQt5"):
-    PackageManager.install_package("PyQt5")
+import pipmaster as pm
 
-import pyautogui
-from PyQt5 import QtWidgets, QtGui
-from PyQt5.QtCore import Qt
-import sys
-
-from functools import partial
-
-
-class ScreenshotWindow(QtWidgets.QWidget):
-    def __init__(self, client, screenshot, fn_view, fn, use_a_single_photo_at_a_time= True):
-        super().__init__()
-        self.client = client
-        self.screenshot = screenshot
-        self.fn_view = fn_view
-        self.fn = fn
-        self.use_a_single_photo_at_a_time = use_a_single_photo_at_a_time
-        
-        self.initUI()
-
-    def initUI(self):
-        self.setWindowTitle('Screenshot Viewer')
-        self.layout = QtWidgets.QVBoxLayout()
-        
-        self.label = QtWidgets.QLabel(self)
-        self.pixmap = QtGui.QPixmap(self.screenshot)
-        self.label.setPixmap(self.pixmap)
-        self.layout.addWidget(self.label)
-        
-        self.ok_button = QtWidgets.QPushButton('OK')
-        self.ok_button.clicked.connect(self.save_and_close)
-        self.layout.addWidget(self.ok_button)
-        
-        self.setLayout(self.layout)
-        
-    def save_and_close(self):
-        self.screenshot.save(self.fn_view)
-        self.screenshot.save(self.fn)
-        self.client.discussion.image_files.append(self.fn)
-        if self.use_a_single_photo_at_a_time:
-            self.client.discussion.image_files = [self.client.discussion.image_files[-1]]
-
-        self.close()
 
 
 def take_screenshot(client: Client, use_ui: bool = False, use_a_single_photo_at_a_time= True):
+
+    if not pm.is_installed("pyautogui"):
+        pm.install("pyautogui")
+    if not pm.is_installed("PyQt5"):
+        pm.install("PyQt5")
+
+    import pyautogui
+    from PyQt5 import QtWidgets, QtGui
+    import sys
+
+    class ScreenshotWindow(QtWidgets.QWidget):
+        def __init__(self, client, screenshot, fn_view, fn, use_a_single_photo_at_a_time= True):
+            super().__init__()
+            self.client = client
+            self.screenshot = screenshot
+            self.fn_view = fn_view
+            self.fn = fn
+            self.use_a_single_photo_at_a_time = use_a_single_photo_at_a_time
+            
+            self.initUI()
+
+        def initUI(self):
+            self.setWindowTitle('Screenshot Viewer')
+            self.layout = QtWidgets.QVBoxLayout()
+            
+            self.label = QtWidgets.QLabel(self)
+            self.pixmap = QtGui.QPixmap(self.screenshot)
+            self.label.setPixmap(self.pixmap)
+            self.layout.addWidget(self.label)
+            
+            self.ok_button = QtWidgets.QPushButton('OK')
+            self.ok_button.clicked.connect(self.save_and_close)
+            self.layout.addWidget(self.ok_button)
+            
+            self.setLayout(self.layout)
+            
+        def save_and_close(self):
+            self.screenshot.save(self.fn_view)
+            self.screenshot.save(self.fn)
+            self.client.discussion.image_files.append(self.fn)
+            if self.use_a_single_photo_at_a_time:
+                self.client.discussion.image_files = [self.client.discussion.image_files[-1]]
+
+            self.close()
+
+
     screenshot = pyautogui.screenshot()
     view_image = client.discussion.discussion_folder / "view_images"
     image = client.discussion.discussion_folder / "images"

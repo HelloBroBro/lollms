@@ -40,63 +40,6 @@ import subprocess
 
 from functools import partial
 
-def install_conda_utility():
-    import platform
-    if platform.system()=="Windows":
-        conda_path = Path(sys.executable).parent.parent/"miniconda3"/"condabin"/"conda"
-    else:
-        conda_path = Path(sys.executable).parent.parent.parent/"miniconda3"/"bin"/"conda"
-    ASCIIColors.red("Conda path:")
-    ASCIIColors.yellow(conda_path)
-    process = subprocess.Popen(f'{conda_path} install conda -y', shell=True)
-    
-    # Wait for the process to finish
-    process.wait()
-    #from conda.cli.python_api import  run_command, Commands
-    # Create a new Conda environment with the specified Python version
-    #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
-
-def install_conda_package(package_name):
-    try:
-        import platform
-        if platform.system()=="Windows":
-            conda_path = Path(sys.executable).parent.parent/"miniconda3"/"condabin"/"conda"
-        else:
-            conda_path = Path(sys.executable).parent.parent.parent/"miniconda3"/"bin"/"conda"
-        ASCIIColors.red("Conda path:")
-        ASCIIColors.yellow(conda_path)
-        process = subprocess.Popen(f'{conda_path} install {package_name} -y', shell=True)
-        
-        # Wait for the process to finish
-        process.wait()
-        #from conda.cli.python_api import  run_command, Commands
-        # Create a new Conda environment with the specified Python version
-        #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
-        return True
-    except Exception as ex:
-        trace_exception(ex)
-        return False
-
-def create_conda_env(env_name, python_version):
-    from lollms.security import sanitize_shell_code
-    env_name = sanitize_shell_code(env_name)
-    python_version = sanitize_shell_code(python_version)
-    # Activate the Conda environment
-    import platform
-    if platform.system()=="Windows":
-        conda_path = Path(sys.executable).parent.parent/"miniconda3"/"condabin"/"conda"
-    else:
-        conda_path = Path(sys.executable).parent.parent.parent/"miniconda3"/"bin"/"conda"
-    ASCIIColors.red("Conda path: ",flush=True, end="")
-    ASCIIColors.yellow(conda_path)
-    process = subprocess.Popen(f'{conda_path} create --name {env_name} python={python_version} -y', shell=True)
-    
-    # Wait for the process to finish
-    process.wait()
-    #from conda.cli.python_api import  run_command, Commands
-    # Create a new Conda environment with the specified Python version
-    #run_command(Commands.CREATE, "-n", env_name, f"python={python_version}")
-
 def run_pip_in_env(env_name, pip_args, cwd=None):
     import platform
     # Set the current working directory if provided, otherwise use the current directory
@@ -334,27 +277,45 @@ def show_custom_dialog(title, text, options):
     except Exception as ex:
         ASCIIColors.error(ex)
         return show_console_custom_dialog(title, text, options)
-    
 def show_yes_no_dialog(title, text):
     try:
-        import tkinter as tk
-        from tkinter import messagebox
-        # Create a new Tkinter root window and hide it
-        root = tk.Tk()
-        root.withdraw()
-    
-        # Make the window appear on top
-        root.attributes('-topmost', True)
-        
-        # Show the dialog box
-        result = messagebox.askyesno(title, text)
-    
-        # Destroy the root window
-        root.destroy()
-    
-        return result
-    except:
-        return yes_or_no_input(text)
+        if sys.platform.startswith('win'):
+            return show_windows_dialog(title, text)
+        elif sys.platform.startswith('darwin'):
+            return show_macos_dialog(title, text)
+        elif sys.platform.startswith('linux'):
+            return show_linux_dialog(title, text)
+        else:
+            return console_dialog(title, text)
+    except Exception as ex:
+        print(f"Error: {ex}")
+        return console_dialog(title, text)
+
+def show_windows_dialog(title, text):
+    from ctypes import windll
+    result = windll.user32.MessageBoxW(0, text, title, 4)
+    return result == 6  # 6 means "Yes"
+
+def show_macos_dialog(title, text):
+    script = f'tell app "System Events" to display dialog "{text}" buttons {{"No", "Yes"}} default button "Yes" with title "{title}"'
+    result = subprocess.run(['osascript', '-e', script], capture_output=True, text=True)
+    return "Yes" in result.stdout
+
+def show_linux_dialog(title, text):
+    zenity_path = Path('/usr/bin/zenity')
+    if zenity_path.exists():
+        result = subprocess.run([str(zenity_path), '--question', '--title', title, '--text', text], capture_output=True)
+        return result.returncode == 0
+    else:
+        return console_dialog(title, text)
+
+def console_dialog(title, text):
+    print(f"{title}\n{text}")
+    while True:
+        response = input("Enter 'yes' or 'no': ").lower()
+        if response in ['yes', 'no']:
+            return response == 'yes'
+        print("Invalid input. Please enter 'yes' or 'no'.")
         
 def show_message_dialog(title, text):
     import tkinter as tk

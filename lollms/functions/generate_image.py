@@ -1,10 +1,6 @@
-from lollms.utilities import PackageManager, find_first_available_file_index, discussion_path_to_url
+from lollms.utilities import discussion_path_to_url
 from lollms.client_session import Client
 from lollms.personality import APScript
-if not PackageManager.check_package_installed("pyautogui"):
-    PackageManager.install_package("pyautogui")
-if not PackageManager.check_package_installed("PyQt5"):
-    PackageManager.install_package("PyQt5")
 from ascii_colors import trace_exception
 from functools import partial
 from lollms.functions.prompting.image_gen_prompts import get_image_gen_prompt, get_random_image_gen_prompt

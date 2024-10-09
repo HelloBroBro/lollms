@@ -4,28 +4,11 @@ from typing import Optional
 from base64 import b64encode
 import io
 from PIL import Image
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from lollms_webui import LOLLMSWebUI
 from pydantic import BaseModel
-from starlette.responses import StreamingResponse
-from lollms.types import MSG_OPERATION_TYPE
-from lollms.utilities import detect_antiprompt, remove_text_from_string, trace_exception
-from lollms.security import sanitize_path
-from ascii_colors import ASCIIColors
-from lollms.databases.discussions_database import DiscussionsDB, Discussion
-from lollms.security import check_access
-from typing import List
 
-from lollms.utilities import PackageManager, find_first_available_file_index, discussion_path_to_url
-from lollms.client_session import Client
-from lollms.personality import APScript
-if not PackageManager.check_package_installed("pyautogui"):
-    PackageManager.install_package("pyautogui")
-if not PackageManager.check_package_installed("PyQt5"):
-    PackageManager.install_package("PyQt5")
 from ascii_colors import trace_exception
-from functools import partial
-from lollms.functions.prompting.image_gen_prompts import get_image_gen_prompt, get_random_image_gen_prompt
 
 
 router = APIRouter()
