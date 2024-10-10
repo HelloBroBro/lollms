@@ -128,7 +128,7 @@ class LollmsDiffusers(LollmsTTI):
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.models_dir.mkdir(parents=True, exist_ok=True)
 
-       
+        ASCIIColors.red("")       
         ASCIIColors.red("   _           _ _                    _ _  __  __                          ")
         ASCIIColors.red("  | |         | | |                  | (_)/ _|/ _|                         ")
         ASCIIColors.red("  | |     ___ | | |_ __ ___  ___   __| |_| |_| |_ _   _ ___  ___ _ __ ___  ")
@@ -137,7 +137,8 @@ class LollmsDiffusers(LollmsTTI):
         ASCIIColors.red("  |______\___/|_|_|_| |_| |_|___/ \__,_|_|_| |_|  \__,_|___/\___|_|  |___/ ")
         ASCIIColors.red("                              ______                                       ")
         ASCIIColors.red("                             |______|                                      ")
-
+        ASCIIColors.red("")       
+        ASCIIColors.yellow(f"Using model: {app.config.diffusers_model}")
         import torch 
         if not PackageManager.check_package_installed("diffusers"):
             check_and_install_torch("nvidia" in self.app.config.hardware_mode)            

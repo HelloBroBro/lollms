@@ -6,7 +6,6 @@
 # Description   :
 # This is an interface class for lollms personalities.
 ######
-from fastapi import Request
 from datetime import datetime
 from pathlib import Path
 from lollms.config import InstallOption, TypedConfig, BaseConfig
@@ -26,7 +25,6 @@ import re
 
 from datetime import datetime
 import importlib
-import shutil
 import subprocess
 import yaml
 from ascii_colors import ASCIIColors
@@ -38,7 +36,6 @@ import json
 from lollmsvectordb.vector_database import VectorDatabase
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
 from lollmsvectordb.text_chunker import TextChunker
-import hashlib
 
 from functools import partial
 import sys
@@ -2533,8 +2530,8 @@ class APScript(StateMachine):
         Raises:
             ValueError: If neither instant_answers nor regular_search_queries is set to True.
         """
-        if not PackageManager.check_package_installed("duckduckgo_search"):
-            PackageManager.install_package("duckduckgo_search")
+        if not pm.is_installed("duckduckgo_search"):
+            pm.install("duckduckgo_search")
         from duckduckgo_search import DDGS
         if not (instant_answers or regular_search_queries):
             raise ValueError("One of ('instant_answers', 'regular_search_queries') must be True")

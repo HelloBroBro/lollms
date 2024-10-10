@@ -532,7 +532,7 @@ class LollmsApplication(LoLLMsCom):
                     self.warning(f"Couldn't load Comfyui")
 
             ASCIIColors.blue("Activating TTI service")
-            if self.config.active_tti_service == "diffusers" and (self.tti is None or self.tti.name!="diffusers"):
+            if self.config.active_tti_service == "diffusers" and (self.tti is None or self.tti.name!="diffusers" or self.tti.model!=self.config.diffusers_model):
                 from lollms.services.tti.diffusers.lollms_diffusers import LollmsDiffusers
                 self.tti = LollmsDiffusers(self)
             elif self.config.active_tti_service == "diffusers_client" and (self.tti.base_url!=self.config.diffusers_client_base_url or self.tti.name!="diffusers_client"):

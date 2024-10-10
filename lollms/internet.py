@@ -2,6 +2,9 @@ from ascii_colors import ASCIIColors, trace_exception
 from lollms.utilities import PackageManager
 import time
 import re
+import pipmaster as pm
+if not pm.is_installed("freedom_search"):
+    pm.install("freedom_search")
 from freedom_search import InternetSearchEnhancer
 from scrapemaster import ScrapeMaster
 from pathlib import Path
