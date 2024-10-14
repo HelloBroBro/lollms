@@ -4267,7 +4267,7 @@ class APScript(StateMachine):
 '''
 
 
-    def build_a_folder_link(self, folder_path, link_text="Open Folder"):
+    def build_a_folder_link(self, folder_path, client: Client, link_text="Open Folder"):
         folder_path = str(folder_path).replace('\\','/')
         return '''
 <a href="#" onclick="path=\''''+f'{folder_path}'+'''\';
@@ -4276,7 +4276,7 @@ fetch('/open_folder', {
     headers: {
         'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ path: path })
+    body: JSON.stringify({ client_id:''' +f'{client.client_id}'+''', path: path })
     })
     .then(response => response.json())
     .then(data => {
@@ -4290,7 +4290,7 @@ fetch('/open_folder', {
     console.error('Error:', error);
     });
 ">'''+f'''{link_text}</a>'''
-    def build_a_file_link(self, file_path, link_text="Open Folder"):
+    def build_a_file_link(self, file_path, client: Client, link_text="Open Folder"):
         file_path = str(file_path).replace('\\','/')
         return '''
 <a href="#" onclick="path=\''''+f'{file_path}'+'''\';
@@ -4299,7 +4299,7 @@ fetch('/open_file', {
     headers: {
         'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ path: path })
+    body: JSON.stringify({ client_id:''' +f'{client.client_id}'+''', path: path })
     })
     .then(response => response.json())
     .then(data => {
