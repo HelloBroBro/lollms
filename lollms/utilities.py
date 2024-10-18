@@ -277,6 +277,7 @@ def show_custom_dialog(title, text, options):
     except Exception as ex:
         ASCIIColors.error(ex)
         return show_console_custom_dialog(title, text, options)
+    
 def show_yes_no_dialog(title, text):
     try:
         if sys.platform.startswith('win'):
@@ -293,7 +294,7 @@ def show_yes_no_dialog(title, text):
 
 def show_windows_dialog(title, text):
     from ctypes import windll
-    result = windll.user32.MessageBoxW(0, text, title, 4)
+    result = windll.user32.MessageBoxW(0, text, title, 4 | 0x40000)
     return result == 6  # 6 means "Yes"
 
 def show_macos_dialog(title, text):

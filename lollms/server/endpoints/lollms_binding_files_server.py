@@ -209,29 +209,6 @@ async def serve_data(path: str):
 
 
 
-@router.get("/help/{path:path}")
-async def serve_help(path: str):
-    """
-    Serve image file.
-
-    Args:
-        filename (str): The name of the data file to serve.
-
-    Returns:
-        FileResponse: The file response containing the requested data file.
-    """
-    path = sanitize_path_from_endpoint(path)    
-
-    root_dir = Path(os.getcwd())
-    file_path = root_dir/'help/' / path
-
-    if not Path(file_path).exists():
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return FileResponse(str(file_path))
-
-
-
 @router.get("/uploads/{path:path}")
 async def serve_uploads(path: str):
     """
