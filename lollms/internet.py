@@ -160,7 +160,12 @@ def scrape_and_save(url, file_path:str|Path=None, use_selenium=False, follow_lin
                 md_file.write(text + '\n\n')
         print(f"Texts saved to {file_path}")
         print(f"Images saved to {images_folder}")
-
+    if len(results['texts'])==0:
+        return {
+            'texts': ["Query returned no information. Please try to change the query."],
+            'image_urls': []
+        }
+        
     return {
         'texts': results['texts'],
         'image_urls': results['image_urls']
@@ -322,7 +327,7 @@ def internet_search(query, internet_nb_search_pages, chromedriver_path=None, qui
 
     return search_results
 
-def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorizer = "semantic", vectorize=True, asses_using_llm=True, yes_no=None):
+def internet_search_with_vectorization(query, chromedriver_path=None, internet_nb_search_pages=5, internet_vectorization_chunk_size=512, internet_vectorization_overlap_size=20, internet_vectorization_nb_chunks=4, model = None, quick_search:bool=False, vectorizer = "tfidf", vectorize=True, asses_using_llm=True, yes_no=None):
     """
     """
 
