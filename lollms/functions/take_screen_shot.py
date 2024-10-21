@@ -1,7 +1,7 @@
 from lollms.utilities import find_first_available_file_index, discussion_path_to_url
 from lollms.client_session import Client
 import pipmaster as pm
-
+from functools import partial
 
 
 def take_screenshot(client: Client, use_ui: bool = False, use_a_single_photo_at_a_time= True):

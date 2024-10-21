@@ -40,6 +40,10 @@ import subprocess
 
 from functools import partial
 
+
+def create_env(env_name, python_version):
+    pass
+
 def run_pip_in_env(env_name, pip_args, cwd=None):
     import platform
     # Set the current working directory if provided, otherwise use the current directory
