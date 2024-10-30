@@ -31,7 +31,7 @@ from ascii_colors import ASCIIColors
 import time
 from lollms.types import MSG_OPERATION_TYPE, SUMMARY_MODE
 import json
-from typing import Any, List, Optional, Type, Callable, Dict, Any, Union
+from typing import Any, List, Optional, Type, Callable, Dict, Any, Union, Tuple
 import json
 from lollmsvectordb.vector_database import VectorDatabase
 from lollmsvectordb.text_document_loader import TextDocumentsLoader
@@ -156,6 +156,9 @@ class AIPersonality:
         #General information
         self._author: str = "ParisNeo"
         self._name: str = "lollms"
+        self._creation_date = "unknown"
+        self._last_update_date = "unknown"
+
         self._user_name: str = "user"
         self._category: str = "General"
         self._category_desc: str = "General"
@@ -303,7 +306,7 @@ class AIPersonality:
             callback = self.callback
 
         if callback:
-            callback(message_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_NEW_MESSAGE, parameters={'type':message_type.value,'metadata':metadata}, personality=self)
+            callback(message_text, MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_NEW_MESSAGE, personality=self)
 
     def set_message_content(self, full_text:str, callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, Any | None], bool]=None):
         """This sends full text to front end
@@ -829,6 +832,9 @@ class AIPersonality:
         self._version = config.get("version", self._version)
         self._author = config.get("author", self._author)
         self._name = config.get("name", self._name)
+        self._creation_date = config.get("creation_date", self._creation_date)
+        self._last_update_date = config.get("last_update_date", self._last_update_date)
+        
         self._user_name = config.get("user_name", self._user_name)
         self._category_desc = config.get("category", self._category)
         self._language = config.get("language", self._language)
@@ -1115,6 +1121,8 @@ class AIPersonality:
             "author": self._author,
             "version": self._version,
             "name": self._name,
+            "creation_date": self._creation_date,
+            "last_update_date": self._last_update_date,
             "user_name": self._user_name,
             "category": self._category,
             "language": self._language,
@@ -1157,6 +1165,8 @@ class AIPersonality:
             "author": self._author,
             "version": self._version,
             "name": self._name,
+            "creation_date": self._creation_date,
+            "last_update_date": self._last_update_date,
             "user_name": self._user_name,
             "category": self._category,
             "language": self._language,
@@ -1233,6 +1243,26 @@ class AIPersonality:
     def name(self, value: str):
         """Set the name."""
         self._name = value
+
+    @property
+    def creation_date(self) -> str:
+        """Get the name."""
+        return self._creation_date
+
+    @creation_date.setter
+    def creation_date(self, value: str):
+        """Set the name."""
+        self._creation_date = value        
+
+    @property
+    def last_update_date(self) -> str:
+        """Get the name."""
+        return self._last_update_date
+
+    @last_update_date.setter
+    def last_update_date(self, value: str):
+        """Set the name."""
+        self._last_update_date = value        
 
     @property
     def user_name(self) -> str:
@@ -2259,6 +2289,83 @@ class APScript(StateMachine):
         """
         pass
 
+    def generate_html_from_dict(self, data):
+        css_style = """
+        <style>
+            .container {
+                font-family: 'Arial', sans-serif;
+                max-width: 1000px;
+                margin: 20px auto;
+                padding: 20px;
+                background-color: #f8f9fa;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            .header {
+                background-color: #343a40;
+                color: white;
+                padding: 20px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+            }
+            .section {
+                margin-bottom: 20px;
+                padding: 15px;
+                background-color: white;
+                border-radius: 6px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            }
+            .key {
+                font-weight: bold;
+                color: #495057;
+                margin-bottom: 5px;
+            }
+            .value {
+                color: #212529;
+                white-space: pre-wrap;
+                line-height: 1.6;
+            }
+            .list {
+                margin: 0;
+                padding-left: 20px;
+            }
+        </style>
+        """
+
+        def format_value(value):
+            if isinstance(value, list):
+                if not value:
+                    return "<em>Empty list</em>"
+                items = [f"<li>{item}</li>" for item in value]
+                return f"<ul class='list'>{''.join(items)}</ul>"
+            elif isinstance(value, (str, int, float)):
+                # Replace pipe character and preserve formatting for multiline strings
+                if isinstance(value, str) and '|' in value:
+                    value = value.replace('|', '').strip()
+                return f"<div class='value'>{value}</div>"
+            else:
+                return f"<div class='value'>{str(value)}</div>"
+
+        html = css_style
+        html += "<div class='container'>"
+        
+        # Add header with name if it exists
+        if "name" in data:
+            html += f"<div class='header'><h1>{data['name']}</h1></div>"
+
+        # Process all key-value pairs
+        for key, value in data.items():
+            if key != "name":  # Skip name as it's already in header
+                html += "<div class='section'>"
+                html += f"<div class='key'>{key.replace('_', ' ').title()}:</div>"
+                html += format_value(value)
+                html += "</div>"
+
+        html += "</div>"
+        return html
+
+
+
     def execute_command(self, command: str, parameters:list=[], client:Client=None):
         """
         Recovers user commands and executes them. Each personality can define a set of commands that they can receive and execute
@@ -2408,16 +2515,22 @@ class APScript(StateMachine):
         codes = self.extract_code_blocks(response)
         return codes
     
-    def generate_code(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, return_full_generated_code=False ):
+    def generate_code(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, return_full_generated_code=False, accept_all_if_no_code_tags_is_present=False):
         response_full = ""
+        full_prompt = self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + self.system_custom_header("User prompt")+ prompt + self.separator_template + self.ai_custom_header("generated code")
         if len(self.personality.image_files)>0:
-            response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+            response = self.personality.generate_with_images(full_prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         elif  len(images)>0:
-            response = self.personality.generate_with_images(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, images, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+            response = self.personality.generate_with_images(full_prompt, images, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         else:
-            response = self.personality.generate(self.system_custom_header("Generation infos")+ "Generated code must be put inside the adequate markdown code tag. Use this template:\n```language name\nCode\n```\nMake sure only a single code tag is generated at each dialogue turn." + self.separator_template + prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+            response = self.personality.generate(full_prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
         response_full += response
         codes = self.extract_code_blocks(response)
+        if len(codes)==0 and accept_all_if_no_code_tags_is_present:
+            if return_full_generated_code:
+                return response, response_full
+            else:
+                return response
         if len(codes)>0:
             if not codes[-1]["is_complete"]:
                 code = "\n".join(codes[-1]["content"].split("\n")[:-1])
@@ -2441,6 +2554,124 @@ class APScript(StateMachine):
                 return code
         else:
             return None
+
+    def generate_text(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, return_full_generated_code=False, accept_all_if_no_code_tags_is_present=False):
+        response_full = ""
+        full_prompt = self.system_custom_header("Generation infos")+ "Generated text content must be put inside a markdown code tag. Use this template:\n```\nText\n```\nMake sure only a single text tag is generated at each dialogue turn." + self.separator_template + self.system_custom_header("User prompt")+ prompt + self.separator_template + self.ai_custom_header("generated answer")
+        if len(self.personality.image_files)>0:
+            response = self.personality.generate_with_images(full_prompt, self.personality.image_files, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        elif  len(images)>0:
+            response = self.personality.generate_with_images(full_prompt, images, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        else:
+            response = self.personality.generate(full_prompt, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+        response_full += response
+        codes = self.extract_code_blocks(response)
+        if len(codes)==0 and accept_all_if_no_code_tags_is_present:
+            if return_full_generated_code:
+                return response, response_full
+            else:
+                return response
+        if len(codes)>0:
+            if not codes[-1]["is_complete"]:
+                code = "\n".join(codes[-1]["content"].split("\n")[:-1])
+                while not codes[-1]["is_complete"]:
+                    response = self.personality.generate(prompt+code+self.user_full_header+"continue the text. Start from last line and continue the text. Put the text inside a markdown code tag."+self.separator_template+self.ai_full_header, max_size, temperature, top_k, top_p, repeat_penalty, repeat_last_n, callback, debug=debug)
+                    response_full += response
+                    codes = self.extract_code_blocks(response)
+                    if len(codes)==0:
+                        break
+                    else:
+                        if not codes[-1]["is_complete"]:
+                            code +="\n"+ "\n".join(codes[-1]["content"].split("\n")[:-1])
+                        else:
+                            code +="\n"+ "\n".join(codes[-1]["content"].split("\n"))
+            else:
+                code = codes[-1]["content"]
+            
+            if return_full_generated_code:
+                return code, response_full
+            else:
+                return code
+        else:
+            return None        
+
+    def generate_structured_content(self, 
+                                prompt, 
+                                template, 
+                                single_shot=False, 
+                                output_format="yaml"):
+        """
+        Generate structured content (YAML/JSON) either in single-shot or step-by-step mode.
+        
+        Args:
+            prompt (str): The main prompt describing what to generate
+            template (dict): Dictionary containing the structure and field-specific prompts
+            single_shot (bool): If True, generates all content at once. If False, generates field by field
+            output_format (str): "yaml" or "json"
+        
+        Returns:
+            dict: Contains both the structured data and formatted string
+        """
+        
+        # Initialize the output dictionary with default values
+        output_data = {}
+        for field, field_info in template.items():
+            output_data[field] = field_info.get("default", "")
+        
+        if single_shot:
+            # Generate all content at once for powerful LLMs
+            full_prompt = f"""Generate {output_format.upper()} content for: {prompt}
+Use this structure:
+{output_data}
+"""
+            response = self.generate_code(full_prompt, callback=self.sink, accept_all_if_no_code_tags_is_present=True)
+            # Parse the response based on format
+            if output_format == "yaml":
+                import yaml
+                try:
+                    cleaned_response = response.replace("```yaml", "").replace("```", "").strip()
+                    output_data = yaml.safe_load(cleaned_response)
+                except yaml.YAMLError:
+                    # If parsing fails, fall back to step-by-step
+                    single_shot = False
+            elif output_format == "json":
+                import json
+                try:
+                    cleaned_response = response.replace("```json", "").replace("```", "").strip()
+                    output_data = json.loads(cleaned_response)
+                except json.JSONDecodeError:
+                    # If parsing fails, fall back to step-by-step
+                    single_shot = False
+        
+        if not single_shot:
+            # Generate each field individually
+            for field, field_info in template.items():
+                if "prompt" in field_info:
+                    field_prompt = field_info["prompt"].format(main_prompt=prompt)
+                    response = self.generate_code(field_prompt, callback=self.sink, accept_all_if_no_code_tags_is_present=True )
+                    # Clean up the response
+                    cleaned_response = response.strip()
+                    # Apply any field-specific processing
+                    if "processor" in field_info:
+                        cleaned_response = field_info["processor"](cleaned_response)
+                    output_data[field] = cleaned_response
+        
+        # Format the output string
+        if output_format == "yaml":
+            formatted_string = ""
+            for key, value in output_data.items():
+                if isinstance(value, str) and ("\n" in value or len(value) > 40):
+                    v = value.replace('\n', '\n    ')
+                    formatted_string += f"{key}: |\n    {v}\n"
+                else:
+                    formatted_string += f"{key}: {value}\n"
+        else:  # json
+            formatted_string = json.dumps(output_data, indent=2)
+        
+        return {
+            "data": output_data,
+            "formatted_string": formatted_string
+        }
             
     def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, AIPersonality| None], bool]=None, context_details:dict=None, client:Client=None):
         """
@@ -2922,28 +3153,84 @@ class APScript(StateMachine):
             prompt_parts[sacrifice_id] = sacrifice_text
             return self.separator_template.join([s for s in prompt_parts if s!=""])
     # ================================================= Sending commands to ui ===========================================
-    def add_collapsible_entry(self, title, content, subtitle="", open_by_default=False):
+    def add_collapsible_entry(self, title, content, subtitle="", open_by_default=False, icon=None, type="default"):
+        """
+        Creates a collapsible entry with enhanced styling and animations.
+        
+        Args:
+            title (str): The main title of the collapsible
+            content (str): The content to be displayed when expanded
+            subtitle (str): Optional subtitle text
+            open_by_default (bool): Whether the collapsible should be open by default
+            icon (str): Optional custom icon SVG string
+            type (str): Type of collapsible ('default', 'success', 'warning', 'error', 'info')
+        
+        Returns:
+            str: HTML string for the collapsible element
+        """
+        # Color schemes for different types
+        color_schemes = {
+            "default": "border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:bg-gray-750",
+            "success": "border-green-200 bg-green-50 hover:bg-green-100 dark:border-green-700 dark:bg-green-900/20 dark:hover:bg-green-900/30",
+            "warning": "border-yellow-200 bg-yellow-50 hover:bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-900/20 dark:hover:bg-yellow-900/30",
+            "error": "border-red-200 bg-red-50 hover:bg-red-100 dark:border-red-700 dark:bg-red-900/20 dark:hover:bg-red-900/30",
+            "info": "border-blue-200 bg-blue-50 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-900/20 dark:hover:bg-blue-900/30"
+        }
+        
+        # Default arrow icon if no custom icon is provided
+        default_icon = '''
+<svg class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-300 transform group-open:rotate-90" 
+xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" 
+d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" 
+clip-rule="evenodd" />
+</svg>
+        '''
+        
+        icon_html = icon if icon else default_icon
+        color_scheme = color_schemes.get(type, color_schemes["default"])
         open_attr = 'open' if open_by_default else ''
+        
         return "\n".join([
-            f'<details class="w-full rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800 mb-4 transition-all duration-300 ease-in-out hover:shadow-md focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400" {open_attr}>',
-            f'    <summary class="flex items-center justify-between p-4 cursor-pointer select-none transition-all duration-300 ease-in-out">',
-            f'        <div class="flex items-center space-x-3">',
-            f'            <div class="flex-shrink-0">',
-            f'                <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-300 transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">',
-            f'                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />',
-            f'                </svg>',
-            f'            </div>',
-            f'            <div>',
-            f'                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>',
-            f'                <p class="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>',
-            f'            </div>',
-            f'        </div>',
-            f'    </summary>',
-            f'    <div class="px-4 pb-4 pt-2 text-gray-700 dark:text-gray-300 transition-all duration-300 ease-in-out max-h-0 overflow-hidden group-open:max-h-40">',
-            f'      <p>{content}</p>',
-            f'    </div>',
-            f'</details>\n'
-        ])
+            f'''
+<details 
+class="group w-full rounded-xl border {color_scheme} shadow-sm mb-4 
+transition-all duration-300 ease-in-out hover:shadow-md 
+focus-within:ring-2 focus-within:ring-blue-500 dark:focus-within:ring-blue-400" 
+{open_attr}>
+<summary 
+class="flex items-center justify-between p-4 cursor-pointer select-none 
+transition-all duration-300 ease-in-out">
+<div class="flex items-center space-x-3 flex-grow">
+<div class="flex-shrink-0">
+{icon_html}
+</div>
+<div class="flex-grow">
+<h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+{title}
+</h3>
+{f'<p class="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>' if subtitle else ''}
+</div>
+</div>
+<div class="flex-shrink-0">
+<svg class="w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform duration-300 
+transform group-open:rotate-180" 
+xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+<path fill-rule="evenodd" 
+d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" 
+clip-rule="evenodd" />
+</svg>
+</div>
+</summary>
+<div class="px-4 pb-4 pt-2 text-gray-700 dark:text-gray-300 
+transition-all duration-300 ease-in-out">
+<div class="prose dark:prose-invert max-w-none">
+{content}
+</div>
+</div>
+</details>
+'''
+])
 
 
 
@@ -3450,29 +3737,35 @@ class APScript(StateMachine):
         
         return updated_content, True  # Section updated successfully
 
-    def extract_code_blocks(self, text: str) -> List[dict]:
+    def extract_code_blocks(self, text: str, return_remaining_text: bool = False) -> Union[List[dict], Tuple[List[dict], str]]:
         """
-        This function extracts code blocks from a given text.
+        This function extracts code blocks from a given text and optionally returns the text without code blocks.
 
         Parameters:
         text (str): The text from which to extract code blocks. Code blocks are identified by triple backticks (```).
+        return_remaining_text (bool): If True, also returns the text with code blocks removed.
 
         Returns:
-        List[dict]: A list of dictionaries where each dictionary represents a code block and contains the following keys:
-            - 'index' (int): The index of the code block in the text.
-            - 'file_name' (str): The name of the file extracted from the preceding line, if available.
-            - 'content' (str): The content of the code block.
-            - 'type' (str): The type of the code block. If the code block starts with a language specifier (like 'python' or 'java'), this field will contain that specifier. Otherwise, it will be set to 'language-specific'.
-            - 'is_complete' (bool): True if the block has a closing tag, False otherwise.
-
-        Note:
-        The function assumes that the number of triple backticks in the text is even.
-        If the number of triple backticks is odd, it will consider the rest of the text as the last code block.
+        Union[List[dict], Tuple[List[dict], str]]: 
+            - If return_remaining_text is False: Returns only the list of code block dictionaries
+            - If return_remaining_text is True: Returns a tuple containing:
+                * List of code block dictionaries
+                * String containing the text with all code blocks removed
+            
+        Each code block dictionary contains:
+            - 'index' (int): The index of the code block in the text
+            - 'file_name' (str): The name of the file extracted from the preceding line, if available
+            - 'content' (str): The content of the code block
+            - 'type' (str): The type of the code block
+            - 'is_complete' (bool): True if the block has a closing tag, False otherwise
         """        
         remaining = text
         bloc_index = 0
         first_index = 0
         indices = []
+        text_without_blocks = text
+        
+        # Find all code block delimiters
         while len(remaining) > 0:
             try:
                 index = remaining.index("```")
@@ -3488,16 +3781,27 @@ class APScript(StateMachine):
 
         code_blocks = []
         is_start = True
+        
+        # Process code blocks and build text without blocks if requested
+        if return_remaining_text:
+            text_parts = []
+            last_end = 0
+            
         for index, code_delimiter_position in enumerate(indices):
-            block_infos = {
-                'index': index,
-                'file_name': "",
-                'section': "",
-                'content': "",
-                'type': "",
-                'is_complete': False
-            }
             if is_start:
+                block_infos = {
+                    'index': len(code_blocks),
+                    'file_name': "",
+                    'section': "",
+                    'content': "",
+                    'type': "",
+                    'is_complete': False
+                }
+                
+                # Store text before code block if returning remaining text
+                if return_remaining_text:
+                    text_parts.append(text[last_end:code_delimiter_position].strip())
+                
                 # Check the preceding line for file name
                 preceding_text = text[:code_delimiter_position].strip().splitlines()
                 if preceding_text:
@@ -3526,6 +3830,7 @@ class APScript(StateMachine):
                     if '{' in sub_text[:next_index]:
                         next_index = 0
                     start_pos = next_index
+                    
                     if code_delimiter_position + 3 < len(text) and text[code_delimiter_position + 3] in ["\n", " ", "\t"]:
                         block_infos["type"] = 'language-specific'
                     else:
@@ -3539,16 +3844,31 @@ class APScript(StateMachine):
                         else:
                             block_infos["content"] = sub_text[start_pos:next_pos].strip()
                             block_infos["is_complete"] = False
+                        
+                        if return_remaining_text:
+                            last_end = indices[index + 1] + 3
                     else:
                         block_infos["content"] = sub_text[start_pos:].strip()
                         block_infos["is_complete"] = False
+                        
+                        if return_remaining_text:
+                            last_end = len(text)
+                    
                     code_blocks.append(block_infos)
                 is_start = False
             else:
                 is_start = True
-                continue
-
+                
+        if return_remaining_text:
+            # Add any remaining text after the last code block
+            if last_end < len(text):
+                text_parts.append(text[last_end:].strip())
+            # Join all non-code parts with newlines
+            text_without_blocks = '\n'.join(filter(None, text_parts))
+            return code_blocks, text_without_blocks
+            
         return code_blocks
+
 
     def build_and_execute_python_code(self,context, instructions, execution_function_signature, extra_imports=""):
         start_header_id_template    = self.config.start_header_id_template
@@ -3984,9 +4304,9 @@ class APScript(StateMachine):
             self.print_prompt("Generated", generated_text)
 
         # Extract the function calls from the generated text.
-        function_calls = self.extract_function_calls_as_json(generated_text)
+        function_calls, text_without_code = self.extract_function_calls_as_json(generated_text)
 
-        return generated_text, function_calls
+        return generated_text, function_calls, text_without_code
 
 
     def generate_with_function_calls_and_images(self, context_details: dict, images:list, functions: List[Dict[str, Any]], max_answer_length: Optional[int] = None, callback = None) -> List[Dict[str, Any]]:
@@ -4008,9 +4328,9 @@ class APScript(StateMachine):
         generated_text = self.fast_gen_with_images(upgraded_prompt, images, max_answer_length, callback=callback)
 
         # Extract the function calls from the generated text.
-        function_calls = self.extract_function_calls_as_json(generated_text)
+        function_calls, text_without_code = self.extract_function_calls_as_json(generated_text)
 
-        return generated_text, function_calls
+        return generated_text, function_calls, text_without_code
 
     def execute_function(self, code, function_definitions = None):
         function_call = json.loads(code)
@@ -4160,7 +4480,7 @@ class APScript(StateMachine):
         """
 
         # Extract markdown code blocks that contain JSON.
-        code_blocks = self.extract_code_blocks(text)
+        code_blocks, text_without_code = self.extract_code_blocks(text, True)
 
         # Filter out and parse JSON entries.
         function_calls = []
@@ -4178,7 +4498,7 @@ class APScript(StateMachine):
                     # If the content is not valid JSON, skip it.
                     continue
 
-        return function_calls
+        return function_calls, text_without_code
 
 
     def interact(
@@ -4207,15 +4527,15 @@ class APScript(StateMachine):
 
         final_output = ""
         if len(self.personality.image_files)>0:
-            out, function_calls = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
+            out, function_calls, text_without_code = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
         else:
-            out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
+            out, function_calls, text_without_code = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
         nested_function_calls = 0
         while len(function_calls)>0 and nested_function_calls<max_nested_function_calls:
             nested_function_calls += 1
             self.add_chunk_to_message_content("\n") 
             if hide_function_call:
-                self.set_message_content("") #Hide function 
+                self.set_message_content(text_without_code) #Hide function 
 
             if self.config.debug:
                 self.print_prompt("Function calls", json.dumps(function_calls, indent=4))
@@ -4229,10 +4549,11 @@ class APScript(StateMachine):
                     self.new_message("")
                 context_details["discussion_messages"] +=out
                 if len(self.personality.image_files)>0:
-                    out, function_calls = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
+                    out, function_calls, twc = self.generate_with_function_calls_and_images(context_details, self.personality.image_files, function_definitions, callback=callback)
                 else:
-                    out, function_calls = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
+                    out, function_calls, twc = self.generate_with_function_calls(context_details, function_definitions, callback=callback)
                 final_output += "\n" + out
+                text_without_code += twc
         else:
             final_output = out
         return final_output
