@@ -2624,6 +2624,9 @@ class APScript(StateMachine):
 Use this structure:
 {output_data}
 """
+            if self.config.debug and not self.personality.processor:
+                ASCIIColors.highlight(full_prompt,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)
+
             response = self.generate_code(full_prompt, callback=self.sink, accept_all_if_no_code_tags_is_present=True)
             # Parse the response based on format
             if output_format == "yaml":

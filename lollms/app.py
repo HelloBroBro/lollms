@@ -1448,7 +1448,7 @@ class LollmsApplication(LoLLMsCom):
             "is_continue":is_continue,
             "previous_chunk":previous_chunk
         }    
-        if self.config.debug:
+        if self.config.debug and not self.personality.processor:
             ASCIIColors.highlight(documentation,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)
         # Return the prepared query, original message content, and tokenized query
         return prompt_data, current_message.content, tokens, context_details, internet_search_infos                
