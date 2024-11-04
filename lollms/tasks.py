@@ -513,12 +513,8 @@ class TasksLibrary:
         return code_blocks
 
     def translate_conditionning(self, prompt, original_language, language):
-        start_header_id_template    = self.config.start_header_id_template
-        end_header_id_template      = self.config.end_header_id_template
-        system_message_template     = self.config.system_message_template
-        separator_template          = self.config.separator_template        
-        conditionning_translation_text = f"{start_header_id_template}{system_message_template}{end_header_id_template}Translate the following prompt to {language}.\nDo not translate any css or code, just the text and strings.{separator_template}{start_header_id_template}prompt{end_header_id_template}\n```{original_language}\n{prompt.replace(f'{start_header_id_template}','')}\n```{separator_template}{start_header_id_template}translation{end_header_id_template}\nHere is the translated prompt:\n```{language}\n"
-        cond_translation = f"```{language}\n"+self.fast_gen(conditionning_translation_text, temperature=0.1, callback=self.sink)
+        conditionning_translation_text = f"{self.lollms.system_full_header}Translate the following prompt to {language}.\n{self.lollms.separator_template}{self.lollms.ai_custom_header('prompt')}\n```{original_language}\n{prompt}\n```\nPut the answer inside a {language} markdown tag like this:\n```{language}\nTranslated text\n```\n{self.lollms.ai_custom_header('translation')}"
+        cond_translation = self.fast_gen(conditionning_translation_text, temperature=0.1, callback=self.sink)
         response = self.extract_code_blocks(cond_translation)
         if len(response)>0 and len(response[0]["content"])>0:
             conditionning = response[0]["content"]

@@ -31,7 +31,7 @@ import yaml
 import time
 from lollms.utilities import PackageManager
 import socket
-
+import shutil
 class LollmsApplication(LoLLMsCom):
     def __init__(
                     self, 
@@ -803,7 +803,11 @@ class LollmsApplication(LoLLMsCom):
 
     #languages:
     def get_personality_languages(self):
-        languages = []
+        languages = [self.personality.default_language]
+        persona_language_path = self.lollms_paths.personalities_zoo_path/self.personality.category/self.personality.name.replace(" ","_")/"languages"
+        for language_file in persona_language_path.glob("*.yaml"):
+            language_code = language_file.stem
+            languages.append(language_code)
         # Construire le chemin vers le dossier contenant les fichiers de langue pour la personnalité actuelle
         languages_dir = self.lollms_paths.personal_configuration_path / "personalities" / self.personality.name
         if self.personality.language:
@@ -822,10 +826,10 @@ class LollmsApplication(LoLLMsCom):
             else:
                 language_code = parts[-1]
             
-            if language_code != default_language:
+            if language_code != default_language and language_code not in languages:
                 languages.append(language_code)
         
-        return [default_language] + languages
+        return languages
 
 
 
@@ -833,24 +837,8 @@ class LollmsApplication(LoLLMsCom):
         if language is None or  language == "":
             return False
         language = language.lower().strip().split()[0]
-        # Build the conditionning text block
-        default_language = self.personality.language.lower().strip().split()[0]
+        self.personality.set_language(language)
 
-        if language!= default_language:
-            language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{language}.yaml"
-            if not language_path.exists():
-                self.ShowBlockingMessage(f"This is the first time this personality speaks {language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {language} out of the box")
-                language_path.parent.mkdir(exist_ok=True, parents=True)
-                # Translating
-                conditionning = self.tasks_library.translate_conditionning(self.personality._personality_conditioning, self.personality.language, language)
-                welcome_message = self.tasks_library.translate_message(self.personality.welcome_message, self.personality.language, language)
-                with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
-                    yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
-                self.HideBlockingMessage()
-            else:
-                with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
-                    language_pack = yaml.safe_load(f)
-                    conditionning = language_pack["conditionning"]
         self.config.current_language=language
         self.config.save_config()
         return True
@@ -934,11 +922,11 @@ class LollmsApplication(LoLLMsCom):
                 conditionning = self.tasks_library.translate_conditionning(self.personality._personality_conditioning, self.personality.language, current_language)
                 welcome_message = self.tasks_library.translate_message(self.personality.welcome_message, self.personality.language, current_language)
                 with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
-                    yaml.safe_dump({"conditionning":conditionning,"welcome_message":welcome_message}, f)
+                    yaml.safe_dump({"personality_conditioning":conditionning,"welcome_message":welcome_message}, f)
             else:
                 with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
                     language_pack = yaml.safe_load(f)
-                    conditionning = language_pack["conditionning"]
+                    conditionning = language_pack["personality_conditioning"]
         else:
             conditionning = self.personality._personality_conditioning
 
