@@ -61,6 +61,68 @@ def list_personalities(category:str):
         ASCIIColors.error(f"No personalities found. Using default one {ex}")
     return personalities
 
+
+@router.get("/get_personality")
+def get_personality():
+    ASCIIColors.yellow("Getting current personality")
+    personality = lollmsElfServer.personality
+
+    real_assets_path = lollmsElfServer.lollms_paths.personalities_zoo_path / personality.category / personality.personality_folder_name / 'assets'
+    assets_path = Path("personalities") / personality.category / personality.personality_folder_name / 'assets'
+    gif_logo_path = assets_path / 'logo.gif'
+    webp_logo_path = assets_path / 'logo.webp'
+    png_logo_path = assets_path / 'logo.png'
+    jpg_logo_path = assets_path / 'logo.jpg'
+    jpeg_logo_path = assets_path / 'logo.jpeg'
+    svg_logo_path = assets_path / 'logo.svg'
+    bmp_logo_path = assets_path / 'logo.bmp'
+
+    gif_logo_path_ = real_assets_path / 'logo.gif'
+    webp_logo_path_ = real_assets_path / 'logo.webp'
+    png_logo_path_ = real_assets_path / 'logo.png'
+    jpg_logo_path_ = real_assets_path / 'logo.jpg'
+    jpeg_logo_path_ = real_assets_path / 'logo.jpeg'
+    svg_logo_path_ = real_assets_path / 'logo.svg'
+    bmp_logo_path_ = real_assets_path / 'logo.bmp'
+        
+    has_logo = png_logo_path.is_file() or gif_logo_path.is_file()
+    
+    if gif_logo_path_.exists():
+        avatar = str(gif_logo_path).replace("\\","/")
+    elif webp_logo_path_.exists():
+        avatar = str(webp_logo_path).replace("\\","/")
+    elif png_logo_path_.exists():
+        avatar = str(png_logo_path).replace("\\","/")
+    elif jpg_logo_path_.exists():
+        avatar = str(jpg_logo_path).replace("\\","/")
+    elif jpeg_logo_path_.exists():
+        avatar = str(jpeg_logo_path).replace("\\","/")
+    elif svg_logo_path_.exists():
+        avatar = str(svg_logo_path).replace("\\","/")
+    elif bmp_logo_path_.exists():
+        avatar = str(bmp_logo_path).replace("\\","/")
+    else:
+        avatar = ""    
+    personality = {
+        "folder":personality.personality_folder_name,
+        "has_scripts":personality.processor is not None,
+        "name":personality.name,
+        "description":personality.personality_description,
+        "disclaimer":personality.disclaimer,
+        "author":personality.author,
+        "language":personality.language,
+        "version":personality.version,
+        "creation_date":personality.creation_date,
+        "last_update_date":personality.last_update_date,
+        "installed":True,
+        "help":personality.help,
+        "commands":personality.commands,
+        "prompts_list":personality.prompts_list,
+        "avatar":avatar,
+        "has_logo":has_logo
+    }
+    return personality
+
 @router.get("/get_all_personalities")
 def get_all_personalities():
     ASCIIColors.yellow("Listing all personalities")
@@ -73,82 +135,142 @@ def get_all_personalities():
             personalities[cat if category_folder!=lollmsElfServer.lollms_paths.custom_personalities_path else "custom_personalities"] = []
             for personality_folder in category_folder.iterdir():
                 pers = personality_folder.stem
-                if personality_folder.is_dir() and not personality_folder.stem.startswith('.'):
-                    personality_info = {"folder":personality_folder.stem}
-                    config_path = personality_folder / 'config.yaml'
-                    if not config_path.exists():
-                        """
+                if lollmsElfServer.personality.personality_folder_name==pers:
+                    personality = lollmsElfServer.personality
+
+                    real_assets_path = lollmsElfServer.lollms_paths.personalities_zoo_path / personality.category / personality.personality_folder_name / 'assets'
+                    assets_path = Path("personalities") / personality.category / personality.personality_folder_name / 'assets'
+                    gif_logo_path = assets_path / 'logo.gif'
+                    webp_logo_path = assets_path / 'logo.webp'
+                    png_logo_path = assets_path / 'logo.png'
+                    jpg_logo_path = assets_path / 'logo.jpg'
+                    jpeg_logo_path = assets_path / 'logo.jpeg'
+                    svg_logo_path = assets_path / 'logo.svg'
+                    bmp_logo_path = assets_path / 'logo.bmp'
+
+                    gif_logo_path_ = real_assets_path / 'logo.gif'
+                    webp_logo_path_ = real_assets_path / 'logo.webp'
+                    png_logo_path_ = real_assets_path / 'logo.png'
+                    jpg_logo_path_ = real_assets_path / 'logo.jpg'
+                    jpeg_logo_path_ = real_assets_path / 'logo.jpeg'
+                    svg_logo_path_ = real_assets_path / 'logo.svg'
+                    bmp_logo_path_ = real_assets_path / 'logo.bmp'
+                        
+                    has_logo = png_logo_path.is_file() or gif_logo_path.is_file()
+                    
+                    if gif_logo_path_.exists():
+                        avatar = str(gif_logo_path).replace("\\","/")
+                    elif webp_logo_path_.exists():
+                        avatar = str(webp_logo_path).replace("\\","/")
+                    elif png_logo_path_.exists():
+                        avatar = str(png_logo_path).replace("\\","/")
+                    elif jpg_logo_path_.exists():
+                        avatar = str(jpg_logo_path).replace("\\","/")
+                    elif jpeg_logo_path_.exists():
+                        avatar = str(jpeg_logo_path).replace("\\","/")
+                    elif svg_logo_path_.exists():
+                        avatar = str(svg_logo_path).replace("\\","/")
+                    elif bmp_logo_path_.exists():
+                        avatar = str(bmp_logo_path).replace("\\","/")
+                    else:
+                        avatar = ""    
+                    personality = {
+                        "folder":personality.personality_folder_name,
+                        "has_scripts":personality.processor is not None,
+                        "name":personality.name,
+                        "description":personality.personality_description,
+                        "disclaimer":personality.disclaimer,
+                        "author":personality.author,
+                        "language":personality.language,
+                        "version":personality.version,
+                        "creation_date":personality.creation_date,
+                        "last_update_date":personality.last_update_date,
+                        "installed":True,
+                        "help":personality.help,
+                        "commands":personality.commands,
+                        "prompts_list":personality.prompts_list,
+                        "avatar":avatar,
+                        "has_logo":has_logo
+                    }
+                    personalities[cat if category_folder!=lollmsElfServer.lollms_paths.custom_personalities_path else "custom_personalities"].append(personality)
+                else:
+                    if personality_folder.is_dir() and not personality_folder.stem.startswith('.'):
+                        personality_info = {"folder":personality_folder.stem}
+                        config_path = personality_folder / 'config.yaml'
+                        if not config_path.exists():
+                            """
+                            try:
+                                shutil.rmtree(str(config_path.parent))
+                                ASCIIColors.warning(f"Deleted useless personality: {config_path.parent}")
+                            except Exception as ex:
+                                ASCIIColors.warning(f"Couldn't delete personality ({ex})")
+                            """
+                            continue                                    
                         try:
-                            shutil.rmtree(str(config_path.parent))
-                            ASCIIColors.warning(f"Deleted useless personality: {config_path.parent}")
-                        except Exception as ex:
-                            ASCIIColors.warning(f"Couldn't delete personality ({ex})")
-                        """
-                        continue                                    
-                    try:
-                        scripts_path = personality_folder / 'scripts'
-                        personality_info['has_scripts'] = scripts_path.exists()
-                        with open(config_path, "r", encoding="utf8") as config_file:
-                            config_data = yaml.load(config_file, Loader=yaml.FullLoader)
-                            personality_info['name'] = config_data.get('name',"No Name")
-                            personality_info['description'] = config_data.get('personality_description',"")
-                            personality_info['disclaimer'] = config_data.get('disclaimer',"")
-                            personality_info['author'] = config_data.get('author', 'ParisNeo')
-                            personality_info['version'] = config_data.get('version', '1.0.0')
-                            personality_info['creation_date'] = config_data.get("creation_date",None)
-                            personality_info['last_update_date'] = config_data.get("last_update_date",None)
-                            personality_info['installed'] = (lollmsElfServer.lollms_paths.personal_configuration_path/f"personality_{personality_folder.stem}.yaml").exists() or personality_info['has_scripts']
-                            personality_info['help'] = config_data.get('help', '')
-                            personality_info['commands'] = config_data.get('commands', '')
-                            personality_info['prompts_list'] = config_data.get('prompts_list', [])
-                        languages_path = personality_folder/ 'languages'
+                            scripts_path = personality_folder / 'scripts'
+                            personality_info['has_scripts'] = scripts_path.exists()
+                            with open(config_path, "r", encoding="utf8") as config_file:
+                                config_data = yaml.load(config_file, Loader=yaml.FullLoader)
+                                personality_info['name'] = config_data.get('name',"No Name")
+                                personality_info['description'] = config_data.get('personality_description',"")
+                                personality_info['disclaimer'] = config_data.get('disclaimer',"")
+                                personality_info['author'] = config_data.get('author', 'ParisNeo')
+                                personality_info['language'] = config_data.get('language', 'english')
+                                personality_info['version'] = config_data.get('version', '1.0.0')
+                                personality_info['creation_date'] = config_data.get("creation_date",None)
+                                personality_info['last_update_date'] = config_data.get("last_update_date",None)
+                                personality_info['installed'] = (lollmsElfServer.lollms_paths.personal_configuration_path/f"personality_{personality_folder.stem}.yaml").exists() or personality_info['has_scripts']
+                                personality_info['help'] = config_data.get('help', '')
+                                personality_info['commands'] = config_data.get('commands', '')
+                                personality_info['prompts_list'] = config_data.get('prompts_list', [])
+                            languages_path = personality_folder/ 'languages'
 
-                        real_assets_path = personality_folder/ 'assets'
-                        assets_path = Path("personalities") / cat / pers / 'assets'
-                        gif_logo_path = assets_path / 'logo.gif'
-                        webp_logo_path = assets_path / 'logo.webp'
-                        png_logo_path = assets_path / 'logo.png'
-                        jpg_logo_path = assets_path / 'logo.jpg'
-                        jpeg_logo_path = assets_path / 'logo.jpeg'
-                        svg_logo_path = assets_path / 'logo.svg'
-                        bmp_logo_path = assets_path / 'logo.bmp'
+                            real_assets_path = personality_folder/ 'assets'
+                            assets_path = Path("personalities") / cat / pers / 'assets'
+                            gif_logo_path = assets_path / 'logo.gif'
+                            webp_logo_path = assets_path / 'logo.webp'
+                            png_logo_path = assets_path / 'logo.png'
+                            jpg_logo_path = assets_path / 'logo.jpg'
+                            jpeg_logo_path = assets_path / 'logo.jpeg'
+                            svg_logo_path = assets_path / 'logo.svg'
+                            bmp_logo_path = assets_path / 'logo.bmp'
 
-                        gif_logo_path_ = real_assets_path / 'logo.gif'
-                        webp_logo_path_ = real_assets_path / 'logo.webp'
-                        png_logo_path_ = real_assets_path / 'logo.png'
-                        jpg_logo_path_ = real_assets_path / 'logo.jpg'
-                        jpeg_logo_path_ = real_assets_path / 'logo.jpeg'
-                        svg_logo_path_ = real_assets_path / 'logo.svg'
-                        bmp_logo_path_ = real_assets_path / 'logo.bmp'
+                            gif_logo_path_ = real_assets_path / 'logo.gif'
+                            webp_logo_path_ = real_assets_path / 'logo.webp'
+                            png_logo_path_ = real_assets_path / 'logo.png'
+                            jpg_logo_path_ = real_assets_path / 'logo.jpg'
+                            jpeg_logo_path_ = real_assets_path / 'logo.jpeg'
+                            svg_logo_path_ = real_assets_path / 'logo.svg'
+                            bmp_logo_path_ = real_assets_path / 'logo.bmp'
 
-                        if languages_path.exists():
-                            personality_info['languages']= [""]+[f.stem for f in languages_path.iterdir() if f.suffix==".yaml"]
-                        else:
-                            personality_info['languages']=None
+                            if languages_path.exists():
+                                personality_info['languages']= [""]+[f.stem for f in languages_path.iterdir() if f.suffix==".yaml"]
+                            else:
+                                personality_info['languages']=None
+                                
+                            personality_info['has_logo'] = png_logo_path.is_file() or gif_logo_path.is_file()
                             
-                        personality_info['has_logo'] = png_logo_path.is_file() or gif_logo_path.is_file()
-                        
-                        if gif_logo_path_.exists():
-                            personality_info['avatar'] = str(gif_logo_path).replace("\\","/")
-                        elif webp_logo_path_.exists():
-                            personality_info['avatar'] = str(webp_logo_path).replace("\\","/")
-                        elif png_logo_path_.exists():
-                            personality_info['avatar'] = str(png_logo_path).replace("\\","/")
-                        elif jpg_logo_path_.exists():
-                            personality_info['avatar'] = str(jpg_logo_path).replace("\\","/")
-                        elif jpeg_logo_path_.exists():
-                            personality_info['avatar'] = str(jpeg_logo_path).replace("\\","/")
-                        elif svg_logo_path_.exists():
-                            personality_info['avatar'] = str(svg_logo_path).replace("\\","/")
-                        elif bmp_logo_path_.exists():
-                            personality_info['avatar'] = str(bmp_logo_path).replace("\\","/")
-                        else:
-                            personality_info['avatar'] = ""
-                        
-                        personalities[cat if category_folder!=lollmsElfServer.lollms_paths.custom_personalities_path else "custom_personalities"].append(personality_info)
-                    except Exception as ex:
-                        ASCIIColors.warning(f"Couldn't load personality from {personality_folder} [{ex}]")
-                        trace_exception(ex)
+                            if gif_logo_path_.exists():
+                                personality_info['avatar'] = str(gif_logo_path).replace("\\","/")
+                            elif webp_logo_path_.exists():
+                                personality_info['avatar'] = str(webp_logo_path).replace("\\","/")
+                            elif png_logo_path_.exists():
+                                personality_info['avatar'] = str(png_logo_path).replace("\\","/")
+                            elif jpg_logo_path_.exists():
+                                personality_info['avatar'] = str(jpg_logo_path).replace("\\","/")
+                            elif jpeg_logo_path_.exists():
+                                personality_info['avatar'] = str(jpeg_logo_path).replace("\\","/")
+                            elif svg_logo_path_.exists():
+                                personality_info['avatar'] = str(svg_logo_path).replace("\\","/")
+                            elif bmp_logo_path_.exists():
+                                personality_info['avatar'] = str(bmp_logo_path).replace("\\","/")
+                            else:
+                                personality_info['avatar'] = ""
+                            
+                            personalities[cat if category_folder!=lollmsElfServer.lollms_paths.custom_personalities_path else "custom_personalities"].append(personality_info)
+                        except Exception as ex:
+                            ASCIIColors.warning(f"Couldn't load personality from {personality_folder} [{ex}]")
+                            trace_exception(ex)
     ASCIIColors.green("OK")
 
     return personalities
@@ -395,7 +517,6 @@ def mount_personality(data:PersonalityMountingInfos):
     print("- Mounting personality")
     category = sanitize_path(data.category)
     name = sanitize_path(data.folder)
-    language = data.language #.get('language', None)
     if category=="":
         return {"status":False, "error":"category must not be empty."}
 
@@ -407,8 +528,6 @@ def mount_personality(data:PersonalityMountingInfos):
     
     config_file = package_full_path / "config.yaml"
     if config_file.exists():
-        if language:
-            package_path += ":" + language
         """
         if package_path in lollmsElfServer.config["personalities"]:
             ASCIIColors.error("Can't mount exact same personality twice")
@@ -513,7 +632,7 @@ def unmount_personality(data:PersonalityMountingInfos):
         return {"status":False, "error":"category must not be empty."}
 
     try:
-        personality_id = f"{category}/{name}" if language is None or language=="" else f"{category}/{name}:{language}"
+        personality_id = f"{category}/{name}" if language is None or language=="" else f"{category}/{name}"
         index = lollmsElfServer.config["personalities"].index(personality_id)
         lollmsElfServer.config["personalities"].remove(personality_id)
         if lollmsElfServer.config["active_personality_id"]>=index:
@@ -540,7 +659,7 @@ def unmount_personality(data:PersonalityMountingInfos):
     except Exception as ex:
         trace_exception(ex)
         if language:
-            ASCIIColors.error(f"nok : Personality not found @ {category}/{name}:{language}")
+            ASCIIColors.error(f"nok : Personality not found @ {category}/{name}")
         else:
             ASCIIColors.error(f"nok : Personality not found @ {category}/{name}")
             

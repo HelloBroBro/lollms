@@ -52,6 +52,13 @@ class LollmsApplication(LoLLMsCom):
         super().__init__(sio)
         self.app_name                   = app_name
         self.config                     = config
+        ASCIIColors.warning(f"Configuration fix ")
+        try:
+            config.personalities = [p.split(":")[0] for p in config.personalities]
+            config.save_config()
+        except Exception as ex:
+            trace_exception(ex)
+
         self.lollms_paths               = lollms_paths
 
         # TODO : implement
@@ -691,10 +698,7 @@ class LollmsApplication(LoLLMsCom):
                 self.n_cond_tk = len(self.cond_tk)
                 ASCIIColors.success(f"Personality  {personality.name} mounted successfully")
             else:
-                if personality.selected_language is not None:
-                    ASCIIColors.success(f"Personality  {personality.name} : {personality.selected_language} mounted successfully but no model is selected")
-                else:
-                    ASCIIColors.success(f"Personality  {personality.name} mounted successfully but no model is selected")
+                ASCIIColors.success(f"Personality  {personality.name} mounted successfully but no model is selected")
         except Exception as ex:
             ASCIIColors.error(f"Couldn't load personality. Please verify your configuration file at {self.lollms_paths.personal_configuration_path} or use the next menu to select a valid personality")
             ASCIIColors.error(f"Binding returned this exception : {ex}")
@@ -913,7 +917,7 @@ class LollmsApplication(LoLLMsCom):
         default_language = self.personality.language.lower().strip().split()[0]
         current_language = self.config.current_language.lower().strip().split()[0]
 
-        if self.config.current_language and  current_language!= default_language:
+        if current_language and  current_language!= self.personality.language:
             language_path = self.lollms_paths.personal_configuration_path/"personalities"/self.personality.name/f"languages_{current_language}.yaml"
             if not language_path.exists():
                 self.info(f"This is the first time this personality speaks {current_language}\nLollms is reconditionning the persona in that language.\nThis will be done just once. Next time, the personality will speak {current_language} out of the box")
@@ -926,7 +930,7 @@ class LollmsApplication(LoLLMsCom):
             else:
                 with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
                     language_pack = yaml.safe_load(f)
-                    conditionning = language_pack["personality_conditioning"]
+                    conditionning = language_pack.get("personality_conditioning", language_pack.get("conditionning", self.personality.personality_conditioning))
         else:
             conditionning = self.personality._personality_conditioning
 

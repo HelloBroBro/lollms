@@ -342,7 +342,7 @@ class MainMenu(Menu):
                     choice = self.show_menu(languages)
                     if 1 <= choice <= len(languages):
                         language = languages[choice - 1]
-                        self.lollms_app.config["personalities"].append(f"{category}/{name}:{language}")
+                        self.lollms_app.config["personalities"].append(f"{category}/{name}")
                     else:
                         print("Invalid choice!")
                 else:

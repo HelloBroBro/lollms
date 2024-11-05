@@ -1094,6 +1094,7 @@ Use this structure:
         # Load parameters from the configuration file
         self._version = config.get("version", self._version)
         self._author = config.get("author", self._author)
+        self._language = config.get("language", self._author)
         self._name = config.get("name", self._name)
         self._creation_date = config.get("creation_date", self._creation_date)
         self._last_update_date = config.get("last_update_date", self._last_update_date)
@@ -1110,6 +1111,16 @@ Use this structure:
         self._personality_description = config.get("personality_description", self._personality_description)
         self._personality_conditioning = config.get("personality_conditioning", self._personality_conditioning)
         self._prompts_list = config.get("prompts_list", self._prompts_list)
+        try:
+            personality_folder = self.lollms_paths.personal_configuration_path/"personalities"/self.personality_folder_name
+            personality_folder.mkdir(exist_ok=True, parents=True)
+            custom_prompts = personality_folder/"custom_prompts.yaml"
+            if custom_prompts.exists():
+                with open(custom_prompts,"r") as f:
+                    data = yaml.safe_load(f)
+                    self._prompts_list.append(data["custom_prompts"])
+        except Exception as ex:
+            trace_exception(ex)
         self._welcome_message = config.get("welcome_message", self._welcome_message)
         self._include_welcome_message_in_discussion = config.get("include_welcome_message_in_discussion", self._include_welcome_message_in_discussion)
 
@@ -1129,12 +1140,58 @@ Use this structure:
         # Script parameters (for example keys to connect to search engine or any other usage)
         self._processor_cfg = config.get("processor_cfg", self._processor_cfg)
 
+    def add_prompt(self, prompt):
+        try:
+            personality_folder = self.lollms_paths.personal_configuration_path/"personalities"/self.personality_folder_name
+            personality_folder.mkdir(exist_ok=True, parents=True)
+            custom_prompts = personality_folder/"custom_prompts.yaml"
+            if custom_prompts.exists():
+                with open(custom_prompts,"r") as f:
+                    data = yaml.safe_load(f)
+                    data["custom_prompts"].append(prompt)
+            else:
+                data = {
+                    "custom_prompts":[prompt]
+                }                
+            with open(custom_prompts,"w") as f:
+                yaml.dump(data, f)
+        except Exception as ex:
+            trace_exception(ex)
+
+    def delete_prompt(self, prompt):
+        try:
+            personality_folder = self.lollms_paths.personal_configuration_path/"personalities"/self.personality_folder_name
+            personality_folder.mkdir(exist_ok=True, parents=True)
+            custom_prompts = personality_folder/"custom_prompts.yaml"
+            if custom_prompts.exists():
+                with open(custom_prompts,"r") as f:
+                    data = yaml.safe_load(f)
+                    index = data["custom_prompts"].index(prompt)
+                    if index>=0:
+                        del data["custom_prompts"][index]
+                with open(custom_prompts,"w") as f:
+                    yaml.dump(data, f)
+        except Exception as ex:
+            trace_exception(ex)
+
     def set_language(self, language):
+        if self.default_language==language:
+            package_path = self.personality_package_path
+
+            # Verify that there is at least a configuration file
+            config_file = package_path / "config.yaml"
+            if not config_file.exists():
+                raise ValueError(f"The provided folder {package_path} does not exist.")
+
+            with open(config_file, "r", encoding='utf-8') as f:
+                config = yaml.safe_load(f)
+            self.set_config(config)
+            return
         if self.language.lower().strip() and  self.language.lower().strip()!= language:
-            language_path = self.app.lollms_paths.personal_configuration_path/"personalities"/self.name/f"languages_{language}.yaml"
+            language_path = self.app.lollms_paths.personal_configuration_path/"personalities"/self.personality_folder_name/f"languages_{language}.yaml"
             if not language_path.exists():
                 #checking if there is already a translation in the personality folder
-                persona_language_path = self.lollms_paths.personalities_zoo_path/self.category/self.name.replace(" ","_")/"languages"/f"{language}.yaml"
+                persona_language_path = self.lollms_paths.personalities_zoo_path/self.category/self.personality_folder_name.replace(" ","_")/"languages"/f"{language}.yaml"
                 if persona_language_path.exists():
                     shutil.copy(persona_language_path, language_path)
                     with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
@@ -1152,16 +1209,27 @@ Use this structure:
                         config_file = package_path / "config.yaml"
                         if not config_file.exists():
                             raise ValueError(f"The provided folder {package_path} does not exist.")
-
+                        def string_constructor(loader, node):
+                            return yaml.loader.SafeLoader.construct_scalar(loader, node)
+                        # Sauvegardez le constructeur original
+                        original_constructor = yaml.loader.SafeLoader.yaml_constructors.get('tag:yaml.org,2002:timestamp')
+                        yaml.add_constructor('tag:yaml.org,2002:timestamp', string_constructor, yaml.loader.SafeLoader)
                         with open(config_file, "r", encoding='utf-8') as f:
-                            default_config = f.read()
-
+                            default_config = yaml.safe_load(f)
+                        # Restaurez le constructeur original
+                        if original_constructor:
+                            yaml.add_constructor('tag:yaml.org,2002:timestamp', original_constructor,  yaml.loader.SafeLoader)
+                        else:
+                            # Si aucun constructeur original n'était présent, supprimez simplement le constructeur personnalisé
+                            del  yaml.loader.SafeLoader.yaml_constructors['tag:yaml.org,2002:timestamp']
                         # Translating
-                        new_config = self.generate_code(f"Translate the following yaml file values to {language}.\n```yaml\n{default_config}```\n")
+                        new_config = self.generate_code(f"Translate the following json file values to {language}. Use double quotes for the keys and strings.  Do not translate the keys, just the values\n```json\n{default_config}```\n", max_continues=1)
+                        json_cfg = json.loads(new_config)
                         with open(language_path,"w",encoding="utf-8", errors="ignore") as f:
-                            f.write(new_config)
+                            yaml.dump(json_cfg, f)
                         with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
                             new_config = yaml.safe_load(f)
+                        new_config["category"] = self.category
                         self.set_config(new_config)                           
                         self.HideBlockingMessage()
 
@@ -1170,9 +1238,12 @@ Use this structure:
                         self.InfoMessage(f"Couldn't translate personality to {language}.\nThe model you are using may be unable to do this task. We'll switch to conditionning language insertion mode.")
 
             else:
-                with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
-                    config = yaml.safe_load(f)
-                self.set_config(config, False)        
+                try:
+                    with open(language_path,"r",encoding="utf-8", errors="ignore") as f:
+                        config = yaml.safe_load(f)
+                    self.set_config(config, False)        
+                except Exception as ex:
+                    trace_exception(ex)
         else:
             pass
 
@@ -1208,15 +1279,17 @@ Use this structure:
 
         self.set_config(config, True)
 
-        if config["language"]:         
-            default_language = config["language"].lower().strip().split()[0]
+        lang = config.get("language","english")
+
+        if lang:         
+            default_language = lang.lower().strip().split()[0]
         else:
             default_language = 'english'
             
-        current_language = self.config.current_language.lower().strip().split()[0]
+        current_language = self.selected_language.lower().strip().split()[0]
 
         if current_language and  current_language!= default_language:
-            language_path = self.app.lollms_paths.personal_configuration_path/"personalities"/config["name"]/f"languages_{current_language}.yaml"
+            language_path = self.app.lollms_paths.personal_configuration_path/"personalities"/self.personality_folder_name/f"languages_{current_language}.yaml"
             if not language_path.exists():
                 #checking if there is already a translation in the personality folder
                 persona_language_path = self.lollms_paths.personalities_zoo_path/self.category/self.name.replace(" ","_")/"languages"/f"{current_language}.yaml"
@@ -1436,12 +1509,15 @@ Use this structure:
                 if process:
                     if self.vectorizer is None:
                         if self.config.rag_vectorizer == "semantic":
+                            self.ShowBlockingMessage("Processing file\nPlease wait ...\nUsing semantic vectorizer")
                             from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
                             v = SemanticVectorizer(self.config.rag_vectorizer_model)
                         elif self.config.rag_vectorizer == "tfidf":
+                            self.ShowBlockingMessage("Processing file\nPlease wait ...\nUsing tfidf vectorizer")
                             from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
                             v = TFIDFVectorizer()
                         elif self.config.rag_vectorizer == "openai":
+                            self.ShowBlockingMessage("Processing file\nPlease wait ...\nUsing open ai vectorizer")
                             from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
                             v = OpenAIVectorizer()
 
@@ -1453,6 +1529,8 @@ Use this structure:
                                     overlap=self.config.rag_overlap
                                     )
                     data = TextDocumentsLoader.read_file(path)
+                    if self.config.debug:
+                        self.print_prompt(data)
                     self.vectorizer.add_document(path.stem, data, path, True)
                     self.vectorizer.build_index()
                     if callback is not None:
@@ -1461,8 +1539,10 @@ Use this structure:
                     return True
             except Exception as e:
                 trace_exception(e)
-                self.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {GenericDataLoader.get_supported_file_types()}",client_id=client.client_id)
+                self.InfoMessage(f"Unsupported file format or empty file.\nSupported formats are {TextDocumentsLoader.get_supported_file_types()}",client_id=client.client_id)
                 return False
+            
+
     def save_personality(self, package_path=None):
         """
         Save the personality parameters to a YAML configuration file.
@@ -1492,8 +1572,7 @@ Use this structure:
             "last_update_date": self._last_update_date,
             "user_name": self._user_name,
             "category": self._category,
-            "language": self._language,
-            "default_language": self._default_language,
+            "language": self._default_language,
             "supported_languages": self._supported_languages,
             "selected_language": self._selected_language,
             "ignore_discussion_documents_rag": self._ignore_discussion_documents_rag,
@@ -5143,13 +5222,7 @@ class PersonalityBuilder:
             if id>len(self.config["personalities"]):
                 id = len(self.config["personalities"])-1
 
-        if ":" in self.config["personalities"][id]:
-            elements = self.config["personalities"][id].split(":")
-            personality_folder = elements[0]
-            personality_language = elements[1]
-        else:
-            personality_folder = self.config["personalities"][id]
-            personality_language = None
+        personality_folder = self.config["personalities"][id]
 
         if len(self.config["personalities"][id].split("/"))==2:
             self.personality = AIPersonality(
@@ -5158,7 +5231,7 @@ class PersonalityBuilder:
                                             self.config,
                                             self.model,
                                             app=self.app,
-                                            selected_language=personality_language,
+                                            selected_language=self.config.current_language,
                                             installation_option=self.installation_option,
                                             callback=self.callback
                                         )
@@ -5170,7 +5243,7 @@ class PersonalityBuilder:
                                             self.model,
                                             app=self.app,
                                             is_relative_path=False,
-                                            selected_language=personality_language,
+                                            selected_language=self.config.current_language,
                                             installation_option=self.installation_option,
                                             callback=self.callback
                                         )
