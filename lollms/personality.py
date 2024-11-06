@@ -735,7 +735,7 @@ class AIPersonality:
                             code +="\n"+ "\n".join(codes[-1]["content"].split("\n")[:-1])
                         else:
                             code +="\n"+ "\n".join(codes[-1]["content"].split("\n"))
-                    max_continues += 1
+                    nb_continues += 1
             else:
                 code = codes[-1]["content"]
             
