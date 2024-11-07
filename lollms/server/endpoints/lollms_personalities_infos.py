@@ -137,9 +137,10 @@ def get_all_personalities():
                 pers = personality_folder.stem
                 if lollmsElfServer.personality.personality_folder_name==pers:
                     personality = lollmsElfServer.personality
-
-                    real_assets_path = lollmsElfServer.lollms_paths.personalities_zoo_path / personality.category / personality.personality_folder_name / 'assets'
-                    assets_path = Path("personalities") / personality.category / personality.personality_folder_name / 'assets'
+                    lollmsElfServer.lollms_paths.custom_personalities_path
+                    real_assets_path = lollmsElfServer.lollms_paths.personalities_zoo_path / personality.personality_folder_name / 'assets'
+                    category = personality.category if category_folder!=lollmsElfServer.lollms_paths.custom_personalities_path!=category_folder else "custom_personalities"
+                    assets_path = Path("personalities") / category / personality.personality_folder_name / 'assets'
                     gif_logo_path = assets_path / 'logo.gif'
                     webp_logo_path = assets_path / 'logo.webp'
                     png_logo_path = assets_path / 'logo.png'

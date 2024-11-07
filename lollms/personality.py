@@ -4240,7 +4240,7 @@ transition-all duration-300 ease-in-out">
                 bloc_index += 1
             except Exception as ex:
                 if bloc_index % 2 == 1:
-                    index = len(remaining)
+                    index = index+len(remaining)
                     indices.append(index)
                 remaining = ""
 
@@ -4303,12 +4303,13 @@ transition-all duration-300 ease-in-out">
 
                     if index + 1 < len(indices):
                         next_pos = indices[index + 1] - code_delimiter_position
-                        if next_pos - 3 < len(sub_text) and sub_text[next_pos - 3] == "`":
-                            block_infos["content"] = sub_text[start_pos:next_pos - 3].strip()
-                            block_infos["is_complete"] = True
-                        else:
-                            block_infos["content"] = sub_text[start_pos:next_pos].strip()
-                            block_infos["is_complete"] = False
+                        if next_pos - 3>0:
+                            if next_pos - 3 < len(sub_text) and sub_text[next_pos - 3] == "`":
+                                block_infos["content"] = sub_text[start_pos:next_pos - 3].strip()
+                                block_infos["is_complete"] = True
+                            else:
+                                block_infos["content"] = sub_text[start_pos:next_pos].strip()
+                                block_infos["is_complete"] = False
                         
                         if return_remaining_text:
                             last_end = indices[index + 1] + 3
