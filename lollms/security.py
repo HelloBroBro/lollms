@@ -338,23 +338,35 @@ if __name__=="__main__":
             print(f"Original: {path}, Sanitized: {sanitized}")
         except HTTPException as e:
             print(f"Original: {path}, Exception: {e.detail}")
-
 class MultipartBoundaryCheck(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if request.headers.get("content-type", "").startswith("multipart/form-data"):
-            boundary = request.headers.get("content-type").split("boundary=")[-1]
-            if len(boundary) > 70:  # Check header boundary
-                return JSONResponse(status_code=400, content={"detail": "Invalid boundary length in header"})
+            content_type = request.headers.get("content-type", "")
+            boundary_start = content_type.find("boundary=")
+            
+            if boundary_start == -1:
+                return JSONResponse(status_code=400, content={"detail": "Missing boundary in content-type header"})
+            
+            boundary = content_type[boundary_start + 9:]  # 9 is the length of "boundary="
+            
+            # Check header boundary
+            if len(boundary) > 70 or not self.is_valid_boundary(boundary):
+                return JSONResponse(status_code=400, content={"detail": "Invalid boundary in header"})
             
             # Read and check the request body
             body = await request.body()
-            body_str = body.decode()
+            body_str = body.decode(errors='ignore')
             
-            # Check for excessively long boundaries in the body
-            pattern = re.escape(f"--{boundary}") + r"-*"
-            matches = re.findall(pattern, body_str)
+            # Check for excessively long or invalid boundaries in the body
+            pattern = re.escape(f"--{boundary}") + r"(?:--)?$"
+            matches = re.findall(pattern, body_str, re.MULTILINE)
             for match in matches:
-                if len(match) > 74:  # 70 + 4 for '--' prefix and '--' suffix
-                    return JSONResponse(status_code=400, content={"detail": "Invalid boundary length in body"})
+                if len(match) > 74 or not self.is_valid_boundary(match[2:].rstrip('-')):
+                    return JSONResponse(status_code=400, content={"detail": "Invalid boundary in body"})
         
         return await call_next(request)
+
+    def is_valid_boundary(self, boundary):
+        # RFC 2046 states that the boundary should only contain these characters
+        valid_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'()+_,-./:=?")
+        return all(char in valid_chars for char in boundary)
