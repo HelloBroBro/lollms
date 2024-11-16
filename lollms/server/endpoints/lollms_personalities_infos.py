@@ -224,6 +224,15 @@ def get_all_personalities():
                                 personality_info['help'] = config_data.get('help', '')
                                 personality_info['commands'] = config_data.get('commands', '')
                                 personality_info['prompts_list'] = config_data.get('prompts_list', [])
+
+
+                            try:
+                                help_path = personality_folder / 'README.md'
+                                if help_path.exists():
+                                    personality_info['help']=help_path.read_text()
+                            except:
+                                pass
+
                             languages_path = personality_folder/ 'languages'
 
                             real_assets_path = personality_folder/ 'assets'

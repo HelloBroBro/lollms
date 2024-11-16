@@ -976,11 +976,14 @@ class LollmsApplication(LoLLMsCom):
                 if self.config.internet_activate_search_decision:
                     self.personality.step_start(f"Requesting if {self.personality.name} needs to search internet to answer the user")
                     q = f"{self.separator_template}".join([
-                        f"{self.start_header_id_template}{system_message_template}{self.end_header_id_template}",
-                        f"Answer the question with yes or no. Don't add any extra explanation.",
-                        f"{self.start_user_header_id_template}user{self.end_user_header_id_template}",
-                        f"Do you have enough information to give a satisfactory answer to {self.config.user_name}'s request without internet search?",
-                        "(If you do not know or you can't answer the question, return 0 (no)"
+                        f"{self.system_custom_header('discussion')}",
+                        f"{discussion[-2048:]}",  # Use the last 2048 characters of the discussion for context
+                        self.system_full_header,
+                        f"You are a sophisticated web search query builder. Your task is to help the user by crafting a precise and concise web search query based on their request.",
+                        f"Carefully read the discussion and generate a web search query that will retrieve the most relevant information to answer the last message from {self.config.user_name}.",
+                        f"Do not answer the prompt directly. Do not provide explanations or additional information.",
+                        f"{self.system_custom_header('current date')}{datetime.now()}",
+                        f"{self.ai_custom_header('websearch query')}"
                     ])
                     need = not self.personality.yes_no(q, discussion)
                     self.personality.step_end(f"Requesting if {self.personality.name} needs to search internet to answer the user")
@@ -990,12 +993,14 @@ class LollmsApplication(LoLLMsCom):
                 if need:
                     self.personality.step_start("Crafting internet search query")
                     q = f"{self.separator_template}".join([
-                        f"{self.start_header_id_template}discussion{self.end_header_id_template}",
-                        f"{discussion[-2048:]}{self.start_header_id_template}system{self.end_header_id_template}",
-                        f"Read the discussion and craft a web search query suited to recover needed information to reply to last {self.config.user_name} message.",
-                        f"Do not answer the prompt. Do not add explanations.",
-                        f"{self.start_header_id_template}current date{self.end_header_id_template}{datetime.now()}",
-                        f"{self.start_header_id_template}websearch query{self.end_header_id_template}"
+                        f"{self.system_custom_header('discussion')}",
+                        f"{discussion[-2048:]}",  # Use the last 2048 characters of the discussion for context
+                        self.system_full_header,
+                        f"You are a sophisticated web search query builder. Your task is to help the user by crafting a precise and concise web search query based on their request.",
+                        f"Carefully read the discussion and generate a web search query that will retrieve the most relevant information to answer the last message from {self.config.user_name}.",
+                        f"Do not answer the prompt directly. Do not provide explanations or additional information.",
+                        f"{self.system_custom_header('current date')}{datetime.now()}",
+                        f"{self.ai_custom_header('websearch query')}"
                     ])
                     query = self.personality.fast_gen(q, max_generation_size=256, show_progress=True, callback=self.personality.sink)
                     query = query.replace("\"","")
