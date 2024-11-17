@@ -14,7 +14,7 @@ from lollms.server.elf_server import LOLLMSElfServer
 from lollms.binding import BindingBuilder, InstallOption
 from ascii_colors import ASCIIColors
 from lollms.utilities import load_config, trace_exception, gc
-from lollms.security import sanitize_path_from_endpoint, sanitize_path
+from lollms.security import sanitize_path_from_endpoint, sanitize_path, check_access
 from lollms.security import check_access
 from pathlib import Path
 from typing import List, Any
@@ -29,6 +29,7 @@ class ReloadBindingParams(BaseModel):
     binding_name: str = Field(..., min_length=1, max_length=50)
 
 class BindingInstallParams(BaseModel):
+    client_id: str
     name: str = Field(..., min_length=1, max_length=50)
 
 
@@ -132,6 +133,7 @@ def install_binding(data:BindingInstallParams):
     Returns:
         dict: Status of operation.
     """
+    check_access(lollmsElfServer, data.client_id)
     sanitize_path_from_endpoint(data.name)    
     
     ASCIIColors.info(f"- Reinstalling binding {data.name}...")
@@ -160,6 +162,7 @@ def reinstall_binding(data:BindingInstallParams):
     Returns:
         dict: Status of operation.
     """    
+    check_access(lollmsElfServer, data.client_id)
     ASCIIColors.info(f"- Reinstalling binding {data.name}...")
     try:
         ASCIIColors.info("Unmounting binding and model")
@@ -191,6 +194,7 @@ def unInstall_binding(data:BindingInstallParams):
     Returns:
         dict: Status of operation.
     """    
+    check_access(lollmsElfServer, data.client_id)
     ASCIIColors.info(f"- Reinstalling binding {data.name}...")
     try:
         ASCIIColors.info("Unmounting binding and model")

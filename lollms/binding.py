@@ -176,7 +176,7 @@ class LLMBinding:
     def reference_model(self, path):
         path = Path(str(path).replace("\\","/"))
         model_name  = path.stem+".reference"
-        folder_path = self.searchModelFolder(model_name)/path.stem
+        folder_path = self.searchModelFolder(model_name)/(path.stem if path.suffix.lower()=="gguf" else path.name)
         model_full_path = (folder_path / model_name)
 
         # Check if file already exists in folder
