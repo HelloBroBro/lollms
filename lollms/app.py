@@ -239,6 +239,15 @@ class LollmsApplication(LoLLMsCom):
             trace_exception(ex)
             return False
         
+
+    def set_active_model(self, model):
+        print(f"New model active : {model.model_name}")
+        self.model = model
+        self.binding = model
+        self.config["binding_name"] = model.binding_folder_name
+        self.config["model_name"] = model.model_name
+
+                
     def add_discussion_to_skills_library(self, client: Client):
         end_header_id_template      = self.config.end_header_id_template
         separator_template          = self.config.separator_template

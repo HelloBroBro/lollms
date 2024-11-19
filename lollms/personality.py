@@ -437,7 +437,7 @@ class AIPersonality:
         """
         return self.multichoice_question(question, ["no","yes"], context, max_answer_length, conditionning=conditionning)>0
 
-    def multichoice_question(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="") -> int:
+    def multichoice_question(self, question: str, possible_answers:list, context:str = "", max_answer_length: int = 50, conditionning="", return_explanation=False) -> int:
         """
         Interprets a multi-choice question from a users response. This function expects only one choice as true. All other choices are considered false. If none are correct, returns -1.
 
@@ -479,7 +479,10 @@ class AIPersonality:
         selection = gen.strip().split()[0].replace(",","").replace(".","")
         self.print_prompt("Multi choice selection",prompt+gen)
         try:
-            return int(selection)
+            if not return_explanation:
+                return int(selection)
+            else:
+                return int(selection), gen
         except:
             ASCIIColors.cyan("Model failed to answer the question")
             return -1
