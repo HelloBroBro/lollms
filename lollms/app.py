@@ -211,13 +211,13 @@ class LollmsApplication(LoLLMsCom):
         model_name = parts[1]
         return binding, model_name
       
-    def select_model(self, binding_name, model_name):
+    def select_model(self, binding_name, model_name, destroy_previous_model=True):
         self.config["binding_name"] = binding_name
         self.config["model_name"] = model_name
         print(f"New binding selected : {binding_name}")
 
         try:
-            if self.binding:
+            if self.binding and destroy_previous_model:
                 self.binding.destroy_model()
             self.binding = None
             self.model = None
@@ -244,6 +244,10 @@ class LollmsApplication(LoLLMsCom):
         print(f"New model active : {model.model_name}")
         self.model = model
         self.binding = model
+        self.personality.model = model
+        for per in self.mounted_personalities:
+            if per is not None:
+                per.model = self.model
         self.config["binding_name"] = model.binding_folder_name
         self.config["model_name"] = model.model_name
 
@@ -703,9 +707,13 @@ class LollmsApplication(LoLLMsCom):
         try:
             personality = PersonalityBuilder(self.lollms_paths, self.config, self.model, self, callback=callback).build_personality(id)
             if personality.model is not None:
-                self.cond_tk = personality.model.tokenize(personality.personality_conditioning)
-                self.n_cond_tk = len(self.cond_tk)
-                ASCIIColors.success(f"Personality  {personality.name} mounted successfully")
+                try:
+                    self.cond_tk = personality.model.tokenize(personality.personality_conditioning)
+                    self.n_cond_tk = len(self.cond_tk)
+                    ASCIIColors.success(f"Personality  {personality.name} mounted successfully")
+                except:
+                    self.cond_tk = []      
+                    self.n_cond_tk = 0      
             else:
                 ASCIIColors.success(f"Personality  {personality.name} mounted successfully but no model is selected")
         except Exception as ex:
