@@ -1097,16 +1097,15 @@ Use this structure:
         # Load parameters from the configuration file
         self._version = config.get("version", self._version)
         self._author = config.get("author", self._author)
-        self._language = config.get("language", self._author)
+        self._language = config.get("language", self._language).lower()
         self._name = config.get("name", self._name)
         self._creation_date = config.get("creation_date", self._creation_date)
         self._last_update_date = config.get("last_update_date", self._last_update_date)
         
         self._user_name = config.get("user_name", self._user_name)
         self._category_desc = config.get("category", self._category)
-        self._language = config.get("language", self._language)
         if is_default_language:
-            self._default_language = config.get("language", self._language)
+            self._default_language = config.get("language", self._language).lower()
 
         self._ignore_discussion_documents_rag = config.get("ignore_discussion_documents_rag", self._ignore_discussion_documents_rag)
 
@@ -1282,7 +1281,7 @@ Use this structure:
 
         self.set_config(config, True)
 
-        lang = config.get("language","english")
+        lang = config.get("language","english").lower()
 
         if lang:         
             default_language = lang.lower().strip().split()[0]

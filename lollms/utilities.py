@@ -975,10 +975,10 @@ class PackageManager:
                     raise ImportError(f"Version {installed_version} is less than the required {min_version}.")
             return True
         except ImportError as ex:
-            print(f"Package '{package_name}' is not installed or version requirement not met. Error: {ex}")
+            ASCIIColors.error(f"\nPackage '{package_name}' is not installed or version requirement not met. Error: {ex}")
             return False
         except Exception as ex:
-            print(f"Error checking package: {ex}")
+            ASCIIColors.error(f"\nError checking package: {ex}")
             return False
 
     @staticmethod
