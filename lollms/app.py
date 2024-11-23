@@ -455,7 +455,7 @@ class LollmsApplication(LoLLMsCom):
                     self.tti = self.sd
                 else:
                     from lollms.services.tti.sd.lollms_sd import LollmsSD
-                    self.tti = LollmsSD(self)
+                    self.tti = LollmsSD(self, auto_sd_base_url = self.config.sd_base_url)
             elif self.config.active_tti_service == "dall-e":
                 from lollms.services.tti.dalle.lollms_dalle import LollmsDalle
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
@@ -563,7 +563,7 @@ class LollmsApplication(LoLLMsCom):
                     self.tti = self.sd
                 else:
                     from lollms.services.tti.sd.lollms_sd import LollmsSD
-                    self.tti = LollmsSD(self)
+                    self.tti = LollmsSD(self, auto_sd_base_url=self.config.sd_base_url)
             elif self.config.active_tti_service == "dall-e" and (self.tti is None or self.tti.name!="dall-e-2" or type(self.tti.name)!="dall-e-3"):
                 from lollms.services.tti.dalle.lollms_dalle import LollmsDalle
                 self.tti = LollmsDalle(self, self.config.dall_e_key)
