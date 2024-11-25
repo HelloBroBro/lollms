@@ -85,7 +85,7 @@ class LollmsGenerateRequest(BaseModel):
     prompt: str
     model_name: Optional[str] = None
     personality: Optional[int] = -1
-    n_predict: Optional[int] = 1024
+    n_predict: Optional[int] = None
     stream: bool = False
     temperature: float = 0.1
     top_k: Optional[int] = 50
@@ -131,7 +131,10 @@ async def lollms_generate(request: LollmsGenerateRequest):
         tokens = elf_server.model.tokenize(prompt)
         n_tokens = len(tokens)
         ASCIIColors.info(f"Prompt input size {n_tokens}")        
-        n_predict = min(min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict), request.n_predict) if request.n_predict>0 else min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict)
+        if request.n_predict is None:
+            n_predict = min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict if elf_server.config.max_n_predict else elf_server.config.ctx_size)
+        else:
+            n_predict = min(min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict if elf_server.config.max_n_predict else elf_server.config.ctx_size), request.n_predict) if request.n_predict>0 else min(elf_server.config.ctx_size-n_tokens-1,elf_server.config.max_n_predict if elf_server.config.max_n_predict else elf_server.config.ctx_size)
         stream = request.stream
         if elf_server.binding is not None:
             if stream:
@@ -491,7 +494,7 @@ async def v1_chat_completions(request: ChatGenerationRequest):
     try:
         reception_manager=RECEPTION_MANAGER()
         messages = request.messages
-        max_tokens = request.max_tokens if request.max_tokens>0 else elf_server.config.max_n_predict
+        max_tokens = request.max_tokens if request.max_tokens>0 else elf_server.config.max_n_predict if elf_server.config.max_n_predict else elf_server.config.ctx_size
         temperature = request.temperature if  elf_server.config.temperature else elf_server.config.temperature
         prompt = ""
         roles= False
@@ -633,7 +636,7 @@ async def ollama_chat_completion(request: ChatGenerationRequest):
     try:
         reception_manager=RECEPTION_MANAGER()
         messages = request.messages
-        max_tokens = request.max_tokens if request.max_tokens>0 else elf_server.config.max_n_predict
+        max_tokens = request.max_tokens if request.max_tokens>0 else elf_server.config.max_n_predict if elf_server.config.max_n_predict else elf_server.config.ctx_size
         temperature = request.temperature if  elf_server.config.temperature else elf_server.config.temperature
         prompt = ""
         roles= False
@@ -986,7 +989,7 @@ async def v1_completion(request: CompletionGenerationRequest):
     """
     try:
         text = request.prompt
-        n_predict = request.max_tokens if request.max_tokens>=0 else elf_server.config.max_n_predict
+        n_predict = request.max_tokens if request.max_tokens>=0 else elf_server.config.max_n_predict if elf_server.config.max_n_predict else elf_server.config.ctx_size
         temperature = request.temperature if request.temperature>=0 else elf_server.config.temperature
         # top_k = request.top_k if request.top_k>=0 else elf_server.config.top_k
         # top_p = request.top_p if request.top_p>=0 else elf_server.config.top_p

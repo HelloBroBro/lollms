@@ -1046,7 +1046,7 @@ Use this structure:
             self.print_prompt("gen",prompt)
 
         if max_size is None:
-            max_size = min(self.config.max_n_predict, self.config.ctx_size-len(self.model.tokenize(prompt)))
+            max_size = min(self.config.max_n_predict if self.config.max_n_predict else self.config.ctx_size-len(self.model.tokenize(prompt)), self.config.ctx_size-len(self.model.tokenize(prompt)))
 
         self.model.generate_with_images(
                                 prompt,
@@ -1071,7 +1071,7 @@ Use this structure:
         
         self.model.generate(
                                 prompt,
-                                max_size if max_size else min(self.config.ctx_size-ntokens,self.config.max_n_predict),
+                                max_size if max_size else min(self.config.ctx_size-ntokens,self.config.max_n_predict if self.config.max_n_predict else self.config.ctx_size-ntokens),
                                 partial(self.process, callback=callback, show_progress=show_progress),
                                 temperature=self.model_temperature if temperature is None else temperature,
                                 top_k=self.model_top_k if top_k is None else top_k,
@@ -3575,7 +3575,7 @@ Use this structure:
         
         if self.config.debug:
             nb_prompt_tokens = len(self.personality.model.tokenize(prompt))
-            nb_tokens = min(self.config.ctx_size - nb_prompt_tokens, self.config.max_n_predict)
+            nb_tokens = min(self.config.ctx_size - nb_prompt_tokens, self.config.max_n_predict if self.config.max_n_predict else self.config.ctx_size-nb_prompt_tokens)
             ASCIIColors.info(f"Prompt size : {nb_prompt_tokens}")
             ASCIIColors.info(f"Requested generation max size : {nb_tokens}")
 
@@ -4740,7 +4740,7 @@ transition-all duration-300 ease-in-out">
 
         out = self.fast_gen(full_prompt)
         nb_tokens = len(self.personality.model.tokenize(out))
-        if nb_tokens >= self.config.max_n_predict-1:
+        if nb_tokens >= (self.config.max_n_predict if self.config.max_n_predict else self.config.ctx_size)-1:
             out = out+self.fast_gen(full_prompt+out, callback=callback)
         if context_details["is_continue"]:
             out = context_details["previous_chunk"] + out
