@@ -50,34 +50,37 @@ def get_generation_status():
 # ----------------------------------- Generation -----------------------------------------
 class LollmsTokenizeRequest(BaseModel):
     prompt: str
+    return_named: bool = False
 class LollmsDeTokenizeRequest(BaseModel):
     tokens: List[int]
+    return_named: bool = False
 
 @router.post("/lollms_tokenize")
 async def lollms_tokenize(request: LollmsTokenizeRequest):
     try:
         tokens = elf_server.model.tokenize(request.prompt)
-        named_tokens=[]
-        for token in tokens:
-            detoken = elf_server.model.detokenize([token])
-            named_tokens.append([detoken,token])
-        tokens = elf_server.model.tokenize(request.prompt)
-        return {"status":True,"raw_tokens":tokens, "named_tokens":named_tokens}
+        if request.return_named:
+            named_tokens=[]
+            for token in tokens:
+                detoken = elf_server.model.detokenize([token])
+                named_tokens.append([detoken,token])
+            return named_tokens
+        else:
+            return tokens
     except Exception as ex:
         return {"status":False,"error":str(ex)}
 
 @router.post("/lollms_detokenize")
 async def lollms_detokenize(request: LollmsDeTokenizeRequest):
-    try:
-        text = elf_server.model.detokenize(request.tokens)
+    text = elf_server.model.detokenize(request.tokens)
+    if request.return_named:
         named_tokens=[]
         for token in request.tokens:
             detoken = elf_server.model.detokenize([token])
             named_tokens.append([detoken,token])
-        tokens = elf_server.model.tokenize(request.prompt)
-        return {"status":True,"raw_tokens":tokens, "named_tokens":named_tokens, "text":text}
-    except Exception as ex:
-        return {"status":False,"error":str(ex)}
+        return named_tokens
+    else:
+        return text
 
 class LollmsGenerateRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())

@@ -27,11 +27,11 @@ def open_and_fill_udio(song_description: str, lyrics: str) -> str:
     try:
         # Open the specified webpage
         webbrowser.open('https://udio.com')
-        time.sleep(4)  # Wait for the page to load
+        time.sleep(5)  # Wait for the page to load
 
         # Click the input field near the "Create" button
         # Adjust the x, y coordinates based on your screen resolution
-        pyautogui.click(x=500, y=110)
+        pyautogui.click(x=500, y=120)
 
         # Fill the song description field
         pyautogui.write(song_description)

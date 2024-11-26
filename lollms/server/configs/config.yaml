@@ -1,5 +1,9 @@
 # =================== Lord Of Large Language Multimodal Systems Configuration file =========================== 
-version: 130
+version: 141
+
+# video viewing and news recovering
+last_viewed_video: null
+
 binding_name: null
 model_name: null
 model_variant: null
@@ -47,7 +51,7 @@ use_continue_message: true
 
 seed: -1
 ctx_size: 4084
-max_n_predict: 4096
+max_n_predict: None
 min_n_predict: 1024
 temperature: 0.9
 top_k: 50
@@ -101,10 +105,11 @@ copy_to_clipboard_add_all_details: false
 
 # -------------------- Services global configurations --------------------------
 # Select the active test to speach, text to image and speach to text services
-active_tts_service: "None" # xtts (offline), openai_tts (API key required), elevenlabs_tts (API key required)
-active_tti_service: "None" # autosd (offline), dall-e (online)
+active_tts_service: "None" # xtts (offline), openai_tts (API key required), elevenlabs_tts, fish_tts (API key required)
+active_tti_service: "None" # autosd (offline), diffusers (offline), diffusers_client (online), dall-e (online), midjourney (online)
 active_stt_service: "None" # whisper (offline), asr (offline or online), openai_whiosper (API key required)
 active_ttm_service: "None" # musicgen (offline)
+active_ttv_service: "None" # cog_video_x, diffusers, lumalab (offline)
 # -------------------- Services --------------------------
 
 # ***************** STT *****************
@@ -163,10 +168,14 @@ openai_tts_voice: "alloy"
 
 
 elevenlabs_tts_key: ""
-elevenlabs_tts_model_id: "eleven_monolingual_v2"
+elevenlabs_tts_model_id: "eleven_turbo_v2_5"
 elevenlabs_tts_voice_stability: 0.5
 elevenlabs_tts_voice_boost: 0.5
 elevenlabs_tts_voice_id: EXAVITQu4vr4xnSDxMaL
+
+fish_tts_key: ""
+fish_tts_voice: "default"
+
 # ***************** TTI *****************
 
 use_negative_prompt: true
@@ -182,9 +191,13 @@ sd_base_url: http://localhost:7860
 enable_fooocus_service: false
 fooocus_base_url: http://localhost:7860
 
-# diffuser
+# diffusers
 diffusers_offloading_mode: sequential_cpu_offload # sequential_cpu_offload
-diffusers_model: PixArt-alpha/PixArt-Sigma-XL-2-1024-MS
+diffusers_model: v2ray/stable-diffusion-3-medium-diffusers
+
+# diffusers client
+diffusers_client_base_url: http://localhost:8593
+
 
 # Dall e service key
 dall_e_key: ""
@@ -204,6 +217,13 @@ comfyui_model: v1-5-pruned-emaonly.ckpt
 enable_motion_ctrl_service: false
 motion_ctrl_base_url: http://localhost:7861
 
+
+# ***************** TTV *****************
+cog_video_x_model: "THUDM/CogVideoX-5b"
+
+# lumalabs configuration
+lumalabs_key: ""
+
 # ***************** TTT *****************
 
 # ollama service
@@ -220,9 +240,21 @@ petals_device: cuda
 enable_lollms_service: false
 lollms_access_keys : [] # set a list of keys separated by coma to restrict access
 activate_lollms_server: true
+activate_lollms_rag_server: true
+activate_lollms_tts_server: true
+activate_lollms_stt_server: true
+activate_lollms_tti_server: true
+activate_lollms_itt_server: true
+activate_lollms_ttm_server: true
 activate_ollama_emulator: true
 activate_openai_emulator: true
 activate_mistralai_emulator: true
+
+use_smart_routing: false
+smart_routing_router_model : ""
+smart_routing_models_description : {}
+restore_model_after_smart_routing : false
+
 
 # elastic search service
 elastic_search_service: false
@@ -262,6 +294,9 @@ rag_preprocess_chunks: false #if true, an LLM will preprocess the content of the
 rag_activate_multi_hops: false #if true, we use multi hops algorithm to do multiple researches until the AI has enough data
 rag_min_nb_tokens_in_chunk: 10 #this removed any useless junk ith less than x tokens
 rag_max_n_hops: 3 #We set the maximum number of hop in multi hops rag
+
+rag_deactivate: false # if you have a large context model, you can activate this to use your document as a whole
+rag_vectorizer_openai_key: "" # The open ai key (if not provided, this will use the environment varaible OPENAI_API_KEY)
 
 contextual_summary: false #If activated this will completely replace the rag and instead will use contextual summary
 
