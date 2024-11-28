@@ -523,9 +523,13 @@ class LollmsSD(LollmsTTI):
 
     def saveImage(self, image:Image, save_folder=None):
         if save_folder is None:
-            save_folder = self.output_dir        
-        image_name = self.get_available_image_name(save_folder, self.wm)
-        image_path = os.path.join(save_folder, image_name)
+            save_folder = self.output_dir    
+        save_folder = Path(save_folder)
+        if save_folder.is_dir():
+            image_name = self.get_available_image_name(save_folder, self.wm)
+            image_path = os.path.join(save_folder, image_name)
+        else:
+            image_path = save_folder
         image.save(image_path)
         return image_path
 
