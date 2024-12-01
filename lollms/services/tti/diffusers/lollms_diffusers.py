@@ -124,9 +124,9 @@ class LollmsDiffusers(LollmsTTI):
         shared_folder = root_dir/"shared"
         self.diffusers_folder = shared_folder / "diffusers"
         self.output_dir = root_dir / "outputs/diffusers"
-        self.models_dir = self.diffusers_folder / "models"
+        self.tti_models_dir = self.diffusers_folder / "models"
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.tti_models_dir.mkdir(parents=True, exist_ok=True)
 
         ASCIIColors.red("")       
         ASCIIColors.red("   _           _ _                    _ _  __  __                          ")
@@ -148,32 +148,34 @@ class LollmsDiffusers(LollmsTTI):
         try:
             if "stable-diffusion-3" in app.config.diffusers_model:
                 from diffusers import StableDiffusion3Pipeline # AutoPipelineForImage2Image#PixArtSigmaPipeline
-                self.model = StableDiffusion3Pipeline.from_pretrained(
-                    app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.models_dir,
+                self.tti_model = StableDiffusion3Pipeline.from_pretrained(
+                    app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.tti_models_dir,
                     use_safetensors=True,
                 )
+                self.iti_model = None
             else:
                 from diffusers import AutoPipelineForText2Image # AutoPipelineForImage2Image#PixArtSigmaPipeline
-                self.model = AutoPipelineForText2Image.from_pretrained(
-                    app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.models_dir,
+                self.tti_model = AutoPipelineForText2Image.from_pretrained(
+                    app.config.diffusers_model, torch_dtype=torch.float16, cache_dir=self.tti_models_dir,
                     use_safetensors=True,
                 )
+                self.iti_model = None
             
             # AutoPipelineForText2Image
-            # self.model = StableDiffusionPipeline.from_pretrained(
-            #     "CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16, cache_dir=self.models_dir,
+            # self.tti_model = StableDiffusionPipeline.from_pretrained(
+            #     "CompVis/stable-diffusion-v1-4", torch_dtype=torch.float16, cache_dir=self.tti_models_dir,
             #     use_safetensors=True,
             # ) # app.config.diffusers_model
             # Enable memory optimizations.
             try:
                 if app.config.diffusers_offloading_mode=="sequential_cpu_offload":
-                    self.model.enable_sequential_cpu_offload()
+                    self.tti_model.enable_sequential_cpu_offload()
                 elif app.coinfig.diffusers_offloading_mode=="model_cpu_offload":
-                    self.model.enable_model_cpu_offload()
+                    self.tti_model.enable_model_cpu_offload()
             except:
                 pass
         except Exception as ex:
-            self.model= None
+            self.tti_model= None
             trace_exception(ex)
     @staticmethod
     def verify(app:LollmsApplication):
@@ -236,7 +238,7 @@ class LollmsDiffusers(LollmsTTI):
         if sampler_name!="":
             sc = self.get_scheduler_by_name(sampler_name)
             if sc:
-                self.model.scheduler = sc
+                self.tti_model.scheduler = sc
         width = adjust_dimensions(int(width))
         height = adjust_dimensions(int(height))
         
@@ -266,15 +268,15 @@ class LollmsDiffusers(LollmsTTI):
         
         if seed!=-1:
             generator = torch.Generator("cuda").manual_seed(seed)
-            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
+            image = self.tti_model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
         else:
-            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
+            image = self.tti_model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
         # Save the image
         image.save(fn)
         return fn, {"prompt":positive_prompt, "negative_prompt":negative_prompt}
     
     def paint_from_images(self, positive_prompt: str, 
-                            images: List[str], 
+                            image: str, 
                             negative_prompt: str = "",
                             sampler_name="",
                             seed=-1,
@@ -287,18 +289,27 @@ class LollmsDiffusers(LollmsTTI):
                             output_path=None
                             ) -> List[Dict[str, str]]:
         import torch
+        from diffusers.utils import make_image_grid, load_image
+
+        if not self.iti_model:
+            from diffusers import AutoPipelineForImage2Image
+            
+            self.iti_model = AutoPipelineForImage2Image.from_pretrained(
+                self.app.config.diffusers_model, torch_dtype=torch.float16, variant="fp16", use_safetensors=True
+            )
         if sampler_name!="":
             sc = self.get_scheduler_by_name(sampler_name)
             if sc:
-                self.model.scheduler = sc
+                self.iti_model.scheduler = sc
 
+        img = load_image(image)
         if output_path is None:
             output_path = self.output_dir
         if seed!=-1:
             generator = torch.Generator("cuda").manual_seed(seed)
-            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
+            image = self.titi_model(positive_prompt,image=img, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps, generator=generator).images[0]
         else:
-            image = self.model(positive_prompt, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
+            image = self.iti_model(positive_prompt,image=img, negative_prompt=negative_prompt, height=height, width=width, guidance_scale=scale, num_inference_steps=steps).images[0]
         output_path = Path(output_path)
         fn = find_next_available_filename(output_path,"diff_img_")
         # Save the image

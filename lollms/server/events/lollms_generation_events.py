@@ -168,7 +168,7 @@ def add_events(sio:socketio):
 
                         full_discussion = personality.personality_conditioning + ''.join(full_discussion_blocks)
 
-                        def callback(text, message_type: MSG_TYPE, metadata:dict={}):
+                        def callback(text, message_type: MSG_OPERATION_TYPE, metadata:dict={}):
                             if message_type == MSG_OPERATION_TYPE.MSG_OPERATION_TYPE_ADD_CHUNK:
                                 lollmsElfServer.answer["full_text"] = lollmsElfServer.answer["full_text"] + text
                                 run_async(partial(lollmsElfServer.sio.emit,'text_chunk', {'chunk': text}, to=client_id))
@@ -189,7 +189,7 @@ def add_events(sio:socketio):
                             context_details = {
 
                             }
-                            generated_text = personality.processor.run_workflow(prompt, previous_discussion_text=personality.personality_conditioning+fd, callback=callback, context_details=context_details, client=client)
+                            generated_text = personality.processor.run_workflow(context_details, client=client, callback=callback)
                         else:
                             ASCIIColors.info("generating...")
                             generated_text = personality.model.generate(

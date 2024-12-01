@@ -1433,11 +1433,7 @@ class LollmsApplication(LoLLMsCom):
             ai_prefix = self.personality.ai_message_prefix
         else:
             ai_prefix = ""
-        # Build the final prompt by concatenating the conditionning and discussion messages
-        prompt_data = conditionning + internet_search_results + documentation + knowledge + user_description + discussion_messages + positive_boost + negative_boost + fun_mode + (self.separator_template + start_ai_header_id_template + ai_prefix + end_ai_header_id_template if not is_continue else '' if not self.config.use_continue_message else end_ai_header_id_template + "CONTINUE FROM HERE And do not open a new markdown code tag" + self.separator_template + start_ai_header_id_template + ai_prefix + end_ai_header_id_template)
 
-        # Tokenize the prompt data
-        tokens = self.model.tokenize(prompt_data)
 
         # Details
         context_details = {
@@ -1460,12 +1456,13 @@ class LollmsApplication(LoLLMsCom):
             "available_space":available_space,
             "skills":skills,
             "is_continue":is_continue,
-            "previous_chunk":previous_chunk
+            "previous_chunk":previous_chunk,
+            "prompt":current_message.content
         }    
         if self.config.debug and not self.personality.processor:
             ASCIIColors.highlight(documentation,"source_document_title", ASCIIColors.color_yellow, ASCIIColors.color_red, False)
         # Return the prepared query, original message content, and tokenized query
-        return prompt_data, current_message.content, tokens, context_details, internet_search_infos                
+        return context_details      
 
 
     # Properties ===============================================

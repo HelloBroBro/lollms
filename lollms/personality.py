@@ -249,6 +249,30 @@ class AIPersonality:
             # Open and store the personality
             self.load_personality()
 
+    def compute_n_predict(self, tokens):
+        return min(self.config.ctx_size-len(tokens)-1,self.config.max_n_predict if self.config.max_n_predict else self.config.ctx_size-len(tokens)-1)      
+
+    def build_context(self, context_details, is_continue=False, return_tokens=False):
+        # Build the final prompt by concatenating the conditionning and discussion messages
+        prompt_data = self.separator_template.join(
+        [
+            context_details["conditionning"],
+            context_details["internet_search_results"],
+            context_details["documentation"],
+            context_details["knowledge"],
+            context_details["user_description"],
+            context_details["discussion_messages"],
+            context_details["positive_boost"],
+            context_details["negative_boost"],
+            context_details["fun_mode"],
+            self.ai_full_header if not is_continue else '' if not self.config.use_continue_message else "CONTINUE FROM HERE And do not open a new markdown code tag." + self.separator_template + self.ai_full_header
+        ]
+        )
+        tokens = self.model.tokenize(prompt_data)
+        if return_tokens:
+            return prompt_data, tokens
+        else:
+            return prompt_data
 
 
     def InfoMessage(self, content, duration:int=4, client_id=None, verbose:bool=True):
@@ -3140,13 +3164,11 @@ Use this structure:
             "formatted_string": formatted_string
         }
             
-    def run_workflow(self, prompt:str, previous_discussion_text:str="", callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, AIPersonality| None], bool]=None, context_details:dict=None, client:Client=None):
+    def run_workflow(self,  context_details:dict=None, client:Client=None,  callback: Callable[[str | list | None, MSG_OPERATION_TYPE, str, AIPersonality| None], bool]=None):
         """
         This function generates code based on the given parameters.
 
         Args:
-            full_prompt (str): The full prompt for code generation.
-            prompt (str): The prompt for code generation.
             context_details (dict): A dictionary containing the following context details for code generation:
                 - conditionning (str): The conditioning information.
                 - documentation (str): The documentation information.
@@ -3158,14 +3180,12 @@ Use this structure:
                 - current_language (str): The force language information.
                 - fun_mode (str): The fun mode conditionning text
                 - ai_prefix (str): The AI prefix information.
-            n_predict (int): The number of predictions to generate.
             client_id: The client ID for code generation.
             callback (function, optional): The callback function for code generation.
 
         Returns:
             None
         """
-
         return None
 
 
