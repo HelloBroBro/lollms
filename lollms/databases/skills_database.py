@@ -124,38 +124,16 @@ class SkillsLibrary:
         conn.close()
         return res
 
-    def query_vector_db(self, query_, top_k=3, max_dist=1000):
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
+    def query_vector_db(self, query_, top_k=3, min_dist=0):
         # Use direct string concatenation for the MATCH expression.
         # Ensure text is safely escaped to avoid SQL injection.
-        query = "SELECT id, title, content FROM skills_library"
-        cursor.execute(query)
-        res = cursor.fetchall()
-        cursor.close()
-        conn.close()
         skills = []
         skill_titles = []        
-        if len(res)>0:
-            for entry in res:
-                self.vectorizer.add_document(entry[1],"Title:"+entry[1]+"\n"+entry[2])
-            self.vectorizer.build_index()
-            
-            chunks = self.vectorizer.search(query_, top_k)
-            for chunk in chunks:
-                if  chunk.distance<max_dist:
-                    skills.append(chunk.text)
-                    skill_titles.append(chunk.doc.title)
-                    # conn = sqlite3.connect(self.db_path)
-                    # cursor = conn.cursor()
-                    # Use direct string concatenation for the MATCH expression.
-                    # Ensure text is safely escaped to avoid SQL injection.
-                    #query = "SELECT content FROM skills_library WHERE id = ?"
-                    #cursor.execute(query, (chunk.chunk_id,))
-                    #res = cursor.fetchall()
-                    #skills.append(res[0])
-                    #cursor.close()
-                    #conn.close()
+        chunks = self.vectorizer.search(query_, top_k)
+        for chunk in chunks:
+            if  chunk.distance>min_dist:
+                skills.append(chunk.text)
+                skill_titles.append(chunk.doc.title)
             
         return skill_titles, skills
 

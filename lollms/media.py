@@ -17,6 +17,7 @@ from functools import partial
 import subprocess
 from collections import deque
 from scipy.signal import butter, lfilter
+import pipmaster as pm
 
 import os
 import threading
@@ -196,8 +197,10 @@ class RTCom:
         self.transcribed_lock = threading.Condition()
 
     def load_and_extract_features(self, file_path):
-        if not PackageManager.check_package_installed("librosa"):
-            PackageManager.install_package(librosa)
+
+        
+        if not pm.is_installed("librosa"):
+            pm.install("librosa")
         import librosa
         y, sr = librosa.load(file_path, sr=None)
         mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=13)
@@ -242,6 +245,8 @@ class RTCom:
         else:
             print(f"No match found. (distance: {distance}) 😢🤡")
             return False
+        
+
     def start_recording(self):
         self.recording = True
         self.stop_flag = False

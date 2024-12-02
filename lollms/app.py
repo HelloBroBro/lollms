@@ -31,7 +31,7 @@ import yaml
 import time
 from lollms.utilities import PackageManager
 import socket
-import shutil
+import json
 class LollmsApplication(LoLLMsCom):
     def __init__(
                     self, 
@@ -300,15 +300,16 @@ class LollmsApplication(LoLLMsCom):
             message_content += f"Rank {rank} - {sender}: {text}\n"
 
         return self.tasks_library.summarize_text(
-            message_content, 
+            message_content,
             "\n".join([
-                "Act as Skills library maker.",
-                "The objective is to find out important information from the discussion and store them as text that can be used in the future to remember those information.",
+                "Find out important information from the discussion and report them.",
                 "Format the output as sections if applicable:",
                 "Global context: Explain in a sentense or two the subject of the discussion",
                 "Interesting things (if applicable): If you find interesting information or something that was discovered or built in this discussion, list it here with enough details to be reproducible just by reading this text.",
                 "Code snippet (if applicable): If there are important code snippets, write them here in a markdown code tag.",
-                "Make the output easy to understand."
+                "Make the output easy to understand.",
+                "The objective is not to talk about the discussion but to store the important information for future usage. Do not report useless information.",
+                "Do not describe the discussion and focuse more on reporting the most important information from the discussion."
             ]),
             doc_name="discussion",
             callback=callback)
@@ -1251,14 +1252,26 @@ class LollmsApplication(LoLLMsCom):
                         if discussion is None:
                             discussion = self.recover_discussion(client_id)
                         self.personality.step_start("Building query")
-                        query = self.personality.fast_gen(f"{self.start_header_id_template}{system_message_template}{self.end_header_id_template}Your task is to carefully read the provided discussion and reformulate {self.config.user_name}'s request concisely. Return only the reformulated request without any additional explanations, commentary, or output.{self.separator_template}{self.start_header_id_template}discussion:\n{discussion[-2048:]}{self.separator_template}{self.start_header_id_template}search query: ", max_generation_size=256, show_progress=True, callback=self.personality.sink)
+                        query = self.personality.generate_code(f"""{self.system_full_header}
+Your task is to carefully read the provided discussion and reformulate {self.config.user_name}'s request concisely.
+The reformulation must be placed inside a json markdown tag like this:
+```json
+{{
+    "request": the reformulated request
+}}
+```
+{self.system_custom_header("discussion:")}
+{discussion[-2048:]}
+{self.system_custom_header("search query:")}""", callback=self.personality.sink)
+                        query_code = json.loads(query)
+                        query = query_code["request"]
                         self.personality.step_end("Building query")
                         self.personality.step(f"query: {query}")
                         # skills = self.skills_library.query_entry(query)
                         self.personality.step_start("Adding skills")
                         if self.config.debug:
                             ASCIIColors.info(f"Query : {query}")
-                        skill_titles, skills = self.skills_library.query_vector_db(query, top_k=3, max_dist=1000)#query_entry_fts(query)
+                        skill_titles, skills = self.skills_library.query_vector_db(query, top_k=3, min_dist=self.config.rag_min_correspondance)#query_entry_fts(query)
                         knowledge_infos={"titles":skill_titles,"contents":skills}
                         if len(skills)>0:
                             if knowledge=="":

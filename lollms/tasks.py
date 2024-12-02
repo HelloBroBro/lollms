@@ -599,7 +599,8 @@ class TasksLibrary:
         prev_len = len(tk)
         while len(tk)>max_summary_size:
             chunk_size = int(self.lollms.config.ctx_size*0.6)
-            document_chunks = DocumentDecomposer.decompose_document(text, chunk_size, 0, self.lollms.model.tokenize, self.lollms.model.detokenize, True)
+            tc = TextChunker(chunk_size, 0, None, self.lollms.model)
+            document_chunks = tc.get_text_chunks(text,Document("","","",0),True)
             text = self.summarize_chunks(
                                             document_chunks, 
                                             data_extraction_instruction, 
@@ -660,7 +661,7 @@ class TasksLibrary:
                                     f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
                                     f"The summary should extract required information from the current chunk to increment the previous summary.",
                                     f"Answer directly with the cumulative summary with no extra comments.",
-                                    f"{start_header_id_template}summary{end_header_id_template}",
+                                    f"{start_header_id_template}cumulative summary{end_header_id_template}",
                                     f"{answer_start}"
                                     ]),
                                     max_generation_size=max_generation_size,
@@ -672,8 +673,8 @@ class TasksLibrary:
                                     f"current chunk:",
                                     f"{chunk}",
                                     f"{start_header_id_template}{system_message_template}{end_header_id_template}{summary_instruction}",
-                                    f"Answer directly with the summary with no extra comments.",
-                                    f"{start_header_id_template}summary{end_header_id_template}",
+                                    f"Answer without any extra comments.",
+                                    f"{start_header_id_template}chunk summary{end_header_id_template}",
                                     f"{answer_start}"
                                     ]),
                                     max_generation_size=max_generation_size,
