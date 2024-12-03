@@ -5,11 +5,38 @@ import numpy as np
 from ascii_colors import ASCIIColors
 class SkillsLibrary:
         
-    def __init__(self, db_path, chunk_size:int=512, overlap:int=0, n_neighbors:int=5):
+    def __init__(self, db_path, chunk_size:int=512, overlap:int=0, n_neighbors:int=5, config=None):
         self.db_path =db_path
+        self.config = config
         self._initialize_db()
-        self.vectorizer = VectorDatabase(db_path, TFIDFVectorizer(), TikTokenTokenizer(),chunk_size, overlap, n_neighbors)
+        from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
+        self.config = config
+        if config is not None:
+            vectorizer = self.config.rag_vectorizer
+            if vectorizer == "semantic":
+                from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+                v = SemanticVectorizer(self.config.rag_vectorizer_model)
+            elif vectorizer == "tfidf":
+                from lollmsvectordb.lollms_vectorizers.tfidf_vectorizer import TFIDFVectorizer
+                v = TFIDFVectorizer()
+            elif vectorizer == "openai":
+                from lollmsvectordb.lollms_vectorizers.openai_vectorizer import OpenAIVectorizer
+                v = OpenAIVectorizer()
+        else:
+            from lollmsvectordb.lollms_vectorizers.semantic_vectorizer import SemanticVectorizer
+            v = SemanticVectorizer("BAAI/bge-m3")
+
+        self.vectorizer = VectorDatabase("", v, TikTokenTokenizer(),chunk_size, overlap, n_neighbors)
         ASCIIColors.green("Vecorizer ready")
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()        
+        cursor.execute("SELECT * FROM skills_library")
+        res = cursor.fetchall()
+        for entry in res:
+            self.vectorizer.add_document(entry[3], entry[4], "",True, category_id=entry[2])
+        self.vectorizer.build_index()    
+        cursor.close()
+        conn.close()
        
 
     def _initialize_db(self):
@@ -90,6 +117,8 @@ class SkillsLibrary:
         conn.commit()
         cursor.close()
         conn.close()
+        self.vectorizer.add_document(title, content, "",True)
+        self.vectorizer.build_index()
 
     def list_entries(self):
         conn = sqlite3.connect(self.db_path)
@@ -124,18 +153,20 @@ class SkillsLibrary:
         conn.close()
         return res
 
-    def query_vector_db(self, query_, top_k=3, min_dist=0):
+    def query_vector_db(self, query_, top_k=3, min_similarity=0):
         # Use direct string concatenation for the MATCH expression.
         # Ensure text is safely escaped to avoid SQL injection.
         skills = []
+        similarities = []
         skill_titles = []        
         chunks = self.vectorizer.search(query_, top_k)
         for chunk in chunks:
-            if  chunk.distance>min_dist:
+            if  1-chunk.distance>min_similarity:
                 skills.append(chunk.text)
+                similarities.append(1-chunk.distance)
                 skill_titles.append(chunk.doc.title)
             
-        return skill_titles, skills
+        return skill_titles, skills, similarities
 
     
     def dump(self):
@@ -231,6 +262,7 @@ class SkillsLibrary:
         conn.commit()
         cursor.close()
         conn.close()
+        self.vectorizer.remove_document_by_id(id)
 
     def export_entries(self, file_path):
         with open(file_path, 'w') as f:

@@ -1271,8 +1271,8 @@ The reformulation must be placed inside a json markdown tag like this:
                         self.personality.step_start("Adding skills")
                         if self.config.debug:
                             ASCIIColors.info(f"Query : {query}")
-                        skill_titles, skills = self.skills_library.query_vector_db(query, top_k=3, min_dist=self.config.rag_min_correspondance)#query_entry_fts(query)
-                        knowledge_infos={"titles":skill_titles,"contents":skills}
+                        skill_titles, skills, similarities = self.skills_library.query_vector_db(query, top_k=3, min_similarity=self.config.rag_min_correspondance)#query_entry_fts(query)
+                        knowledge_infos={"titles":skill_titles,"contents":skills, "similarities":similarities}
                         if len(skills)>0:
                             if knowledge=="":
                                 knowledge=f"{self.system_custom_header(knowledge)}\n"
@@ -1281,7 +1281,7 @@ The reformulation must be placed inside a json markdown tag like this:
                         self.personality.step_end("Adding skills")
                         self.personality.step_end("Querying skills library")
                     except Exception as ex:
-                        ASCIIColors.error(ex)
+                        trace_exception(ex)
                         self.warning("Couldn't add long term memory information to the context. Please verify the vector database")        # Add information about the user
                         self.personality.step_end("Adding skills")
                         self.personality.step_end("Querying skills library",False)
@@ -1467,7 +1467,7 @@ The reformulation must be placed inside a json markdown tag like this:
             "ai_prefix":ai_prefix,
             "extra":"",
             "available_space":available_space,
-            "skills":skills,
+            "skills":[{"title": title, "content":content, "similarity":similarity} for title, content, similarity in zip(skill_titles, skills, similarities)],
             "is_continue":is_continue,
             "previous_chunk":previous_chunk,
             "prompt":current_message.content
