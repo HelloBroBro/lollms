@@ -3041,7 +3041,10 @@ class APScript(StateMachine):
             else:
                 return code
         else:
-            return None
+            if return_full_generated_code:
+                return None, None
+            else:
+                return None
 
     def generate_text(self, prompt, images=[], max_size = None,  temperature = None, top_k = None, top_p=None, repeat_penalty=None, repeat_last_n=None, callback=None, debug=False, return_full_generated_code=False, accept_all_if_no_code_tags_is_present=False):
         response_full = ""

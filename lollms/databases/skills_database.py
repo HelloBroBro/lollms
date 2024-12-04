@@ -2,7 +2,7 @@ import sqlite3
 from lollmsvectordb import VectorDatabase, TFIDFVectorizer
 from lollmsvectordb.lollms_tokenizers.tiktoken_tokenizer import TikTokenTokenizer
 import numpy as np
-from ascii_colors import ASCIIColors
+from ascii_colors import ASCIIColors, trace_exception
 class SkillsLibrary:
         
     def __init__(self, db_path, chunk_size:int=512, overlap:int=0, n_neighbors:int=5, config=None):
@@ -32,12 +32,15 @@ class SkillsLibrary:
         cursor = conn.cursor()        
         cursor.execute("SELECT * FROM skills_library")
         res = cursor.fetchall()
-        for entry in res:
-            self.vectorizer.add_document(entry[3], entry[4], "",True, category_id=entry[2])
-        self.vectorizer.build_index()    
-        cursor.close()
-        conn.close()
-       
+        try:
+            for entry in res:
+                self.vectorizer.add_document(entry[3], entry[4], "",True, category_id=entry[2])
+            self.vectorizer.build_index()    
+            cursor.close()
+            conn.close()
+        except Exception as ex:
+            trace_exception(ex)
+                   
 
     def _initialize_db(self):
         conn = sqlite3.connect(self.db_path)
